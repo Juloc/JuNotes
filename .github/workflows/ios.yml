@@ -13,8 +13,8 @@ permissions:
 
 jobs:
   build:
-    # The newest macOS image that carries Xcode 27; adjust the label if GitHub renames it.
-    runs-on: macos-latest
+    # The runner image that carries Xcode 27 (Swift 6.4); macos-latest still has Xcode 26.
+    runs-on: xcode-27
     steps:
       - uses: actions/checkout@v4
       - name: Select the newest Xcode
