@@ -9,7 +9,12 @@ struct JuNotesApp: App {
         WindowGroup {
             RootView()
                 .environment(model)
-                .task { if Demo.isOn && Demo.wantsLandscape { DemoOrientation.landscape() } }
+                .task {
+                    guard Demo.isOn && Demo.wantsLandscape else { return }
+                    // The scene is not ready the instant the app starts.
+                    try? await Task.sleep(for: .seconds(1.5))
+                    DemoOrientation.landscape()
+                }
         }
     }
 }

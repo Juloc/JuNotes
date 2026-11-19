@@ -40,6 +40,8 @@ final class AppModel {
     /// Counts up when files arrived from the server, so pages that waited for their scan look again.
     var assetRevision = 0
     var sidebar: SidebarItem?
+    /// True while a notebook is open: the sidebar steps aside so the page gets the whole width.
+    var writing = false
     var settings: ServerSettings
 
     private let schoolCache: URL
