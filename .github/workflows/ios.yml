@@ -30,7 +30,7 @@ jobs:
         run: brew install xcodegen
       - name: Build unsigned IPA
         run: scripts/build-ipa.sh "$RUNNER_TEMP/ipa"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: JuNotes-unsigned-ipa
           path: ${{ runner.temp }}/ipa/JuNotes.ipa
@@ -50,7 +50,7 @@ jobs:
         run: brew install xcodegen
       - name: Run the app and take screenshots
         run: scripts/screenshots.sh "$RUNNER_TEMP/screenshots"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: JuNotes-screenshots
