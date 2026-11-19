@@ -24,16 +24,17 @@ namespace JuNotes.Backend.Backup
                 {
                     return;
                 }
-                catch (BackupFailedException error)
+                catch (Exception error) when (error is not OperationCanceledException)
                 {
-                    LogFailed(logger, error.Message);
+                    // Any failure, a full disk included, is logged and retried; an unhandled one would stop the whole server.
+                    LogFailed(logger, error);
                     due = time.GetUtcNow() + RetryAfterFailure;
                 }
             }
         }
 
-        [LoggerMessage(Level = LogLevel.Error, Message = "Nightly backup failed: {Message}")]
-        private static partial void LogFailed(ILogger logger, string message);
+        [LoggerMessage(Level = LogLevel.Error, Message = "Nightly backup failed")]
+        private static partial void LogFailed(ILogger logger, Exception exception);
 
         private DateTimeOffset NextNight() => BackupSchedule.NextRun(time.GetUtcNow(), backups.Options.Hour, time.LocalTimeZone);
     }

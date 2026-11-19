@@ -35,6 +35,10 @@ Betrieb mit Docker (Server und Postgres): `.env.example` nach `.env` kopieren, `
 `docker compose up -d`. Der Server hört auf `127.0.0.1:8098`; Backups liegen im Volume unter `/data/backups` (nachts um 3 Uhr,
 die neuesten 7 bleiben, dazu eines vor jeder Migration).
 
+Schule (alles optional): `School__TimetableIcsUrl` ist der iCal-Link des Stundenplans (in WebUntis unter „Stundenplan abonnieren“,
+`webcal://` geht auch), `School__NewsFeedUrl` ein RSS- oder Atom-Feed der Schul-Website. Der Server holt beides alle 30 Minuten
+und stellt es unter `/api/v1/school/calendar` und `/api/v1/school/news` bereit, ebenfalls mit dem Token.
+
 Server ohne Docker starten (legt die Datenbank bei Bedarf selbst an):
 
 ```bash

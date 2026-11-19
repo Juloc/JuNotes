@@ -2,6 +2,7 @@ using System.Reflection;
 using JuNotes.Backend.Backup;
 using JuNotes.Backend.Data.Sync;
 using JuNotes.Backend.Database;
+using JuNotes.Backend.School;
 using JuNotes.Backend.Service;
 using JuNotes.Workers;
 using Npgsql;
@@ -33,17 +34,19 @@ app.MapGet("/health/live", () => Results.Ok());
 app.MapGet("/health/ready", async (HealthService health, CancellationToken ct) => await health.IsReadyAsync(ct) ? Results.Ok() : Results.StatusCode(503));
 app.MapGet("/api/v1/status", () => Results.Json(new { name = "JuNotes", version = Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "0.0.0", api = 1 }));
 
-var sync = app.MapGroup("/api/v1/sync");
-sync.AddEndpointFilter(async (context, next) =>
+// Everything below needs the instance token; /api/v1/status above is the only open endpoint.
+var secured = app.MapGroup("/api/v1");
+secured.AddEndpointFilter(async (context, next) =>
 {
     var access = context.HttpContext.RequestServices.GetRequiredService<SyncAccess>();
     if (!access.IsConfigured)
     {
-        return Results.Problem("Sync is not set up: set Sync:Token (environment variable Sync__Token).", statusCode: 503);
+        return Results.Problem("The API is not set up: set Sync:Token (environment variable Sync__Token).", statusCode: 503);
     }
 
     return access.IsAuthorized(context.HttpContext.Request.Headers.Authorization) ? await next(context) : Results.Unauthorized();
 });
+var sync = secured.MapGroup("/sync");
 sync.MapPost("/push", async (PushRequest request, SyncService service, CancellationToken ct) =>
 {
     try
@@ -57,6 +60,18 @@ sync.MapPost("/push", async (PushRequest request, SyncService service, Cancellat
 });
 sync.MapGet("/info", (BackupService backup, TimeProvider time) => Results.Ok(new { serverTime = time.GetUtcNow(), lastBackupAt = backup.Latest()?.At }));
 sync.MapGet("/pull", async (long? since, int? limit, SyncService service, CancellationToken ct) => Results.Ok(await service.PullAsync(since ?? 0, limit ?? SyncService.MaxChanges, ct)));
+
+var schoolApi = secured.MapGroup("/school");
+schoolApi.MapGet("/status", (SchoolImportService import) => Results.Ok(import.Status));
+schoolApi.MapGet("/calendar", async (DateTimeOffset? from, DateTimeOffset? to, SchoolStore store, TimeProvider time, CancellationToken ct) =>
+{
+    var start = from ?? time.GetUtcNow().AddDays(-1);
+    var end = to ?? start.AddDays(14);
+    return end <= start || end - start > TimeSpan.FromDays(366)
+        ? Results.Problem("The range must be positive and at most a year.", statusCode: 400)
+        : Results.Ok(await store.EventsAsync(start, end, ct));
+});
+schoolApi.MapGet("/news", async (int? limit, SchoolStore store, CancellationToken ct) => Results.Ok(await store.NewsAsync(limit ?? 20, ct)));
 
 app.Run();
 

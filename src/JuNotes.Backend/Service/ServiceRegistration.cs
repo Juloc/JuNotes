@@ -1,5 +1,6 @@
 using JuNotes.Backend.Backup;
 using JuNotes.Backend.Infrastructure.Sql;
+using JuNotes.Backend.School;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -20,6 +21,12 @@ namespace JuNotes.Backend.Service
             configuration.GetSection("Backup").Bind(backup);
             services.AddSingleton(backup);
             services.AddSingleton(provider => new BackupService(connectionString, backup, provider.GetRequiredService<TimeProvider>(), provider.GetRequiredService<ILogger<BackupService>>()));
+            var school = new SchoolOptions();
+            configuration.GetSection("School").Bind(school);
+            services.AddSingleton(school);
+            services.AddHttpClient<IFeedFetcher, FeedFetcher>(client => client.DefaultRequestHeaders.UserAgent.ParseAdd("JuNotes"));
+            services.AddSingleton<SchoolStore>();
+            services.AddSingleton<SchoolImportService>();
             services.AddSingleton<HealthService>();
             services.AddSingleton<SyncService>();
             services.AddSingleton(new SyncAccess(configuration["Sync:Token"]));
