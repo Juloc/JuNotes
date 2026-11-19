@@ -23,7 +23,9 @@ struct JuNotesApp: App {
 @MainActor
 enum DemoOrientation {
     static func landscape() {
-        guard let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene else { return }
-        scene.requestGeometryUpdate(.iOS(interfaceOrientations: .landscape))
+        guard let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene else { NSLog("JuNotes demo: no window scene"); return }
+        scene.requestGeometryUpdate(.iOS(interfaceOrientations: .landscape)) { error in NSLog("JuNotes demo: landscape refused: \(error)") }
+        // The window controller has to agree to the new orientation.
+        scene.keyWindow?.rootViewController?.setNeedsUpdateOfSupportedInterfaceOrientations()
     }
 }

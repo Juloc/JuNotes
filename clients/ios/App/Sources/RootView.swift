@@ -8,7 +8,7 @@ struct RootView: View {
     @State private var showNewSubject = false
     @State private var showSettings = false
     @State private var showSearch = false
-    @State private var columns = NavigationSplitViewVisibility.automatic
+    @State private var columns = NavigationSplitViewVisibility.doubleColumn
 
     var body: some View {
         @Bindable var model = model
@@ -62,7 +62,7 @@ struct RootView: View {
             await model.syncNow()
         }
         .onChange(of: model.writing) { _, writing in
-            withAnimation { columns = writing ? .detailOnly : .automatic }
+            withAnimation { columns = writing ? .detailOnly : .doubleColumn }
         }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active { Task { await model.consumePendingAction(); await model.syncNow() } }
