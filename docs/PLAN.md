@@ -5,7 +5,7 @@ native iPad-App mit vollem Apple-Pencil-Pro-Support, dazu eine Web-App und ein e
 Ziel: alles, was GoodNotes kann, aber einfacher, klarer und mit Schule und KI verbunden. Sie soll sich anfühlen wie
 eine App von Apple, aber konsequent auf Funktion ausgerichtet sein.
 
-Stand der Versionen: 19.11.2026.
+Stand der Versionen: 19.11.2026. Was davon gebaut ist und was nicht, steht in [STATUS.md](STATUS.md).
 
 **Zielgerät:** iPad Air 13" (M2, 2024), 512 GB, nur WLAN, mit Apple Pencil Pro (Squeeze, Barrel Roll, Hover
 und Haptik werden unterstützt). Das Display hat **60 Hz** (kein ProMotion). Ohne Mobilfunk gilt: Offline ist der
