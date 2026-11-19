@@ -1,0 +1,50 @@
+import Foundation
+
+/// Fractional keys that order pages: a page can go between two others without renumbering anything, so two devices
+/// that move different pages never disagree about the rest.
+public enum PageOrder {
+    private static let digits = Array("0123456789abcdefghijklmnopqrstuvwxyz")
+
+    /// A key that sorts after `lower` and before `upper`; either may be nil for the start or end of the notebook.
+    public static func key(after lower: String?, before upper: String?) -> String {
+        if let lower, let upper { precondition(lower < upper, "lower must sort before upper") }
+        guard lower != nil || upper != nil else { return "i" }
+        return midpoint(Array(lower ?? ""), upper.map(Array.init))
+    }
+
+    /// Keys for `count` pages appended after `last`, in order.
+    public static func keys(appending count: Int, after last: String?) -> [String] {
+        var keys: [String] = []
+        var previous = last
+        for _ in 0..<count {
+            let next = key(after: previous, before: nil)
+            keys.append(next)
+            previous = next
+        }
+        return keys
+    }
+
+    private static func index(_ character: Character) -> Int { digits.firstIndex(of: character) ?? 0 }
+
+    private static func midpoint(_ lower: [Character], _ upper: [Character]?) -> String {
+        if let upper {
+            // Shared prefix stays; only what differs needs a middle.
+            var shared = 0
+            while shared < upper.count, (shared < lower.count ? lower[shared] : digits[0]) == upper[shared] { shared += 1 }
+            if shared > 0 {
+                return String(upper[0..<shared]) + midpoint(Array(lower.dropFirst(shared)), Array(upper.dropFirst(shared)))
+            }
+        }
+
+        let low = lower.first.map(index) ?? 0
+        let high = upper?.first.map(index) ?? digits.count
+        if high - low > 1 {
+            return String(digits[(low + high) / 2])
+        }
+        if let upper, upper.count > 1 {
+            // The upper key's first digit alone already sorts between the two.
+            return String(upper[0])
+        }
+        return String(digits[low]) + midpoint(Array(lower.dropFirst()), nil)
+    }
+}
