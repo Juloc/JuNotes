@@ -3,7 +3,7 @@
 Notizen und Lernen für das iPad, mit Web-App und eigenem Server. Handschrift mit dem Apple Pencil Pro, Hefte, Scans,
 Suche und Lernhilfen, gebaut so, dass man immer sieht, was gerade passiert.
 
-Der Plan steht in [docs/PLAN.md](docs/PLAN.md). Das Projekt ist in Phase 0 (Fundament).
+Der Plan steht in [docs/PLAN.md](docs/PLAN.md), was davon gebaut und wie es geprüft ist in [docs/STATUS.md](docs/STATUS.md). Alle Phasen sind umgesetzt; die iPad-App wurde bisher nur übersetzt, noch nicht auf einem iPad benutzt.
 
 ## Aufbau
 
