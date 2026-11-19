@@ -1,4 +1,5 @@
 using System.Reflection;
+using JuNotes.Backend.Data.Sync;
 using JuNotes.Backend.Database;
 using JuNotes.Backend.Service;
 using JuNotes.Workers;
@@ -21,6 +22,30 @@ app.MapRazorPages();
 app.MapGet("/health/live", () => Results.Ok());
 app.MapGet("/health/ready", async (HealthService health, CancellationToken ct) => await health.IsReadyAsync(ct) ? Results.Ok() : Results.StatusCode(503));
 app.MapGet("/api/v1/status", () => Results.Json(new { name = "JuNotes", version = Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "0.0.0", api = 1 }));
+
+var sync = app.MapGroup("/api/v1/sync");
+sync.AddEndpointFilter(async (context, next) =>
+{
+    var access = context.HttpContext.RequestServices.GetRequiredService<SyncAccess>();
+    if (!access.IsConfigured)
+    {
+        return Results.Problem("Sync is not set up: set Sync:Token (environment variable Sync__Token).", statusCode: 503);
+    }
+
+    return access.IsAuthorized(context.HttpContext.Request.Headers.Authorization) ? await next(context) : Results.Unauthorized();
+});
+sync.MapPost("/push", async (PushRequest request, SyncService service, CancellationToken ct) =>
+{
+    try
+    {
+        return Results.Ok(await service.PushAsync(request, ct));
+    }
+    catch (SyncValidationException error)
+    {
+        return Results.Problem(error.Message, statusCode: 400);
+    }
+});
+sync.MapGet("/pull", async (long? since, int? limit, SyncService service, CancellationToken ct) => Results.Ok(await service.PullAsync(since ?? 0, limit ?? SyncService.MaxChanges, ct)));
 
 app.Run();
 

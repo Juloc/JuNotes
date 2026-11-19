@@ -13,6 +13,8 @@ namespace JuNotes.Backend.Service
             services.AddSingleton(_ => SqlDatabase.Create(connectionString, SqlLane.Web, 20, TimeSpan.FromSeconds(10), TimeSpan.FromSeconds(5)));
             services.AddSingleton(provider => provider.GetRequiredService<SqlDatabase>().DataSource);
             services.AddSingleton<HealthService>();
+            services.AddSingleton<SyncService>();
+            services.AddSingleton(new SyncAccess(configuration["Sync:Token"]));
             return services;
         }
     }

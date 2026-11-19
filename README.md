@@ -36,6 +36,9 @@ export ConnectionStrings__JuNotes='Host=…;Database=junotes;Username=…;Passwo
 dotnet run --project src/JuNotes.Frontend
 ```
 
+Die Sync-API (`/api/v1/sync/push` und `/pull`) verlangt ein Token, das du setzt: `Sync__Token=<langer zufälliger Wert>`.
+Ohne Token antwortet sie mit 503, mit falschem Token mit 401.
+
 iPad-Logik (Swift 6.4):
 
 ```bash
