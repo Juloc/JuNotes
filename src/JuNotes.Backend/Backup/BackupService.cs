@@ -17,6 +17,9 @@ namespace JuNotes.Backend.Backup
         public string PgDump { get; set; } = "pg_dump";
 
         public bool BeforeMigration { get; set; } = true;
+
+        // Scans and PDFs; zipped next to each dump. Set from Assets:Directory.
+        public string? AssetsDirectory { get; set; }
     }
 
     public sealed class BackupFailedException(string message) : Exception(message);
@@ -45,6 +48,7 @@ namespace JuNotes.Backend.Backup
                 try
                 {
                     await DumpAsync(partial, ct);
+                    ArchiveAssets(BackupFiles.AssetsArchiveFor(final));
                     File.Move(partial, final, overwrite: true);
                 }
                 catch
@@ -66,6 +70,34 @@ namespace JuNotes.Backend.Backup
 
         [LoggerMessage(Level = LogLevel.Information, Message = "Backup {Kind} written ({Bytes} bytes), {Removed} old removed")]
         private static partial void LogWritten(ILogger logger, BackupKind kind, long bytes, int removed);
+
+        // The files are archived under another name first, like the dump, and only the finished archive is kept.
+        private void ArchiveAssets(string archive)
+        {
+            if (options.AssetsDirectory is not { } directory || !System.IO.Directory.Exists(directory) || !System.IO.Directory.EnumerateFiles(directory).Any(file => !file.EndsWith(".partial", StringComparison.Ordinal)))
+            {
+                return;
+            }
+
+            var partial = archive + ".partial";
+            try
+            {
+                File.Delete(partial);
+                using (var zip = System.IO.Compression.ZipFile.Open(partial, System.IO.Compression.ZipArchiveMode.Create))
+                {
+                    foreach (var file in System.IO.Directory.EnumerateFiles(directory).Where(file => !file.EndsWith(".partial", StringComparison.Ordinal)))
+                    {
+                        System.IO.Compression.ZipFileExtensions.CreateEntryFromFile(zip, file, Path.GetFileName(file), System.IO.Compression.CompressionLevel.NoCompression);
+                    }
+                }
+
+                File.Move(partial, archive, overwrite: true);
+            }
+            finally
+            {
+                File.Delete(partial);
+            }
+        }
 
         private async Task DumpAsync(string path, CancellationToken ct)
         {

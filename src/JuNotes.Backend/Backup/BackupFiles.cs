@@ -53,6 +53,9 @@ namespace JuNotes.Backend.Backup
             return true;
         }
 
+        // The scanned files that belong to a dump: junotes-…-kind.dump has junotes-…-kind.assets.zip beside it.
+        public static string AssetsArchiveFor(string dumpPath) => dumpPath[..^Extension.Length] + ".assets.zip";
+
         // Newest first. Files that are not ours, and half-written ones, are ignored.
         public static IReadOnlyList<BackupFile> List(string directory)
         {
@@ -80,6 +83,7 @@ namespace JuNotes.Backend.Backup
             foreach (var file in removable)
             {
                 File.Delete(file.Path);
+                File.Delete(AssetsArchiveFor(file.Path));
             }
 
             return removable;

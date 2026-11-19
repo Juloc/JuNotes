@@ -58,6 +58,34 @@ namespace JuNotes.Backend.Tests
         }
 
         [RequiresDatabaseFact]
+        public async Task The_scanned_files_are_archived_beside_the_dump_and_rotated_with_it()
+        {
+            await using var database = await TestDatabase.CreateCurrentAsync();
+            var assets = Path.Combine(_directory, "assets");
+            Directory.CreateDirectory(assets);
+            await File.WriteAllBytesAsync(Path.Combine(assets, "abc"), [0xFF, 0xD8, 0xFF, 1, 2, 3]);
+            await File.WriteAllTextAsync(Path.Combine(assets, "half.partial"), "x");
+            var admin = new NpgsqlConnectionStringBuilder(Environment.GetEnvironmentVariable(RequiresDatabaseFactAttribute.Variable)!) { Database = new NpgsqlConnectionStringBuilder(database.Data.ConnectionString).Database };
+            var backups = Path.Combine(_directory, "backups");
+            using var service = new BackupService(admin.ConnectionString, new BackupOptions { Directory = backups, PgDump = PostgresTools.PgDump, Keep = 1, AssetsDirectory = assets }, TimeProvider.System, NullLogger<BackupService>.Instance);
+
+            var first = await service.RunAsync(BackupKind.Automatic, CancellationToken.None);
+            var archive = BackupFiles.AssetsArchiveFor(first.Path);
+
+            Assert.True(File.Exists(archive));
+            using (var zip = System.IO.Compression.ZipFile.OpenRead(archive))
+            {
+                Assert.Equal(["abc"], zip.Entries.Select(entry => entry.Name));
+            }
+
+            await Task.Delay(1100);
+            await service.RunAsync(BackupKind.Automatic, CancellationToken.None);
+
+            Assert.False(File.Exists(first.Path));
+            Assert.False(File.Exists(archive));
+        }
+
+        [RequiresDatabaseFact]
         public async Task Rotation_runs_after_each_backup()
         {
             await using var database = await TestDatabase.CreateCurrentAsync();

@@ -1,3 +1,4 @@
+using JuNotes.Backend.Assets;
 using JuNotes.Backend.Backup;
 using JuNotes.Backend.Infrastructure.Sql;
 using JuNotes.Backend.School;
@@ -17,8 +18,14 @@ namespace JuNotes.Backend.Service
             services.AddSingleton(_ => SqlDatabase.Create(connectionString, SqlLane.Web, 20, TimeSpan.FromSeconds(10), TimeSpan.FromSeconds(5)));
             services.AddSingleton(provider => provider.GetRequiredService<SqlDatabase>().DataSource);
             services.TryAddSingleton(TimeProvider.System);
+            var assets = new AssetOptions();
+            configuration.GetSection("Assets").Bind(assets);
+            services.AddSingleton(assets);
+            services.AddSingleton<AssetService>();
             var backup = new BackupOptions();
             configuration.GetSection("Backup").Bind(backup);
+            // The backup takes the scanned files along with the database.
+            backup.AssetsDirectory ??= assets.Directory;
             services.AddSingleton(backup);
             services.AddSingleton(provider => new BackupService(connectionString, backup, provider.GetRequiredService<TimeProvider>(), provider.GetRequiredService<ILogger<BackupService>>()));
             var school = new SchoolOptions();

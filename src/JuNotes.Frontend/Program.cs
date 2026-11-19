@@ -1,4 +1,5 @@
 using System.Reflection;
+using JuNotes.Backend.Assets;
 using JuNotes.Backend.Backup;
 using JuNotes.Backend.Data.Sync;
 using JuNotes.Backend.Database;
@@ -72,6 +73,22 @@ schoolApi.MapGet("/calendar", async (DateTimeOffset? from, DateTimeOffset? to, S
         : Results.Ok(await store.EventsAsync(start, end, ct));
 });
 schoolApi.MapGet("/news", async (int? limit, SchoolStore store, CancellationToken ct) => Results.Ok(await store.NewsAsync(limit ?? 20, ct)));
+
+var assetApi = secured.MapGroup("/assets");
+assetApi.MapPut("/{id:guid}", async (Guid id, HttpRequest request, AssetService assets, CancellationToken ct) =>
+{
+    try
+    {
+        await assets.SaveAsync(id, request.Body, ct);
+        return Results.NoContent();
+    }
+    catch (AssetException error)
+    {
+        return Results.Problem(error.Message, statusCode: error.StatusCode);
+    }
+});
+assetApi.MapMethods("/{id:guid}", ["HEAD"], (Guid id, AssetService assets) => assets.Exists(id) ? Results.Ok() : Results.NotFound());
+assetApi.MapGet("/{id:guid}", (Guid id, AssetService assets) => assets.Open(id) is { } file ? Results.Stream(file.Stream, file.ContentType, enableRangeProcessing: true) : Results.NotFound());
 
 app.Run();
 

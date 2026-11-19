@@ -16,10 +16,11 @@ RUN apt-get update \
  && apt-get update \
  && apt-get install -y --no-install-recommends postgresql-client-18 \
  && rm -rf /var/lib/apt/lists/* \
- && mkdir -p /data/backups && chown -R app:app /data
+ && mkdir -p /data/backups /data/assets && chown -R app:app /data
 
 ENV ASPNETCORE_URLS=http://+:8080 \
     Backup__Directory=/data/backups \
+    Assets__Directory=/data/assets \
     Backup__PgDump=/usr/lib/postgresql/18/bin/pg_dump
 WORKDIR /app
 COPY --from=build /app .
