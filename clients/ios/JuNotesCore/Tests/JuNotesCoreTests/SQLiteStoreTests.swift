@@ -158,5 +158,34 @@ struct SQLiteStoreTests {
         #expect(try await store.grades(subjectID: uuid(10)).map(\.title) == ["neu", "alt"])
         #expect(try await store.grades().count == 3)
     }
+
+    @Test func singleEntitiesCanBeLookedUp() async throws {
+        let store = try store()
+        try await store.put(Subject(id: uuid(1), name: "Mathe"))
+        let notebook = Notebook(id: uuid(2), subjectID: uuid(1), title: "Brüche", createdAt: created)
+        try await store.put(notebook)
+        try await store.put(Page(id: uuid(3), notebookID: uuid(2), sort: "i"))
+
+        #expect(try await store.subject(id: uuid(1))?.name == "Mathe")
+        #expect(try await store.notebook(id: uuid(2)) == notebook)
+        #expect(try await store.page(id: uuid(3))?.notebookID == uuid(2))
+        #expect(try await store.notebook(id: uuid(99)) == nil)
+    }
+
+    @Test func assetsAreSentOnceAndAllReferencedOnesAreListed() async throws {
+        let store = try store()
+        try await store.registerAsset(uuid(7))
+        try await store.registerAsset(uuid(8))
+        try await store.markAssetUploaded(uuid(7))
+        try await store.registerAsset(uuid(7))
+
+        #expect(try await store.pendingAssetUploads() == [uuid(8)])
+
+        try await store.put(Page(id: uuid(3), notebookID: uuid(2), sort: "i", content: .scan(assetID: uuid(7))))
+        try await store.put(Page(id: uuid(4), notebookID: uuid(2), sort: "j", content: .pdf(assetID: uuid(9), pageIndex: 2)))
+        try await store.put(Page(id: uuid(5), notebookID: uuid(2), sort: "k"))
+
+        #expect(Set(try await store.referencedAssetIDs()) == [uuid(7), uuid(9)])
+    }
 }
 #endif

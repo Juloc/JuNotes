@@ -110,6 +110,7 @@ public actor SQLiteStore: SyncStore {
         create table if not exists outbox (
             seq integer primary key autoincrement, kind text not null, id text not null, parent_id text, payload text, deleted integer not null);
         create table if not exists meta (key text primary key, value text not null);
+        create table if not exists assets (id text primary key, uploaded integer not null default 0);
         create virtual table if not exists page_text using fts5(page_id unindexed, notebook_id unindexed, body, tokenize = 'unicode61 remove_diacritics 2');
         """)
     }
@@ -164,6 +165,45 @@ public actor SQLiteStore: SyncStore {
 
     public func strokes(pageID: UUID) throws -> [Stroke] {
         try decoded(kind: .stroke, parent: pageID, filterParent: true).compactMap { try? Stroke.decode($0).stroke }
+    }
+
+    // MARK: Single entities
+
+    public func subject(id: UUID) throws -> Subject? {
+        try record(kind: .subject, id: id).flatMap { try? Subject.decode($0) }
+    }
+
+    public func notebook(id: UUID) throws -> Notebook? {
+        try record(kind: .notebook, id: id).flatMap { try? Notebook.decode($0) }
+    }
+
+    public func page(id: UUID) throws -> Page? {
+        try record(kind: .page, id: id).flatMap { try? Page.decode($0) }
+    }
+
+    // MARK: Assets (scans and PDFs)
+
+    /// Remember a file the app made itself, so it is sent to the server.
+    public func registerAsset(_ id: UUID) throws {
+        try database.run("insert or ignore into assets (id, uploaded) values (?, 0)", [.text(id.uuidString)])
+    }
+
+    public func pendingAssetUploads() throws -> [UUID] {
+        try database.query("select id from assets where uploaded = 0") { $0.text(0).flatMap(UUID.init(uuidString:)) }.compactMap { $0 }
+    }
+
+    public func markAssetUploaded(_ id: UUID) throws {
+        try database.run("insert into assets (id, uploaded) values (?, 1) on conflict (id) do update set uploaded = 1", [.text(id.uuidString)])
+    }
+
+    /// Every file the pages refer to, including those another device made: the app fetches the ones it does not have yet.
+    public func referencedAssetIDs() throws -> [UUID] {
+        try decoded(kind: .page, parent: nil, filterParent: false).compactMap { try? Page.decode($0) }.compactMap { page in
+            switch page.content {
+            case .scan(let id), .pdf(let id, _): id
+            case .drawing: nil
+            }
+        }
     }
 
     // MARK: Search
@@ -260,6 +300,12 @@ public actor SQLiteStore: SyncStore {
 
     private func payload(_ text: String?) throws -> JSONValue? {
         try text.map { try JSONDecoder().decode(JSONValue.self, from: Data($0.utf8)) }
+    }
+
+    private func record(kind: EntityKind, id: UUID) throws -> SyncRecord? {
+        try database.query("select parent_id, payload from entities where kind = ? and id = ? and deleted = 0", [.text(kind.rawValue), .text(id.uuidString)]) { row in
+            SyncRecord(kind: kind, id: id, parentID: row.text(0).flatMap(UUID.init(uuidString:)), payload: try payload(row.text(1)), seq: 0)
+        }.first
     }
 
     private func decoded(kind: EntityKind, parent: UUID?, filterParent: Bool) throws -> [SyncRecord] {

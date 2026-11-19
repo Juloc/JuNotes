@@ -30,6 +30,7 @@ targets:
         INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents: YES
         INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad: "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"
         INFOPLIST_KEY_UIRequiresFullScreen: NO
+        INFOPLIST_KEY_NSCameraUsageDescription: JuNotes scannt Arbeitsblätter und Hefte mit der Kamera ab.
 schemes:
   JuNotes:
     build:

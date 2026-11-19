@@ -6,9 +6,11 @@ public enum PageOrder {
     private static let digits = Array("0123456789abcdefghijklmnopqrstuvwxyz")
 
     /// A key that sorts after `lower` and before `upper`; either may be nil for the start or end of the notebook.
+    /// If the neighbours are equal or the wrong way round (two devices picked the same key, or a sync reordered them), the new key simply goes after `lower`.
     public static func key(after lower: String?, before upper: String?) -> String {
-        if let lower, let upper { precondition(lower < upper, "lower must sort before upper") }
         guard lower != nil || upper != nil else { return "i" }
+        var upper = upper
+        if let low = lower, let high = upper, low >= high { upper = nil }
         return midpoint(Array(lower ?? ""), upper.map(Array.init))
     }
 

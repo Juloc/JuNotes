@@ -6,6 +6,7 @@ struct RootView: View {
     @Environment(\.scenePhase) private var scenePhase
     @State private var showNewSubject = false
     @State private var showSettings = false
+    @State private var showSearch = false
 
     var body: some View {
         @Bindable var model = model
@@ -22,6 +23,9 @@ struct RootView: View {
                         .tag(SidebarItem.subject(subject.id))
                     }
                 }
+                if model.hasLooseNotebooks {
+                    Section { Label("Lose Blätter", systemImage: "doc.on.doc").tag(SidebarItem.loose) }
+                }
                 Section {
                     Label("Noten", systemImage: "list.number").tag(SidebarItem.grades)
                     Label("Papierkorb", systemImage: "trash").tag(SidebarItem.trash)
@@ -30,6 +34,7 @@ struct RootView: View {
             .navigationTitle("JuNotes")
             .toolbar {
                 ToolbarItem(placement: .primaryAction) { Button("Neues Fach", systemImage: "plus") { showNewSubject = true } }
+                ToolbarItem(placement: .secondaryAction) { Button("Suchen", systemImage: "magnifyingglass") { showSearch = true } }
                 ToolbarItem(placement: .bottomBar) { Button("Einstellungen", systemImage: "gearshape") { showSettings = true } }
             }
         } detail: {
@@ -52,5 +57,18 @@ struct RootView: View {
         }
         .sheet(isPresented: $showNewSubject) { NewSubjectSheet() }
         .sheet(isPresented: $showSettings) { SettingsView() }
+        .sheet(isPresented: $showSearch) { SearchView() }
+        .sheet(item: $model.pendingScan) { ScanDestinationSheet(scan: $0) }
+        .fullScreenCover(item: $model.scannerOrigin) { origin in
+            DocumentScanner(
+                onFinish: { images in
+                    model.scannerOrigin = nil
+                    // The camera has to be gone before the next sheet can come up.
+                    Task { try? await Task.sleep(for: .milliseconds(450)); model.pendingScan = PendingScan(images: images, origin: origin) }
+                },
+                onCancel: { model.scannerOrigin = nil }
+            )
+            .ignoresSafeArea()
+        }
     }
 }

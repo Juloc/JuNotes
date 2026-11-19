@@ -19,6 +19,9 @@ final class ToolPicker {
 /// A page's drawing. The Pencil draws, a finger scrolls. Every stroke is saved the moment it is made.
 struct PencilCanvas: UIViewRepresentable {
     let pageID: UUID
+    let notebookID: UUID
+    /// Drawing pages are read for text so they can be found; a scan keeps the text of the scan itself.
+    let indexDrawing: Bool
     let logicalSize: CGSize
     let displayWidth: CGFloat
     let initialStrokes: [Stroke]
@@ -64,6 +67,7 @@ struct PencilCanvas: UIViewRepresentable {
         private var writes: Task<Void, Never>?
         private var counter = 0
         private var loading = false
+        private var idleTask: Task<Void, Never>?
 
         init(parent: PencilCanvas) { self.parent = parent }
 
@@ -131,8 +135,36 @@ struct PencilCanvas: UIViewRepresentable {
             }
 
             parent.onStrokeCount(strokes.count)
+            scheduleIndexing(canvas)
             if let lowest = added.map(\.lowest).max(), AutoPages.needsNewPage(writingAtY: Double(lowest), pageHeight: Double(parent.logicalSize.height), isLastPage: true) {
                 parent.onNearBottom()
+            }
+        }
+
+        /// A few seconds after she stops writing, the page is read for text, so what she wrote can be searched.
+        private func scheduleIndexing(_ canvas: PKCanvasView) {
+            guard parent.indexDrawing else { return }
+            idleTask?.cancel()
+            let pageID = parent.pageID
+            let notebookID = parent.notebookID
+            let store = parent.store
+            let size = parent.logicalSize
+            idleTask = Task { [weak canvas] in
+                try? await Task.sleep(for: .seconds(6))
+                guard !Task.isCancelled, let canvas else { return }
+                let drawing = canvas.drawing
+                var text = ""
+                if !drawing.strokes.isEmpty {
+                    let ink = drawing.image(from: CGRect(origin: .zero, size: size), scale: 1.5, userInterfaceStyle: .light)
+                    // Text recognition wants dark ink on white, not on transparent.
+                    let flat = UIGraphicsImageRenderer(size: ink.size).image { context in
+                        UIColor.white.setFill()
+                        context.fill(CGRect(origin: .zero, size: ink.size))
+                        ink.draw(at: .zero)
+                    }
+                    text = await TextRecognition.recognize(flat)
+                }
+                try? await store.index(pageID: pageID, notebookID: notebookID, text: text)
             }
         }
     }

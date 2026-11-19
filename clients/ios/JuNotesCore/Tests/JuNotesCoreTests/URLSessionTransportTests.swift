@@ -133,3 +133,30 @@ extension URLSessionTransportTests {
         #expect(info.lastBackupAt != nil)
     }
 }
+
+extension URLSessionTransportTests {
+    @Test func anUploadIsAPutWithTheFileAndTheToken() async throws {
+        let id = uuid(5)
+        StubProtocol.handler = { request in
+            #expect(request.httpMethod == "PUT")
+            #expect(request.url?.path == "/api/v1/assets/\(id.uuidString.lowercased())")
+            #expect(request.value(forHTTPHeaderField: "Authorization") == "Bearer t0k")
+            return (204, Data())
+        }
+
+        try await transport.uploadAsset(id: id, data: Data([0xFF, 0xD8, 0xFF]))
+    }
+
+    @Test func aTooBigOrWrongFileIsRefusedForGood() async {
+        StubProtocol.handler = { _ in (413, Data(#"{"detail":"The file is larger than 20 MB."}"#.utf8)) }
+        await #expect(throws: TransportError.rejected("The file is larger than 20 MB.")) { try await transport.uploadAsset(id: uuid(5), data: Data([1])) }
+    }
+
+    @Test func aDownloadReturnsTheBytesOrNilWhenTheServerHasNone() async throws {
+        StubProtocol.handler = { _ in (200, Data([1, 2, 3])) }
+        #expect(try await transport.downloadAsset(id: uuid(5)) == Data([1, 2, 3]))
+
+        StubProtocol.handler = { _ in (404, Data()) }
+        #expect(try await transport.downloadAsset(id: uuid(5)) == nil)
+    }
+}

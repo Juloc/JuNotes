@@ -31,7 +31,7 @@ public struct URLSessionTransport: SyncTransport {
         return try await send(request)
     }
 
-    private func makeRequest(path: String) -> URLRequest {
+    func makeRequest(path: String) -> URLRequest {
         var request = URLRequest(url: baseURL.appendingPathComponent(path))
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         return request
@@ -56,7 +56,7 @@ public struct URLSessionTransport: SyncTransport {
         }
     }
 
-    private func body(of request: URLRequest) async throws -> Data {
+    func body(of request: URLRequest) async throws -> Data {
         let data: Data
         let response: URLResponse
         do {

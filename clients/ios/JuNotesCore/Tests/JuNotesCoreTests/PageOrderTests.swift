@@ -57,3 +57,15 @@ struct PageOrderTests {
         #expect("a" < a && a < "c")
     }
 }
+
+struct PageOrderRobustnessTests {
+    @Test func equalNeighboursDoNotCrashAndTheKeyGoesAfter() {
+        let key = PageOrder.key(after: "i", before: "i")
+        #expect(key > "i")
+    }
+
+    @Test func neighboursTheWrongWayRoundDoNotCrash() {
+        let key = PageOrder.key(after: "j", before: "i")
+        #expect(key > "j")
+    }
+}

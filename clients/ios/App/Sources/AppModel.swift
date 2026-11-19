@@ -7,6 +7,8 @@ enum SidebarItem: Hashable {
     case subject(UUID)
     case grades
     case trash
+    /// Notebooks that belong to no subject, such as a worksheet scanned when no lesson was running.
+    case loose
 }
 
 /// What the whole app shares: the local database, the library the sidebar and lists show, and the sync with the server.
@@ -23,6 +25,12 @@ final class AppModel {
     var news: [SchoolNews] = []
     /// Set when "Neue Seite für jetzt" made a page: the notebook list opens that notebook.
     var pendingNotebookID: UUID?
+    var pendingPageID: UUID?
+    var scannerOrigin: ScanOrigin?
+    var pendingScan: PendingScan?
+    var hasLooseNotebooks = false
+    /// Counts up when files arrived from the server, so pages that waited for their scan look again.
+    var assetRevision = 0
     var sidebar: SidebarItem?
     var settings: ServerSettings
 
@@ -58,6 +66,7 @@ final class AppModel {
     func reload() async {
         subjects = (try? await store.subjects()) ?? []
         grades = (try? await store.grades()) ?? []
+        hasLooseNotebooks = !((try? await store.notebooks(subjectID: nil)) ?? []).isEmpty
         await reloadNotebooks()
         trashed = ((try? await store.trashedNotebooks()) ?? []).sorted { ($0.trashedAt ?? .distantPast) > ($1.trashedAt ?? .distantPast) }
     }
@@ -146,6 +155,7 @@ final class AppModel {
         if case .synced = result {
             if let info = try? await transport.info() { snapshot.lastBackupAt = info.lastBackupAt }
             await refreshSchool(using: transport)
+            await syncAssets(using: transport)
             await reload()
         }
     }

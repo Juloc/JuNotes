@@ -19,10 +19,10 @@ struct NotebookListView: View {
 
     private var content: some View {
         Group {
-            if let subject = model.selectedSubject {
+            if model.selectedSubject != nil || model.sidebar == .loose {
                 if model.notebooks.isEmpty {
                     ContentUnavailableView {
-                        Label("Noch kein Heft in \(subject.name)", systemImage: "book.closed")
+                        Label("Noch kein Heft in \(model.selectedSubject?.name ?? "Lose Blätter")", systemImage: "book.closed")
                     } description: {
                         Text("Lege das erste Heft an.")
                     } actions: {
@@ -32,7 +32,7 @@ struct NotebookListView: View {
                     ScrollView {
                         LazyVGrid(columns: [GridItem(.adaptive(minimum: 170), spacing: 20)], spacing: 24) {
                             ForEach(model.notebooks) { notebook in
-                                NavigationLink(value: notebook.id) { card(notebook, color: subject.color) }
+                                NavigationLink(value: notebook.id) { card(notebook, color: model.selectedSubject?.color ?? "#8e8e93") }
                                     .buttonStyle(.plain)
                                     .contextMenu {
                                         Button("In den Papierkorb", systemImage: "trash", role: .destructive) { Task { await model.moveToTrash(notebook) } }
@@ -46,11 +46,14 @@ struct NotebookListView: View {
                 ContentUnavailableView("Kein Fach gewählt", systemImage: "books.vertical", description: Text("Lege links ein Fach an oder wähle eines aus."))
             }
         }
-        .navigationTitle(model.selectedSubject?.name ?? "JuNotes")
+        .navigationTitle(model.selectedSubject?.name ?? (model.sidebar == .loose ? "Lose Blätter" : "JuNotes"))
         .navigationDestination(for: UUID.self) { id in
             if let notebook = model.notebooks.first(where: { $0.id == id }) { NotebookView(notebook: notebook) }
         }
         .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Button("Scannen", systemImage: "doc.viewfinder") { model.scannerOrigin = ScanOrigin() }
+            }
             if model.selectedSubject != nil {
                 ToolbarItem(placement: .primaryAction) {
                     Button("Neues Heft", systemImage: "plus") { showNew = true }

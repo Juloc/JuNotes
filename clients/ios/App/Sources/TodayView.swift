@@ -29,6 +29,7 @@ struct TodayView: View {
             }
             .navigationTitle(context.date.formatted(.dateTime.weekday(.wide).day().month(.wide)))
             .refreshable { await model.syncNow() }
+            .toolbar { ToolbarItem(placement: .primaryAction) { Button("Scannen", systemImage: "doc.viewfinder") { model.scannerOrigin = ScanOrigin() } } }
         }
     }
 

@@ -19,6 +19,9 @@ struct NotebookView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .principal) { positionLabel }
+            ToolbarItem(placement: .primaryAction) {
+                Button("Scannen", systemImage: "doc.viewfinder") { model.scannerOrigin = ScanOrigin(notebook: notebook, afterPageID: currentPageID) }
+            }
         }
         .task { await load() }
         .onDisappear { Task { await trimAutoPages() } }
@@ -79,7 +82,9 @@ struct NotebookView: View {
             strokeCounts[first.id] = 0
         }
         pages = loaded
-        currentPageID = loaded.first?.id
+        // A search result or a fresh scan asks for one page.
+        if let wanted = model.pendingPageID, loaded.contains(where: { $0.id == wanted }) { currentPageID = wanted } else { currentPageID = loaded.first?.id }
+        model.pendingPageID = nil
     }
 
     private func addPage(auto: Bool) async {
