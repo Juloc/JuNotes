@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>JuNotes auf dem iPad Air 13"</title>
+<style>
+*{box-sizing:border-box;margin:0}
+html,body{height:100%}
+body{font:14px/1.4 -apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",system-ui,sans-serif;background:#e9e6f4;color:#1b1a23;overflow:hidden;display:flex;flex-direction:column;align-items:center}
+@media (prefers-color-scheme:dark){body{background:#17151f;color:#f2f1f7}}
+.bar{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;padding:12px 16px 4px;z-index:2}
+.bar .group{display:flex;gap:2px;padding:3px;border-radius:12px;background:#ffffffb0;box-shadow:inset 0 0 0 1px #0000001a}
+@media (prefers-color-scheme:dark){.bar .group{background:#ffffff14;box-shadow:inset 0 0 0 1px #ffffff1f}}
+.bar button{font:inherit;padding:7px 13px;border-radius:9px;border:0;background:none;color:inherit;cursor:pointer;min-height:34px}
+.bar button.on{background:#6c5ce7;color:#fff;font-weight:600}
+.stagewrap{flex:1;width:100%;display:grid;place-items:center;min-height:0;position:relative}
+/* The device is laid out at the iPad Air 13" size (1366 x 1024 points) and scaled to fit. */
+.device{position:absolute;left:50%;top:50%;transform-origin:center;background:#0c0c0f;box-shadow:0 0 0 2px #3a3a42,0 30px 80px #1b103d66;padding:20px;border-radius:52px}
+.device.land{width:calc(1366px + 40px);height:calc(1024px + 40px)}
+.device.port{width:calc(1024px + 40px);height:calc(1366px + 40px)}
+.screen{position:relative;width:100%;height:100%;border-radius:34px;overflow:hidden;background:#000}
+.screen iframe{width:100%;height:100%;border:0;display:block;background:#fff}
+.camera{position:absolute;width:9px;height:9px;border-radius:50%;background:#1d1d24;box-shadow:inset 0 0 0 2px #2a2a33}
+.land .camera{left:50%;top:6px;transform:translateX(-50%)}.port .camera{left:50%;top:6px;transform:translateX(-50%)}
+.statusbar{position:absolute;left:0;right:0;top:0;height:28px;display:flex;align-items:center;padding:0 26px;font:600 15px -apple-system,system-ui,sans-serif;pointer-events:none;z-index:5;color:#111}
+.statusbar.dark{color:#fff}
+.statusbar .r{margin-left:auto;display:flex;gap:8px;align-items:center}
+.statusbar .date{margin-left:14px;font-weight:500}
+.batt{display:inline-flex;align-items:center;gap:6px;font-weight:600}
+.batt i{width:26px;height:13px;border-radius:4px;box-shadow:inset 0 0 0 1.3px currentColor;position:relative;opacity:.9}
+.batt i:before{content:"";position:absolute;left:2px;top:2px;bottom:2px;right:2px;border-radius:2px;background:currentColor}
+.batt i:after{content:"";position:absolute;right:-3.5px;top:4px;width:2px;height:5px;border-radius:0 2px 2px 0;background:currentColor;opacity:.7}
+.home{position:absolute;left:50%;bottom:8px;transform:translateX(-50%);width:170px;height:5px;border-radius:3px;background:#111;opacity:.75;z-index:5;pointer-events:none}
+.home.dark{background:#fff}
+.note{font-size:12px;color:#6d6a7d;padding:0 16px 10px;text-align:center}
+</style>
+</head>
+<body>
+<div class="bar">
+  <div class="group" id="orient"><button class="on" data-o="land">Querformat</button><button data-o="port">Hochformat</button></div>
+  <div class="group" id="views"><button class="on" data-v="today">Heute</button><button data-v="subject">Fach</button><button data-v="book">Heft</button><button data-v="cards">Karteikarten</button><button data-v="grades">Noten</button></div>
+  <div class="group" id="theme"><button class="on" data-d="0">Hell</button><button data-d="1">Dunkel</button></div>
+</div>
+<div class="stagewrap" id="wrap">
+  <div class="device land" id="device">
+    <div class="screen">
+      <div class="statusbar" id="sb"><span>09:41</span><span class="date">Do. 19. Nov.</span>
+        <span class="r"><svg width="18" height="13" viewBox="0 0 18 13" fill="currentColor" aria-hidden="true"><path d="M9 11.5a1.4 1.4 0 1 1 0 .01zM4.7 8.2a6 6 0 0 1 8.6 0l-1.2 1.3a4.3 4.3 0 0 0-6.2 0zM1.6 5.1a10.3 10.3 0 0 1 14.8 0l-1.2 1.3a8.6 8.6 0 0 0-12.4 0z"/></svg><span class="batt">100 % <i></i></span></span></div>
+      <iframe id="app" title="JuNotes" src="index.html?device=1"></iframe>
+      <div class="home" id="hm"></div>
+    </div>
+    <div class="camera"></div>
+  </div>
+</div>
+<div class="note">Entwurf, kein Programm: so würde JuNotes auf dem iPad Air 13" aussehen (1366 × 1024 Punkte, hier verkleinert). Die Ansichten und der Stift lassen sich ausprobieren.</div>
+<script>
+const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
+const frame=$('#app'),device=$('#device');
+let state={o:'land',v:'today',d:'0'};
+function fit(){
+  const wrap=$('#wrap').getBoundingClientRect();
+  const w=state.o==='land'?1406:1064,h=state.o==='land'?1064:1406;
+  const s=Math.min((wrap.width-24)/w,(wrap.height-8)/h,1);
+  device.style.transform=`translate(-50%,-50%) scale(${s})`;
+}
+function load(){
+  const q=new URLSearchParams({device:1});
+  if(state.o==='port')q.set('portrait',1);
+  if(state.d==='1')q.set('dark',1);
+  q.set('view',state.v);
+  device.className='device '+state.o;
+  frame.src='index.html?'+q.toString();
+  const dark=state.d==='1';$('#sb').classList.toggle('dark',dark);$('#hm').classList.toggle('dark',dark);
+  fit();
+}
+function mark(group,attr,val){$$('#'+group+' button').forEach(b=>b.classList.toggle('on',b.dataset[attr]===val))}
+$('#orient').onclick=e=>{const b=e.target.closest('button');if(!b)return;state.o=b.dataset.o;mark('orient','o',state.o);load()};
+$('#theme').onclick=e=>{const b=e.target.closest('button');if(!b)return;state.d=b.dataset.d;mark('theme','d',state.d);load()};
+$('#views').onclick=e=>{const b=e.target.closest('button');if(!b)return;state.v=b.dataset.v;mark('views','v',state.v);
+  try{frame.contentWindow.show(state.v)}catch{load()}};
+addEventListener('resize',fit);
+// the status bar's colour follows the page: a dark background under light text
+frame.addEventListener('load',()=>{fit();try{frame.contentWindow.show(state.v)}catch{}});
+load();
+</script>
+</body>
+</html>
