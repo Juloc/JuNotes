@@ -9,13 +9,16 @@ public enum Connection: Sendable, Equatable {
 
 /// Everything the status line needs to know; the app fills it from the local database and the network monitor.
 public struct SyncSnapshot: Sendable, Equatable {
+    /// False until the server address and token are entered.
+    public var isConfigured: Bool
     public var localWriteFailed: Bool
     public var pendingChanges: Int
     public var lastSyncedAt: Date?
     public var lastBackupAt: Date?
     public var connection: Connection
 
-    public init(localWriteFailed: Bool = false, pendingChanges: Int = 0, lastSyncedAt: Date? = nil, lastBackupAt: Date? = nil, connection: Connection = .online) {
+    public init(isConfigured: Bool = true, localWriteFailed: Bool = false, pendingChanges: Int = 0, lastSyncedAt: Date? = nil, lastBackupAt: Date? = nil, connection: Connection = .online) {
+        self.isConfigured = isConfigured
         self.localWriteFailed = localWriteFailed
         self.pendingChanges = pendingChanges
         self.lastSyncedAt = lastSyncedAt
@@ -36,6 +39,7 @@ public enum SavedState: Sendable, Equatable {
 }
 
 public enum SyncState: Sendable, Equatable {
+    case notConfigured
     case synced(at: Date)
     case pending(count: Int)
     case waitingForNetwork(pending: Int)
@@ -62,6 +66,8 @@ public struct StatusLine: Sendable, Equatable {
         saved = snapshot.localWriteFailed ? .failed : .saved
 
         switch snapshot.connection {
+        case _ where !snapshot.isConfigured:
+            sync = .notConfigured
         case .noNetwork:
             sync = .waitingForNetwork(pending: snapshot.pendingChanges)
         case .serverUnreachable:
@@ -88,7 +94,7 @@ public struct StatusLine: Sendable, Equatable {
     public var syncLevel: Level {
         switch sync {
         case .synced: .ok
-        case .pending, .waitingForNetwork, .never: .waiting
+        case .pending, .waitingForNetwork, .never, .notConfigured: .waiting
         case .serverUnreachable: .problem
         }
     }

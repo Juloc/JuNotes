@@ -1,38 +1,58 @@
+import JuNotesCore
 import SwiftUI
 
-/// A subject in the sidebar. Phase 1 reads these from the local database; Phase 2 takes them from the timetable.
-struct Subject: Identifiable, Hashable {
-    let id: String
-    let name: String
-    let symbol: String
-
-    static let samples = [
-        Subject(id: "math", name: "Mathe", symbol: "function"),
-        Subject(id: "german", name: "Deutsch", symbol: "text.book.closed"),
-        Subject(id: "english", name: "Englisch", symbol: "character.bubble"),
-    ]
-}
-
 struct RootView: View {
-    @State private var selection: Subject? = Subject.samples.first
+    @Environment(AppModel.self) private var model
+    @Environment(\.scenePhase) private var scenePhase
+    @State private var showNewSubject = false
+    @State private var showSettings = false
 
     var body: some View {
+        @Bindable var model = model
         NavigationSplitView {
-            List(Subject.samples, selection: $selection) { subject in
-                Label(subject.name, systemImage: subject.symbol)
-                    .tag(subject)
+            List(selection: Binding(get: { model.sidebar }, set: { item in Task { await model.select(item) } })) {
+                Section("Fächer") {
+                    ForEach(model.subjects) { subject in
+                        Label { Text(subject.name) } icon: {
+                            Image(systemName: subject.symbol).foregroundStyle(Color(uiColor: StrokeConversion.color(hex: subject.color)))
+                        }
+                        .tag(SidebarItem.subject(subject.id))
+                    }
+                }
+                Section {
+                    Label("Papierkorb", systemImage: "trash").tag(SidebarItem.trash)
+                }
             }
-            .navigationTitle("Fächer")
+            .navigationTitle("JuNotes")
+            .toolbar {
+                ToolbarItem(placement: .primaryAction) { Button("Neues Fach", systemImage: "plus") { showNewSubject = true } }
+                ToolbarItem(placement: .bottomBar) { Button("Einstellungen", systemImage: "gearshape") { showSettings = true } }
+            }
+            .overlay {
+                if model.subjects.isEmpty {
+                    ContentUnavailableView {
+                        Label("Noch kein Fach", systemImage: "books.vertical")
+                    } actions: {
+                        Button("Erstes Fach anlegen") { showNewSubject = true }.buttonStyle(.borderedProminent)
+                    }
+                }
+            }
         } detail: {
-            if let selection {
-                NotebookView(subject: selection)
-            } else {
-                ContentUnavailableView("Kein Fach gewählt", systemImage: "books.vertical")
+            NavigationStack {
+                if model.sidebar == .trash { TrashView() } else { NotebookListView() }
             }
         }
         // The status line is always visible: what is saved, synced and backed up.
-        .safeAreaInset(edge: .bottom, spacing: 0) {
-            StatusLineView()
+        .safeAreaInset(edge: .bottom, spacing: 0) { StatusLineView() }
+        .task {
+            await model.purgeTrash()
+            await model.reload()
+            await model.syncNow()
         }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active { Task { await model.syncNow() } }
+        }
+        .sheet(isPresented: $showNewSubject) { NewSubjectSheet() }
+        .sheet(isPresented: $showSettings) { SettingsView() }
     }
 }

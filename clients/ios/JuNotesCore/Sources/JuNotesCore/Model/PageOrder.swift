@@ -48,3 +48,15 @@ public enum PageOrder {
         return String(digits[low]) + midpoint(Array(lower.dropFirst()), nil)
     }
 }
+
+/// The size of a page in its own units, independent of the screen. Strokes are stored in these units, so a page looks the same on any iPad.
+public enum PageGeometry {
+    public static let width = 595.0
+    public static let height = 842.0
+    public static let whiteboardWidth = 3000.0
+    public static let whiteboardHeight = 2000.0
+
+    public static func size(for kind: NotebookKind) -> (width: Double, height: Double) {
+        kind == .whiteboard ? (whiteboardWidth, whiteboardHeight) : (width, height)
+    }
+}

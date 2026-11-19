@@ -1,32 +1,139 @@
+import JuNotesCore
 import PencilKit
 import SwiftUI
 
-/// PencilKit gives the lowest latency and the system tool picker, which already handles squeeze, double tap, hover and haptics of the Pencil Pro.
+/// One tool picker for the whole app: it follows whichever page the Pencil last touched, and it is what carries the Pencil Pro's squeeze, double tap and hover.
+@MainActor
+final class ToolPicker {
+    static let shared = ToolPicker()
+    private let picker = PKToolPicker()
+
+    func add(_ canvas: PKCanvasView) { picker.addObserver(canvas) }
+
+    func activate(_ canvas: PKCanvasView) {
+        canvas.becomeFirstResponder()
+        picker.setVisible(true, forFirstResponder: canvas)
+    }
+}
+
+/// A page's drawing. The Pencil draws, a finger scrolls. Every stroke is saved the moment it is made.
 struct PencilCanvas: UIViewRepresentable {
-    func makeCoordinator() -> Coordinator { Coordinator() }
+    let pageID: UUID
+    let logicalSize: CGSize
+    let displayWidth: CGFloat
+    let initialStrokes: [Stroke]
+    let store: SQLiteStore
+    let onStrokeCount: (Int) -> Void
+    let onNearBottom: () -> Void
+    let onStoreFailure: () -> Void
+    let onChanged: () -> Void
+
+    func makeCoordinator() -> Coordinator { Coordinator(parent: self) }
 
     func makeUIView(context: Context) -> PKCanvasView {
         let canvas = PKCanvasView()
-        canvas.drawingPolicy = .anyInput
-        canvas.backgroundColor = .systemBackground
-        canvas.isOpaque = true
-        canvas.alwaysBounceVertical = true
-
-        let picker = PKToolPicker()
-        picker.addObserver(canvas)
-        context.coordinator.picker = picker
-
-        // The picker shows once the canvas is in a window and first responder.
-        Task { @MainActor in
-            picker.setVisible(true, forFirstResponder: canvas)
-            canvas.becomeFirstResponder()
-        }
+        canvas.backgroundColor = .clear
+        canvas.isOpaque = false
+        // The paper stays white and the ink dark, in dark mode too.
+        canvas.overrideUserInterfaceStyle = .light
+        canvas.drawingPolicy = .pencilOnly
+        canvas.isScrollEnabled = false
+        canvas.contentSize = logicalSize
+        canvas.minimumZoomScale = 0.05
+        canvas.maximumZoomScale = 8
+        canvas.delegate = context.coordinator
+        context.coordinator.attach(canvas, strokes: initialStrokes)
+        applyScale(canvas)
         return canvas
     }
 
-    func updateUIView(_ canvas: PKCanvasView, context: Context) {}
+    func updateUIView(_ canvas: PKCanvasView, context: Context) {
+        context.coordinator.parent = self
+        applyScale(canvas)
+    }
 
-    final class Coordinator {
-        var picker: PKToolPicker?
+    private func applyScale(_ canvas: PKCanvasView) {
+        let scale = displayWidth / logicalSize.width
+        if abs(canvas.zoomScale - scale) > 0.0001 { canvas.zoomScale = scale }
+    }
+
+    @MainActor
+    final class Coordinator: NSObject, PKCanvasViewDelegate {
+        var parent: PencilCanvas
+        private var known: [String: UUID] = [:]
+        private var writes: Task<Void, Never>?
+        private var counter = 0
+        private var loading = false
+
+        init(parent: PencilCanvas) { self.parent = parent }
+
+        func attach(_ canvas: PKCanvasView, strokes: [Stroke]) {
+            loading = true
+            var converted: [PKStroke] = []
+            for stroke in strokes {
+                counter += 1
+                let pk = StrokeConversion.pkStroke(from: stroke, creationDate: Date(timeIntervalSince1970: 1_000_000_000 + Double(counter)))
+                known[StrokeConversion.fingerprint(pk)] = stroke.id
+                converted.append(pk)
+            }
+            canvas.drawing = PKDrawing(strokes: converted)
+            loading = false
+            ToolPicker.shared.add(canvas)
+            let count = strokes.count
+            let report = parent.onStrokeCount
+            Task { @MainActor in report(count) }
+        }
+
+        nonisolated func canvasViewDidBeginUsingTool(_ canvasView: PKCanvasView) {
+            MainActor.assumeIsolated { ToolPicker.shared.activate(canvasView) }
+        }
+
+        nonisolated func canvasViewDrawingDidChange(_ canvasView: PKCanvasView) {
+            MainActor.assumeIsolated { drawingChanged(canvasView) }
+        }
+
+        private func drawingChanged(_ canvas: PKCanvasView) {
+            guard !loading else { return }
+            let strokes = canvas.drawing.strokes
+            var seen = Set<String>()
+            var added: [(stroke: Stroke, lowest: CGFloat)] = []
+            for pk in strokes {
+                let fingerprint = StrokeConversion.fingerprint(pk)
+                seen.insert(fingerprint)
+                if known[fingerprint] == nil {
+                    let stroke = StrokeConversion.stroke(from: pk)
+                    known[fingerprint] = stroke.id
+                    added.append((stroke, pk.renderBounds.maxY))
+                }
+            }
+            let removed = known.filter { !seen.contains($0.key) }
+            for key in removed.keys { known[key] = nil }
+
+            let pageID = parent.pageID
+            let store = parent.store
+            let failed = parent.onStoreFailure
+            let changed = parent.onChanged
+            let additions = added.map(\.stroke)
+            let deletions = Array(removed.values)
+            if !additions.isEmpty || !deletions.isEmpty {
+                // One chain, so a stroke drawn and undone at once is never deleted before it was saved.
+                let previous = writes
+                writes = Task {
+                    await previous?.value
+                    do {
+                        for stroke in additions { try await store.put(stroke, on: pageID) }
+                        for id in deletions { try await store.remove(Stroke(id: id, points: []), on: pageID) }
+                        await MainActor.run { changed() }
+                    } catch {
+                        await MainActor.run { failed() }
+                    }
+                }
+            }
+
+            parent.onStrokeCount(strokes.count)
+            if let lowest = added.map(\.lowest).max(), AutoPages.needsNewPage(writingAtY: Double(lowest), pageHeight: Double(parent.logicalSize.height), isLastPage: true) {
+                parent.onNearBottom()
+            }
+        }
     }
 }

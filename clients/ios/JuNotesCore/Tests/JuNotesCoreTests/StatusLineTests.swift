@@ -54,3 +54,21 @@ struct StatusLineTests {
         #expect(line.overall == .waiting)
     }
 }
+
+struct StatusLineSetupTests {
+    let now = Date(timeIntervalSince1970: 1_800_000_000)
+
+    @Test func withoutAServerTheLineSaysSoAndTheWorkIsSafe() {
+        let line = StatusLine(SyncSnapshot(isConfigured: false, pendingChanges: 4, lastBackupAt: nil, connection: .online), now: now)
+
+        #expect(line.sync == .notConfigured)
+        #expect(line.syncLevel == .waiting)
+        #expect(line.isWorkSafe)
+        #expect(StatusLineText(now: now).sync(.notConfigured) == "Server noch nicht eingerichtet, alles liegt auf dem iPad")
+    }
+
+    @Test func pageGeometryDependsOnTheNotebookKind() {
+        #expect(PageGeometry.size(for: .pages) == (595, 842))
+        #expect(PageGeometry.size(for: .whiteboard) == (3000, 2000))
+    }
+}

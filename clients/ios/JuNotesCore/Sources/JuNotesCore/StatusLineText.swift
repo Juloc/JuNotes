@@ -24,6 +24,7 @@ public struct StatusLineText: Sendable {
         case .waitingForNetwork(let pending): pending > 0 ? "Wartet auf WLAN, \(changes(pending)) sicher auf dem iPad" : "Offline, alles ist sicher auf dem iPad"
         case .serverUnreachable: "Server nicht erreichbar, alles ist sicher auf dem iPad"
         case .never: "Noch nicht synchronisiert"
+        case .notConfigured: "Server noch nicht eingerichtet, alles liegt auf dem iPad"
         }
     }
 
