@@ -9,12 +9,16 @@ namespace JuNotes.Backend.Tests
         private readonly string _admin;
         private readonly string _name;
 
-        private TestDatabase(string admin, string name, NpgsqlDataSource data)
+        private TestDatabase(string admin, string name, string connectionString, NpgsqlDataSource data)
         {
             _admin = admin;
             _name = name;
+            ConnectionString = connectionString;
             Data = data;
         }
+
+        // With the password, which a data source's own ConnectionString leaves out.
+        public string ConnectionString { get; }
 
         public NpgsqlDataSource Data { get; }
 
@@ -30,7 +34,8 @@ namespace JuNotes.Backend.Tests
                 await create.ExecuteNonQueryAsync();
             }
 
-            return new TestDatabase(admin, name, NpgsqlDataSource.Create(new NpgsqlConnectionStringBuilder(admin) { Database = name, Pooling = false }.ConnectionString));
+            var connectionString = new NpgsqlConnectionStringBuilder(admin) { Database = name, Pooling = false }.ConnectionString;
+            return new TestDatabase(admin, name, connectionString, NpgsqlDataSource.Create(connectionString));
         }
 
         // With the baseline and every shipped migration, as the host would leave it.

@@ -1,5 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
   <ItemGroup>
+    <InternalsVisibleTo Include="JuNotes.Backend.Tests" />
     <ProjectReference Include="../JuNotes.Backend/JuNotes.Backend.csproj" />
     <ProjectReference Include="../JuNotes.Workers/JuNotes.Workers.csproj" />
   </ItemGroup>

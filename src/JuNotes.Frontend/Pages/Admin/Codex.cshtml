@@ -1,0 +1,37 @@
+@page "/Admin/Codex"
+@model CodexModel
+@{
+    ViewData["Title"] = "KI-Verbindung";
+}
+@section Head {
+    @if (Model.Waiting is not null)
+    {
+        <meta http-equiv="refresh" content="5" />
+    }
+}
+<div class="card">
+    <h2>Codex auf dem Server</h2>
+    @if (!Model.Status.Installed)
+    {
+        <p><i class="dot bad"></i>Das Programm <code>codex</code> ist auf dem Server nicht installiert. Im Docker-Image muss es mit hinein, oder <code>Codex__Executable</code> zeigt auf den Pfad.</p>
+    }
+    else if (Model.Status.SignedIn)
+    {
+        <div class="row"><span><i class="dot ok"></i>Angemeldet</span><span>@(Model.Status.SignIn == "chatgpt" ? "mit ChatGPT" : Model.Status.SignIn == "apiKey" ? "mit API-Schlüssel" : "")</span></div>
+        <div class="row"><span>Version</span><span>@Model.Status.Version</span></div>
+        <form method="post" asp-page-handler="Logout"><div class="actions"><button class="danger" type="submit">Abmelden</button></div></form>
+    }
+    else if (Model.Waiting is { } code)
+    {
+        <p>Öffne diese Seite auf einem beliebigen Gerät und gib den Code ein:</p>
+        <p><a href="@code.Url" target="_blank" rel="noopener noreferrer">@code.Url</a></p>
+        <p><span class="code">@code.Code</span></p>
+        <p class="muted">Diese Seite lädt sich selbst neu und zeigt „Angemeldet“, sobald es geklappt hat. Der Code gilt 15 Minuten.</p>
+        <form method="post" asp-page-handler="Cancel"><div class="actions"><button class="secondary" type="submit">Abbrechen</button></div></form>
+    }
+    else
+    {
+        <p><i class="dot warn"></i>Nicht angemeldet. Die Lernfunktionen gehen erst, wenn der Server angemeldet ist. Du meldest dich mit dem ChatGPT-Konto an, dessen Kontingent genutzt werden soll. Das Passwort sieht der Server nie.</p>
+        <form method="post" asp-page-handler="Login"><div class="actions"><button type="submit">Anmelden</button></div></form>
+    }
+</div>

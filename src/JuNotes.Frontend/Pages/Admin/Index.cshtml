@@ -1,0 +1,39 @@
+@page "/Admin"
+@model IndexModel
+@{
+    ViewData["Title"] = "Übersicht";
+}
+<div class="card">
+    <h2>Server</h2>
+    <div class="row"><span><i class="dot @(Model.DatabaseReady ? "ok" : "bad")"></i>Datenbank</span><span>@(Model.DatabaseReady ? "erreichbar" : "nicht erreichbar")</span></div>
+    <div class="row"><span><i class="dot @Model.BackupDot"></i>Letztes Backup</span><span>@Model.BackupText</span></div>
+</div>
+
+<div class="card">
+    <h2>Schule</h2>
+    @if (!Model.School.TimetableConfigured && !Model.School.NewsConfigured)
+    {
+        <p class="muted">Nicht eingerichtet. Setze <code>School__TimetableIcsUrl</code> (der iCal-Link des Stundenplans) und optional <code>School__NewsFeedUrl</code>.</p>
+    }
+    else
+    {
+        <div class="row"><span>Stundenplan</span><span>@(Model.School.TimetableConfigured ? $"{Model.School.EventCount} Einträge" : "aus")</span></div>
+        <div class="row"><span>Schul-News</span><span>@(Model.School.NewsConfigured ? $"{Model.School.NewsCount} Meldungen" : "aus")</span></div>
+        <div class="row"><span><i class="dot @(Model.School.LastError is null ? (Model.School.LastSuccess is null ? "warn" : "ok") : "bad")"></i>Letzter Abruf</span><span>@(Model.School.LastSuccess is { } at ? AdminFormat.Time(at) : "noch keiner")</span></div>
+        @if (Model.School.LastError is { } problem)
+        {
+            <p class="muted">@problem</p>
+        }
+        <form method="post" asp-page-handler="School"><div class="actions"><button class="secondary" type="submit">Jetzt abrufen</button></div></form>
+    }
+</div>
+
+<div class="card">
+    <h2>KI</h2>
+    <div class="row"><span><i class="dot @Model.CodexDot"></i>Verbindung</span><span>@Model.CodexText</span></div>
+    <div class="row"><span>Heute</span><span>@Model.Today.Requests von @Model.Limit Anfragen@(Model.Today.Failures > 0 ? $", {Model.Today.Failures} fehlgeschlagen" : "")</span></div>
+    @foreach (var day in Model.Recent.Skip(1))
+    {
+        <div class="row muted"><span>@AdminFormat.Day(day.Day)</span><span>@day.Requests Anfragen@(day.Failures > 0 ? $", {day.Failures} fehlgeschlagen" : "")</span></div>
+    }
+</div>

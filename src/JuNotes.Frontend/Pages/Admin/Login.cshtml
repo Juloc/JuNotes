@@ -1,0 +1,25 @@
+@page "/Admin/Login"
+@model LoginModel
+@{
+    ViewData["Title"] = "Anmelden";
+}
+@if (!Model.Enabled)
+{
+    <div class="card">
+        <h2>Der Admin-Bereich ist noch aus</h2>
+        <p class="muted">Setze auf dem Server die Umgebungsvariable <code>Admin__Password</code> auf ein langes Passwort und starte den Server neu.</p>
+    </div>
+}
+else
+{
+    <form method="post" class="card">
+        @if (Model.Failure is not null)
+        {
+            <div class="notice bad">@Model.Failure</div>
+        }
+        <label for="password">Passwort</label>
+        <input id="password" name="password" type="password" autocomplete="current-password" autofocus />
+        <input type="hidden" name="returnUrl" value="@Model.ReturnUrl" />
+        <div class="actions"><button type="submit">Anmelden</button></div>
+    </form>
+}

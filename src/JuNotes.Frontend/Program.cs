@@ -1,5 +1,6 @@
 using System.Reflection;
 using JuNotes.Backend.Ai;
+using JuNotes.Frontend.Admin;
 using JuNotes.Backend.Assets;
 using JuNotes.Backend.Backup;
 using JuNotes.Backend.Data.Sync;
@@ -11,7 +12,13 @@ using JuNotes.Workers;
 using Npgsql;
 
 var builder = WebApplication.CreateBuilder(args);
-builder.Services.AddRazorPages();
+builder.Services.AddRazorPages(options =>
+{
+    // The admin area is behind its own login; only the login page is open.
+    options.Conventions.AuthorizeFolder("/Admin");
+    options.Conventions.AllowAnonymousToPage("/Admin/Login");
+});
+builder.Services.AddJuNotesAdmin(builder.Configuration);
 builder.Services.AddJuNotesServices(builder.Configuration);
 builder.Services.AddJuNotesWorkers();
 builder.Services.Configure<HostOptions>(options => options.ShutdownTimeout = TimeSpan.FromSeconds(15));
@@ -33,7 +40,10 @@ await DatabaseUpgrade.RunAsync(data, migrations, DatabaseUpgrade.ReadBaseline(ba
 
 await app.Services.GetRequiredService<AiProfileStore>().EnsureDefaultsAsync(app.Lifetime.ApplicationStopping);
 
+app.UseForwardedHeaders();
 app.UseStaticFiles();
+app.UseAuthentication();
+app.UseAuthorization();
 app.MapRazorPages();
 app.MapGet("/health/live", () => Results.Ok());
 app.MapGet("/health/ready", async (HealthService health, CancellationToken ct) => await health.IsReadyAsync(ct) ? Results.Ok() : Results.StatusCode(503));
