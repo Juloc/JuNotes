@@ -22,29 +22,21 @@ fi
 rm -rf "$out"
 mkdir -p "$out"
 
-# Landscape is what the design is made for. The simulator cannot be turned from the command line, so a landscape-only build starts in landscape.
-build() { # derived data path, extra build settings...
-  local path="$1"
-  shift
-  xcodebuild \
-    -project "$app/JuNotes.xcodeproj" \
-    -scheme JuNotes \
-    -configuration Debug \
-    -destination "id=$device_id" \
-    -derivedDataPath "$path" \
-    CODE_SIGNING_ALLOWED=NO \
-    "$@" \
-    build
-}
-build "$derived-landscape" 'INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad=UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight'
-build "$derived-portrait"
+xcodebuild \
+  -project "$app/JuNotes.xcodeproj" \
+  -scheme JuNotes \
+  -configuration Debug \
+  -destination "id=$device_id" \
+  -derivedDataPath "$derived" \
+  CODE_SIGNING_ALLOWED=NO \
+  build
 
 xcrun simctl boot "$device_id" 2>/dev/null || true
 xcrun simctl bootstatus "$device_id" -b
+# The headless simulator always delivers the upright picture, so these are all portrait.
 # A fixed time and full battery, so the pictures do not differ by when they were taken.
 xcrun simctl status_bar "$device_id" override --time "9:41" --batteryState charged --batteryLevel 100 --wifiBars 3 || true
-install() { xcrun simctl install "$device_id" "$1/Build/Products/Debug-iphonesimulator/JuNotes.app"; }
-install "$derived-landscape"
+xcrun simctl install "$device_id" "$derived/Build/Products/Debug-iphonesimulator/JuNotes.app"
 
 shoot() { # name, screen, extra launch arguments...
   local name="$1" screen="$2"
@@ -60,8 +52,5 @@ shoot 2-fach subject
 shoot 3-heft notebook
 shoot 4-karteikarten cards
 shoot 5-noten grades
-install "$derived-portrait"
-shoot 6-heute-hochformat today
-shoot 7-heft-hochformat notebook
 
 ls -l "$out"
