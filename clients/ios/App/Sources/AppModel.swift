@@ -48,10 +48,11 @@ final class AppModel {
     private var syncing = false
 
     init() {
-        let directory = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("JuNotes", isDirectory: true)
+        let base = Demo.isOn ? FileManager.default.temporaryDirectory.appendingPathComponent("JuNotesDemo-\(UUID().uuidString)", isDirectory: true) : FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+        let directory = base.appendingPathComponent("JuNotes", isDirectory: true)
         try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         var failed = false
-        if let store = try? SQLiteStore(path: directory.appendingPathComponent("junotes.sqlite").path) {
+        if let store = try? SQLiteStore(path: Demo.isOn ? ":memory:" : directory.appendingPathComponent("junotes.sqlite").path) {
             self.store = store
         } else {
             // Without a database the app still opens, and the status line says plainly that nothing is being saved.

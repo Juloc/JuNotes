@@ -54,6 +54,7 @@ struct RootView: View {
         // The status line is always visible: what is saved, synced and backed up.
         .safeAreaInset(edge: .bottom, spacing: 0) { StatusLineView() }
         .task {
+            if Demo.isOn { await model.seedDemo() }
             await model.purgeTrash()
             await model.reload()
             await model.consumePendingAction()

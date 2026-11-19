@@ -3,9 +3,9 @@ name: iPad app
 on:
   push:
     branches: [main]
-    paths: ["clients/ios/**", "scripts/build-ipa.sh", ".github/workflows/ios.yml"]
+    paths: ["clients/ios/**", "scripts/build-ipa.sh", "scripts/screenshots.sh", ".github/workflows/ios.yml"]
   pull_request:
-    paths: ["clients/ios/**", "scripts/build-ipa.sh", ".github/workflows/ios.yml"]
+    paths: ["clients/ios/**", "scripts/build-ipa.sh", "scripts/screenshots.sh", ".github/workflows/ios.yml"]
   workflow_dispatch:
 
 permissions:
@@ -34,4 +34,25 @@ jobs:
         with:
           name: JuNotes-unsigned-ipa
           path: ${{ runner.temp }}/ipa/JuNotes.ipa
+          retention-days: 14
+
+  screenshots:
+    # The real app in the iPad simulator, with made-up data, as pictures to look at.
+    runs-on: xcode-27
+    steps:
+      - uses: actions/checkout@v4
+      - name: Select the newest Xcode
+        run: |
+          latest="$(find /Applications -maxdepth 1 -name 'Xcode_27*.app' | sort -V | tail -1)"
+          if [ -n "$latest" ]; then sudo xcode-select -s "$latest"; fi
+          xcodebuild -version
+      - name: Install XcodeGen
+        run: brew install xcodegen
+      - name: Run the app and take screenshots
+        run: scripts/screenshots.sh "$RUNNER_TEMP/screenshots"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: JuNotes-screenshots
+          path: ${{ runner.temp }}/screenshots/*.png
           retention-days: 14
