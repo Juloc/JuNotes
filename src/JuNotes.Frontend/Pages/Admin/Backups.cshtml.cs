@@ -12,6 +12,12 @@ namespace JuNotes.Frontend.Pages.Admin
 
         public int Keep => backups.Options.Keep;
 
+        public IReadOnlyList<string> Destinations => backups.Mirror?.Names ?? [];
+
+        public bool Encrypts => backups.Mirror?.Encrypts ?? false;
+
+        public IReadOnlyList<BackupMirror.Result> LastResults => backups.Mirror?.Last ?? [];
+
         public void OnGet() => Files = BackupFiles.List(backups.Options.Directory);
 
         public async Task<IActionResult> OnPostRunAsync(CancellationToken ct)

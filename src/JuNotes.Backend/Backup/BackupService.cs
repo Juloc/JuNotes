@@ -20,16 +20,26 @@ namespace JuNotes.Backend.Backup
 
         // Scans and PDFs; zipped next to each dump. Set from Assets:Directory.
         public string? AssetsDirectory { get; set; }
+
+        // A second folder every backup is copied to, such as a share of the NAS mounted into the container.
+        public string? CopyTo { get; set; }
+
+        // With a passphrase, copies that leave the server are encrypted first. Without one they leave as they are.
+        public string? Passphrase { get; set; }
+
+        public DriveOptions Drive { get; set; } = new();
     }
 
     public sealed class BackupFailedException(string message) : Exception(message);
 
-    public sealed partial class BackupService(string connectionString, BackupOptions options, TimeProvider time, ILogger<BackupService> logger) : IDisposable
+    public sealed partial class BackupService(string connectionString, BackupOptions options, TimeProvider time, ILogger<BackupService> logger, BackupMirror? mirror = null) : IDisposable
     {
         // One backup at a time: the nightly run and a click on "Jetzt sichern" never overlap.
         private readonly SemaphoreSlim _gate = new(1, 1);
 
         public BackupOptions Options => options;
+
+        public BackupMirror? Mirror => mirror;
 
         public BackupFile? Latest() => BackupFiles.List(options.Directory) is { Count: > 0 } files ? files[0] : null;
 
@@ -59,6 +69,18 @@ namespace JuNotes.Backend.Backup
 
                 var removed = BackupFiles.Rotate(options.Directory, options.Keep);
                 var bytes = new FileInfo(final).Length;
+                if (mirror is { IsActive: true })
+                {
+                    // A copy that fails is reported and logged, never allowed to fail the backup that is already safe here.
+                    var files = new List<string> { final };
+                    if (File.Exists(BackupFiles.AssetsArchiveFor(final)))
+                    {
+                        files.Add(BackupFiles.AssetsArchiveFor(final));
+                    }
+
+                    await mirror.MirrorAsync(files, prune: kind != BackupKind.Manual, ct);
+                }
+
                 LogWritten(logger, kind, bytes, removed.Count);
                 return new BackupFile(final, new DateTimeOffset(at.UtcDateTime, TimeSpan.Zero), kind, bytes);
             }

@@ -9,6 +9,22 @@
     <form method="post" asp-page-handler="Run"><div class="actions"><button type="submit">Jetzt sichern</button></div></form>
 </div>
 <div class="card">
+    <h2>Weitere Orte</h2>
+    @if (Model.Destinations.Count == 0)
+    {
+        <p class="muted">Keine eingerichtet. <code>Backup__CopyTo</code> kopiert jedes Backup in einen zweiten Ordner (zum Beispiel die NAS-Freigabe), <code>Backup__Drive__*</code> zu Google Drive. Mit <code>Backup__Passphrase</code> wird alles verschlüsselt, bevor es den Server verlässt.</p>
+    }
+    else
+    {
+        <p class="muted">@(Model.Encrypts ? "Die Kopien sind verschlüsselt." : "Die Kopien sind nicht verschlüsselt. Setze Backup__Passphrase, bevor sie zu einem fremden Dienst gehen.")</p>
+        @foreach (var destination in Model.Destinations)
+        {
+            var last = Model.LastResults.FirstOrDefault(result => result.Destination == destination);
+            <div class="row"><span><i class="dot @(last is null ? "warn" : last.Ok ? "ok" : "bad")"></i>@destination</span><span class="muted">@(last is null ? "noch keine Kopie seit dem Start" : last.Ok ? "zuletzt in Ordnung" : last.Error)</span></div>
+        }
+    }
+</div>
+<div class="card">
     <h2>Vorhandene Backups</h2>
     @if (Model.Files.Count == 0)
     {

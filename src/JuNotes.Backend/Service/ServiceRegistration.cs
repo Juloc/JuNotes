@@ -29,7 +29,23 @@ namespace JuNotes.Backend.Service
             // The backup takes the scanned files along with the database.
             backup.AssetsDirectory ??= assets.Directory;
             services.AddSingleton(backup);
-            services.AddSingleton(provider => new BackupService(connectionString, backup, provider.GetRequiredService<TimeProvider>(), provider.GetRequiredService<ILogger<BackupService>>()));
+            services.AddSingleton(provider =>
+            {
+                var destinations = new List<IBackupDestination>();
+                if (!string.IsNullOrWhiteSpace(backup.CopyTo))
+                {
+                    destinations.Add(new FolderDestination(backup.CopyTo));
+                }
+
+                if (backup.Drive.IsComplete)
+                {
+                    // Uploads can take a while, so this client is not held to the usual hundred seconds.
+                    destinations.Add(new GoogleDriveDestination(new HttpClient { Timeout = TimeSpan.FromMinutes(30) }, backup.Drive));
+                }
+
+                return new BackupMirror(destinations, backup.Passphrase, backup.Keep, provider.GetRequiredService<ILogger<BackupMirror>>());
+            });
+            services.AddSingleton(provider => new BackupService(connectionString, backup, provider.GetRequiredService<TimeProvider>(), provider.GetRequiredService<ILogger<BackupService>>(), provider.GetRequiredService<BackupMirror>()));
             var codex = new CodexOptions();
             configuration.GetSection("Codex").Bind(codex);
             services.AddSingleton(codex);

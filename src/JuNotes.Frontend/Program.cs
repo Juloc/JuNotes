@@ -11,6 +11,29 @@ using JuNotes.Integrations.Codex;
 using JuNotes.Workers;
 using Npgsql;
 
+// `decrypt-backup <encrypted file> <output file>` reads the passphrase from Backup__Passphrase, undoes the encryption of a copy and ends.
+if (args is ["decrypt-backup", var encrypted, var plain])
+{
+    var passphrase = Environment.GetEnvironmentVariable("Backup__Passphrase");
+    if (string.IsNullOrEmpty(passphrase))
+    {
+        await Console.Error.WriteLineAsync("Set the passphrase in the environment variable Backup__Passphrase.");
+        return 2;
+    }
+
+    try
+    {
+        await BackupCrypto.DecryptAsync(encrypted, plain, passphrase, CancellationToken.None);
+        Console.WriteLine("Decrypted to " + plain);
+        return 0;
+    }
+    catch (Exception error) when (error is BackupDecryptionException or IOException)
+    {
+        await Console.Error.WriteLineAsync(error.Message);
+        return 1;
+    }
+}
+
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddRazorPages(options =>
 {
@@ -142,5 +165,6 @@ aiApi.MapPost("/{task}", async (string task, AiRequest request, LearningService 
 });
 
 app.Run();
+return 0;
 
 public partial class Program;

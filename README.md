@@ -43,6 +43,17 @@ KI (Phase 3): Das Codex-CLI muss im Image oder auf dem Server stehen (`Codex__Ex
 `Codex__Home` (im Docker-Image `/data/codex`) und wird im Admin-Bereich per Geräteanmeldung gemacht. `Ai__DailyLimit` (Standard 60)
 begrenzt die Anfragen pro Tag. Die Profile (Prompts, Schwierigkeit, Ton) stellt der Admin ein; die App sieht nur ihre Namen.
 
+Weitere Orte für Backups (Phase 4, alles optional): `Backup__CopyTo` kopiert jedes Backup in einen zweiten Ordner, zum Beispiel eine
+NAS-Freigabe, die in den Container gemountet ist. `Backup__Drive__ClientId`, `__ClientSecret`, `__RefreshToken` und `__FolderId` schicken es
+zu Google Drive (den Refresh-Token holt man einmal mit dem Google OAuth Playground, Bereich `https://www.googleapis.com/auth/drive.file`).
+Mit `Backup__Passphrase` wird jede Kopie verschlüsselt (AES-256-GCM), bevor sie den Server verlässt. Wieder öffnen:
+
+```bash
+Backup__Passphrase='…' dotnet JuNotes.Frontend.dll decrypt-backup junotes-….dump.enc junotes-….dump
+```
+
+Das Passwort für den Admin-Bereich (`/Admin`) steht in `Admin__Password`; ohne es bleibt der Bereich geschlossen.
+
 Server ohne Docker starten (legt die Datenbank bei Bedarf selbst an):
 
 ```bash
