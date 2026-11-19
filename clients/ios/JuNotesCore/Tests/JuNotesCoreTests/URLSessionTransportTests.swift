@@ -239,3 +239,67 @@ extension URLRequest {
         return data
     }
 }
+
+extension URLSessionTransportTests {
+    @Test func paperlessAvailabilityIsReadFromTheServer() async throws {
+        StubProtocol.handler = { request in
+            #expect(request.url?.path == "/api/v1/export/status")
+            return (200, Data(#"{"paperless":true}"#.utf8))
+        }
+        #expect(try await transport.paperlessAvailable())
+
+        StubProtocol.handler = { _ in (200, Data(#"{"paperless":false}"#.utf8)) }
+        #expect(try await transport.paperlessAvailable() == false)
+    }
+
+    @Test func aPdfIsSentWithTitleAndTagsInTheQuery() async throws {
+        StubProtocol.handler = { request in
+            let items = URLComponents(url: request.url!, resolvingAgainstBaseURL: false)!.queryItems ?? []
+            #expect(request.url?.path == "/api/v1/export/paperless")
+            #expect(request.httpMethod == "POST")
+            #expect(items.first { $0.name == "title" }?.value == "Brüche & mehr")
+            #expect(items.first { $0.name == "tags" }?.value == "Mathe,Schule")
+            #expect(request.value(forHTTPHeaderField: "Content-Type") == "application/pdf")
+            #expect(request.value(forHTTPHeaderField: "Authorization") == "Bearer t0k")
+            #expect(request.timeoutInterval == 300)
+            #expect(request.bodyData() == Data("%PDF-1.7".utf8))
+            return (202, Data(#"{"task":"abc"}"#.utf8))
+        }
+
+        try await transport.sendToPaperless(pdf: Data("%PDF-1.7".utf8), title: "Brüche & mehr", tags: ["Mathe", "Schule"])
+    }
+
+    @Test(arguments: [
+        (503, #"{"detail":"Paperless ist auf dem Server nicht eingerichtet."}"#, ExportError.notSetUp),
+        (502, #"{"detail":"Paperless refused uploading (403)."}"#, ExportError.failed("Paperless refused uploading (403).")),
+        (415, #"{"detail":"Das ist keine PDF-Datei."}"#, ExportError.refused("Das ist keine PDF-Datei.")),
+        (401, "", ExportError.unauthorized),
+        (500, "", ExportError.unreachable),
+    ])
+    func paperlessRefusalsBecomeSentences(status: Int, body: String, expected: ExportError) async {
+        StubProtocol.handler = { _ in (status, Data(body.utf8)) }
+        await #expect(throws: expected) { try await transport.sendToPaperless(pdf: Data("%PDF".utf8), title: "x", tags: []) }
+    }
+
+    @Test func noNetworkWhileSendingIsTold() async {
+        StubProtocol.handler = { _ in throw URLError(.notConnectedToInternet) }
+        await #expect(throws: ExportError.noNetwork) { try await transport.sendToPaperless(pdf: Data("%PDF".utf8), title: "x", tags: []) }
+    }
+}
+
+struct NotebookTitleTests {
+    @Test(arguments: [
+        ("Mathe-Heft.pdf", "Mathe-Heft"),
+        ("GoodNotes_-_Mathe_2026.pdf", "GoodNotes - Mathe 2026"),
+        ("  Biologie  Zelle .pdf", "Biologie Zelle"),
+        (".pdf", "Importiertes Heft"),
+        ("ohne Endung", "ohne Endung"),
+    ])
+    func aTitleFromAFileName(name: String, expected: String) {
+        #expect(NotebookTitle.fromFileName(name) == expected)
+    }
+
+    @Test func aVeryLongNameIsCut() {
+        #expect(NotebookTitle.fromFileName(String(repeating: "a", count: 300) + ".pdf").count == 120)
+    }
+}

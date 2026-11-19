@@ -5,8 +5,8 @@ import FoundationNetworking
 
 /// Talks to the server's `/api/v1/sync` endpoints and turns every failure into a `TransportError` the status line understands.
 public struct URLSessionTransport: SyncTransport {
-    private let baseURL: URL
-    private let token: String
+    let baseURL: URL
+    let token: String
     private let session: URLSession
 
     public init(baseURL: URL, token: String, session: URLSession = .shared) {

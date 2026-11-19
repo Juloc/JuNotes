@@ -13,6 +13,7 @@ struct PageView: View {
     @Environment(AppModel.self) private var model
     @State private var strokes: [Stroke]?
     @State private var scanImage: UIImage?
+    @State private var pdfImage: UIImage?
     @State private var showSolution = false
 
     var body: some View {
@@ -38,6 +39,13 @@ struct PageView: View {
                     Spacer()
                 }
                 .allowsHitTesting(false)
+            }
+            if case .pdf(let assetID, _) = page.content {
+                if let pdfImage {
+                    Image(uiImage: pdfImage).resizable().scaledToFit().frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else {
+                    VStack(spacing: 8) { ProgressView(); Text(AssetFiles.exists(assetID) ? "PDF-Seite wird geöffnet" : "PDF wird vom Server geholt").font(.footnote).foregroundStyle(.secondary) }
+                }
             }
             if let heading = page.heading {
                 VStack {
@@ -74,6 +82,9 @@ struct PageView: View {
         .task(id: model.assetRevision) {
             if case .scan(let assetID) = page.content {
                 scanImage = await Task.detached { AssetFiles.image(for: assetID) }.value
+            }
+            if case .pdf(let assetID, let index) = page.content {
+                pdfImage = PDFPages.shared.image(assetID: assetID, pageIndex: index, width: displayWidth)
             }
         }
     }

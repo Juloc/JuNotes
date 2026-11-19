@@ -209,5 +209,15 @@ struct SQLiteStoreTests {
         #expect(try await store.cards(subjectID: uuid(10)).map(\.id) == [uuid(1)])
         #expect(try await store.cards().count == 2)
     }
+
+    @Test func allNotebooksOfAllSubjectsComeBackWithoutTheTrashed() async throws {
+        let store = try store()
+        try await store.put(Notebook(id: uuid(1), subjectID: uuid(10), title: "A", createdAt: created))
+        try await store.put(Notebook(id: uuid(2), subjectID: uuid(11), title: "B", createdAt: created))
+        try await store.put(Notebook(id: uuid(3), subjectID: nil, title: "C", createdAt: created))
+        try await store.put(Notebook(id: uuid(4), subjectID: uuid(10), title: "D", createdAt: created, trashedAt: created))
+
+        #expect(Set(try await store.allNotebooks().map(\.title)) == ["A", "B", "C"])
+    }
 }
 #endif

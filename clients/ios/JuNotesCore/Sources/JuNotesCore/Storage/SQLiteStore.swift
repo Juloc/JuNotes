@@ -148,6 +148,11 @@ public actor SQLiteStore: SyncStore {
             .sorted { $0.createdAt < $1.createdAt }
     }
 
+    /// Every notebook of every subject, for the system search.
+    public func allNotebooks() throws -> [Notebook] {
+        try decoded(kind: .notebook, parent: nil, filterParent: false).compactMap { try? Notebook.decode($0) }.filter { $0.trashedAt == nil }
+    }
+
     public func trashedNotebooks() throws -> [Notebook] {
         try decoded(kind: .notebook, parent: nil, filterParent: false).compactMap { try? Notebook.decode($0) }.filter { $0.trashedAt != nil }
     }

@@ -1,4 +1,5 @@
 import JuNotesCore
+import CoreSpotlight
 import SwiftUI
 
 struct RootView: View {
@@ -55,14 +56,24 @@ struct RootView: View {
         .task {
             await model.purgeTrash()
             await model.reload()
+            await model.consumePendingAction()
             await model.syncNow()
         }
         .onChange(of: scenePhase) { _, phase in
-            if phase == .active { Task { await model.syncNow() } }
+            if phase == .active { Task { await model.consumePendingAction(); await model.syncNow() } }
         }
         .sheet(isPresented: $showNewSubject) { NewSubjectSheet() }
         .sheet(isPresented: $showSettings) { SettingsView() }
         .sheet(isPresented: $showSearch) { SearchView() }
+        .sheet(item: $model.shareItem) { ShareSheet(url: $0.url) }
+        .alert("Hinweis", isPresented: Binding(get: { model.notice != nil }, set: { if !$0 { model.notice = nil } })) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(model.notice ?? "")
+        }
+        .onContinueUserActivity(CSSearchableItemActionType) { activity in
+            if let id = SpotlightIndex.notebookID(from: activity) { Task { await model.open(notebookID: id, pageID: nil) } }
+        }
         .sheet(item: $model.learnRequest) { LearnSheet(request: $0) }
         .sheet(item: $model.pendingScan) { ScanDestinationSheet(scan: $0) }
         .fullScreenCover(item: $model.scannerOrigin) { origin in

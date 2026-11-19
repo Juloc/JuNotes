@@ -32,6 +32,9 @@ final class AppModel {
     var pendingPageID: UUID?
     var scannerOrigin: ScanOrigin?
     var learnRequest: LearnRequest?
+    /// A message for her, shown once: the result of sending to Paperless, a failed export.
+    var notice: String?
+    var shareItem: ShareItem?
     var pendingScan: PendingScan?
     var hasLooseNotebooks = false
     /// Counts up when files arrived from the server, so pages that waited for their scan look again.
@@ -74,6 +77,7 @@ final class AppModel {
         subjects = (try? await store.subjects()) ?? []
         grades = (try? await store.grades()) ?? []
         cards = (try? await store.cards()) ?? []
+        SpotlightIndex.update(subjects: subjects, notebooks: (try? await store.allNotebooks()) ?? [])
         hasLooseNotebooks = !((try? await store.notebooks(subjectID: nil)) ?? []).isEmpty
         await reloadNotebooks()
         trashed = ((try? await store.trashedNotebooks()) ?? []).sorted { ($0.trashedAt ?? .distantPast) > ($1.trashedAt ?? .distantPast) }
@@ -236,5 +240,17 @@ final class AppModel {
     func deleteGrade(_ grade: Grade) async {
         await write { try await self.store.write(grade.deletion()) }
         grades = (try? await store.grades()) ?? grades
+    }
+
+    /// Does what a shortcut asked for, once the app is up.
+    func consumePendingAction() async {
+        guard let action = PendingActions.next else { return }
+        PendingActions.next = nil
+        switch action {
+        case .startPageForNow:
+            if cockpit().suggestedSubject == nil { notice = "Zu dieser Zeit läuft keine Stunde, die zu einem deiner Fächer passt." } else { await startPageForNow() }
+        case .scan:
+            scannerOrigin = ScanOrigin()
+        }
     }
 }

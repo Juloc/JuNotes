@@ -19,6 +19,14 @@ struct NotebookView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .principal) { positionLabel }
+            ToolbarItem(placement: .primaryAction) {
+                Menu {
+                    Button("Als PDF teilen", systemImage: "square.and.arrow.up") { Task { if let url = await model.exportPDF(notebook) { model.shareItem = ShareItem(url: url) } } }
+                    Button("An Paperless senden", systemImage: "archivebox") { Task { await model.sendToPaperless(notebook) } }
+                } label: {
+                    Label("Teilen", systemImage: "square.and.arrow.up")
+                }
+            }
             ToolbarItem(placement: .primaryAction) { LearnMenu(notebook: notebook, pageID: currentPageID) }
             ToolbarItem(placement: .primaryAction) {
                 Button("Scannen", systemImage: "doc.viewfinder") { model.scannerOrigin = ScanOrigin(notebook: notebook, afterPageID: currentPageID) }

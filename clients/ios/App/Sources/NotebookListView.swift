@@ -1,9 +1,11 @@
 import JuNotesCore
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct NotebookListView: View {
     @Environment(AppModel.self) private var model
     @State private var showNew = false
+    @State private var showImporter = false
     @State private var path: [UUID] = []
 
     var body: some View {
@@ -52,6 +54,9 @@ struct NotebookListView: View {
         }
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
+                Button("PDF importieren", systemImage: "square.and.arrow.down") { showImporter = true }
+            }
+            ToolbarItem(placement: .primaryAction) {
                 Button("Scannen", systemImage: "doc.viewfinder") { model.scannerOrigin = ScanOrigin() }
             }
             if model.selectedSubject != nil {
@@ -61,6 +66,14 @@ struct NotebookListView: View {
             }
         }
         .sheet(isPresented: $showNew) { NewNotebookSheet() }
+        .fileImporter(isPresented: $showImporter, allowedContentTypes: [.pdf], allowsMultipleSelection: true) { result in
+            guard case .success(let urls) = result else { return }
+            Task {
+                for url in urls {
+                    do { try await model.importPDF(from: url) } catch let error as PDFImportError { model.notice = "\(url.lastPathComponent): \(error.sentence)" } catch { model.notice = "\(url.lastPathComponent) konnte nicht importiert werden." }
+                }
+            }
+        }
     }
 
     private func card(_ notebook: Notebook, color: String) -> some View {
