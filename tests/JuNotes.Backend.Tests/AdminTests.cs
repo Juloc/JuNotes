@@ -16,14 +16,16 @@ namespace JuNotes.Backend.Tests
         private readonly TestDatabase _database;
         private readonly string? _password;
         private readonly string _codex;
+        private readonly string? _webPassword;
 
         public string BackupDirectory { get; } = Path.Combine(Path.GetTempPath(), "junotes-admin-" + Guid.NewGuid().ToString("N"));
 
-        public AdminHost(TestDatabase database, string? password, string codex)
+        public AdminHost(TestDatabase database, string? password, string codex, string? webPassword = null)
         {
             _database = database;
             _password = password;
             _codex = codex;
+            _webPassword = webPassword;
         }
 
         protected override void ConfigureWebHost(Microsoft.AspNetCore.Hosting.IWebHostBuilder builder)
@@ -35,9 +37,15 @@ namespace JuNotes.Backend.Tests
             builder.UseSetting("Backup:PgDump", PostgresTools.PgDump);
             builder.UseSetting("Codex:Executable", _codex);
             builder.UseSetting("Codex:Home", Path.Combine(BackupDirectory, "codex"));
+            builder.UseSetting("Assets:Directory", Path.Combine(BackupDirectory, "assets"));
             if (_password is not null)
             {
                 builder.UseSetting("Admin:Password", _password);
+            }
+
+            if (_webPassword is not null)
+            {
+                builder.UseSetting("Web:Password", _webPassword);
             }
         }
 
@@ -67,6 +75,10 @@ namespace JuNotes.Backend.Tests
             fields["__RequestVerificationToken"] = await TokenAsync(client, page);
             return await client.PostAsync(new Uri(url, UriKind.Relative), new FormUrlEncodedContent(fields));
         }
+
+        // Where a redirect leads, as a path: the server answers with a relative or an absolute address depending on who sent the user away.
+        public static string PathOf(HttpResponseMessage response)
+            => response.Headers.Location is { IsAbsoluteUri: true } absolute ? absolute.AbsolutePath : response.Headers.Location!.OriginalString.Split('?')[0];
 
         public static async Task LoginAsync(HttpClient client)
         {
@@ -114,7 +126,7 @@ namespace JuNotes.Backend.Tests
                 var response = await host.Browser().GetAsync(new Uri("/Admin/Profiles", UriKind.Relative));
 
                 Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
-                Assert.Equal("/Admin/Login", response.Headers.Location!.AbsolutePath);
+                Assert.Equal("/Admin/Login", Web.PathOf(response));
             }
         }
 

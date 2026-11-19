@@ -1,0 +1,37 @@
+@page "/Notes"
+@model IndexModel
+@{
+    ViewData["Title"] = "Meine Hefte";
+}
+<h1>Meine Hefte</h1>
+@if (Model.Groups.Count == 0)
+{
+    <div class="card"><p>Noch nichts hier. Sobald das iPad synchronisiert hat, erscheinen die Hefte.</p></div>
+}
+else
+{
+    <input type="search" id="filter" placeholder="Hefte suchen" aria-label="Hefte suchen" />
+    @foreach (var group in Model.Groups)
+    {
+        <section class="subject">
+            <h2><span class="dot" style="background:@group.Color"></span>@group.Name</h2>
+            <div class="grid">
+                @foreach (var notebook in group.Notebooks)
+                {
+                    <a class="book" href="/Notes/@notebook.Id" data-title="@notebook.Title.ToLowerInvariant()">
+                        <div class="cover" style="background:@group.Color">@(notebook.Type == "whiteboard" ? "Whiteboard" : "Heft")</div>
+                        <strong>@notebook.Title</strong>
+                    </a>
+                }
+            </div>
+        </section>
+    }
+    <script>
+        const filter = document.getElementById('filter');
+        filter.addEventListener('input', () => {
+            const q = filter.value.trim().toLowerCase();
+            document.querySelectorAll('.book').forEach(b => b.style.display = !q || b.dataset.title.includes(q) ? '' : 'none');
+            document.querySelectorAll('.subject').forEach(s => s.style.display = [...s.querySelectorAll('.book')].some(b => b.style.display !== 'none') ? '' : 'none');
+        });
+    </script>
+}

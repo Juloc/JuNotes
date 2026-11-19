@@ -1,6 +1,7 @@
 using JuNotes.Backend.Ai;
 using JuNotes.Backend.Assets;
 using JuNotes.Backend.Backup;
+using JuNotes.Backend.Library;
 using JuNotes.Backend.Infrastructure.Sql;
 using JuNotes.Backend.School;
 using JuNotes.Integrations.Codex;
@@ -63,6 +64,7 @@ namespace JuNotes.Backend.Service
             services.AddHttpClient<IFeedFetcher, FeedFetcher>(client => client.DefaultRequestHeaders.UserAgent.ParseAdd("JuNotes"));
             services.AddSingleton<SchoolStore>();
             services.AddSingleton<SchoolImportService>();
+            services.AddSingleton<LibraryReader>();
             services.AddSingleton<HealthService>();
             services.AddSingleton<SyncService>();
             services.AddSingleton(new SyncAccess(configuration["Sync:Token"]));

@@ -11,6 +11,15 @@ namespace JuNotes.Frontend.Admin
         public string? Password { get; set; }
     }
 
+    public sealed class WebOptions
+    {
+        // The password for reading her notes in the browser (environment variable Web__Password). The reading side stays off until it is set.
+        public string? Password { get; set; }
+    }
+
+    // The same lock and the same care as the admin password, for the reading side of the web app.
+    public sealed class ReaderAccess(WebOptions options, TimeProvider time) : AdminAccess(new AdminOptions { Password = options.Password }, time);
+
     public enum LoginResult
     {
         Accepted,
@@ -20,7 +29,7 @@ namespace JuNotes.Frontend.Admin
     }
 
     // The one password of the admin area. Five wrong tries from one address lock that address out for ten minutes, so the password cannot be guessed.
-    public sealed class AdminAccess(AdminOptions options, TimeProvider time)
+    public class AdminAccess(AdminOptions options, TimeProvider time)
     {
         public const int MaxFailures = 5;
         public static readonly TimeSpan Window = TimeSpan.FromMinutes(10);

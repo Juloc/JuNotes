@@ -1,0 +1,13 @@
+{
+  "name": "JuNotes",
+  "short_name": "JuNotes",
+  "description": "Meine Hefte, im Browser gelesen",
+  "start_url": "/Notes",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f2f2f7",
+  "theme_color": "#007aff",
+  "icons": [
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}

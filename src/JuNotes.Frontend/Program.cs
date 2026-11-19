@@ -38,8 +38,9 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddRazorPages(options =>
 {
     // The admin area is behind its own login; only the login page is open.
-    options.Conventions.AuthorizeFolder("/Admin");
+    options.Conventions.AuthorizeFolder("/Admin", AdminSetup.AdminPolicy);
     options.Conventions.AllowAnonymousToPage("/Admin/Login");
+    options.Conventions.AuthorizeFolder("/Notes", AdminSetup.ReaderPolicy);
 });
 builder.Services.AddJuNotesAdmin(builder.Configuration);
 builder.Services.AddJuNotesServices(builder.Configuration);

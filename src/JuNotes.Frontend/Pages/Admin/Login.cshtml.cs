@@ -23,7 +23,7 @@ namespace JuNotes.Frontend.Pages.Admin
             switch (access.TryLogin(password, address))
             {
                 case LoginResult.Accepted:
-                    await HttpContext.SignInAsync(AdminSetup.Scheme, new ClaimsPrincipal(new ClaimsIdentity([new Claim(ClaimTypes.Name, "admin")], AdminSetup.Scheme)));
+                    await HttpContext.SignInAsync(AdminSetup.Scheme, new ClaimsPrincipal(new ClaimsIdentity([new Claim(ClaimTypes.Name, "admin"), new Claim(ClaimTypes.Role, "admin")], AdminSetup.Scheme)));
                     return LocalRedirect(ReturnUrl);
                 case LoginResult.LockedOut:
                     Failure = "Zu viele Versuche. Warte zehn Minuten.";
