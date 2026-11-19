@@ -4,8 +4,20 @@ import SwiftUI
 struct NotebookListView: View {
     @Environment(AppModel.self) private var model
     @State private var showNew = false
+    @State private var path: [UUID] = []
 
     var body: some View {
+        NavigationStack(path: $path) { content }
+            .task(id: model.pendingNotebookID) {
+                // "Neue Seite für jetzt" asked for a notebook to be opened.
+                if let id = model.pendingNotebookID {
+                    model.pendingNotebookID = nil
+                    path = [id]
+                }
+            }
+    }
+
+    private var content: some View {
         Group {
             if let subject = model.selectedSubject {
                 if model.notebooks.isEmpty {

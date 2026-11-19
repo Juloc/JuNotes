@@ -145,5 +145,18 @@ struct SQLiteStoreTests {
         #expect(try await store.search("alt").isEmpty)
         #expect(try await store.search("neu").count == 1)
     }
+
+    @Test func gradesComeBackPerSubjectNewestFirst() async throws {
+        let store = try store()
+        let old = Grade(id: uuid(1), subjectID: uuid(10), value: 3, date: created, title: "alt")
+        let new = Grade(id: uuid(2), subjectID: uuid(10), value: 2, date: created + 100, title: "neu")
+        let other = Grade(id: uuid(3), subjectID: uuid(11), value: 1, date: created)
+        try await store.put(old)
+        try await store.put(new)
+        try await store.put(other)
+
+        #expect(try await store.grades(subjectID: uuid(10)).map(\.title) == ["neu", "alt"])
+        #expect(try await store.grades().count == 3)
+    }
 }
 #endif

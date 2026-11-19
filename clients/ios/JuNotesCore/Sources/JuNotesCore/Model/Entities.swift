@@ -185,21 +185,24 @@ public struct Page: SyncEntity {
     public var template: PageTemplate?
     public var content: PageContent
     public var autoCreated: Bool
+    /// A line at the top of the page, such as "Do 19.11. · Mathe", which "Neue Seite für jetzt" writes.
+    public var heading: String?
     public var trashedAt: Date?
 
     public var parentID: UUID? { notebookID }
 
-    public init(id: UUID = UUID(), notebookID: UUID, sort: String, template: PageTemplate? = nil, content: PageContent = .drawing, autoCreated: Bool = false, trashedAt: Date? = nil) {
+    public init(id: UUID = UUID(), notebookID: UUID, sort: String, template: PageTemplate? = nil, content: PageContent = .drawing, autoCreated: Bool = false, heading: String? = nil, trashedAt: Date? = nil) {
         self.id = id
         self.notebookID = notebookID
         self.sort = sort
         self.template = template
         self.content = content
         self.autoCreated = autoCreated
+        self.heading = heading
         self.trashedAt = trashedAt
     }
 
-    enum CodingKeys: String, CodingKey { case sort, template, content, autoCreated, trashedAt }
+    enum CodingKeys: String, CodingKey { case sort, template, content, autoCreated, heading, trashedAt }
 
     public init(from decoder: any Decoder) throws {
         let values = try decoder.container(keyedBy: CodingKeys.self)
@@ -209,6 +212,7 @@ public struct Page: SyncEntity {
         template = try values.decodeIfPresent(PageTemplate.self, forKey: .template)
         content = try values.decodeIfPresent(PageContent.self, forKey: .content) ?? .drawing
         autoCreated = try values.decodeIfPresent(Bool.self, forKey: .autoCreated) ?? false
+        heading = try values.decodeIfPresent(String.self, forKey: .heading)
         trashedAt = try values.decodeIfPresent(Date.self, forKey: .trashedAt)
     }
 

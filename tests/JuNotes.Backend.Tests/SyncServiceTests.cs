@@ -153,6 +153,19 @@ namespace JuNotes.Backend.Tests
         }
 
         [RequiresDatabaseFact]
+        public async Task A_grade_is_stored_like_any_other_entity()
+        {
+            await using var database = await TestDatabase.CreateCurrentAsync();
+            var service = new SyncService(database.Data);
+            var grade = new SyncChange(EntityKinds.Grade, Guid.NewGuid(), Page, Json("{\"value\":2.3}"), false);
+
+            await service.PushAsync(Push(grade), CancellationToken.None);
+
+            var pulled = await service.PullAsync(0, 10, CancellationToken.None);
+            Assert.Equal(EntityKinds.Grade, Assert.Single(pulled.Changes).Kind);
+        }
+
+        [RequiresDatabaseFact]
         public async Task A_rejected_push_changes_nothing()
         {
             await using var database = await TestDatabase.CreateCurrentAsync();

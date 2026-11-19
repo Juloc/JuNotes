@@ -6,7 +6,7 @@ import FoundationNetworking
 #endif
 
 /// Answers every request from a closure, so the transport is tested without a server.
-final class StubProtocol: URLProtocol, @unchecked Sendable {
+final class StubProtocol: URLProtocol {
     nonisolated(unsafe) static var handler: (@Sendable (URLRequest) throws -> (Int, Data))?
 
     override class func canInit(with request: URLRequest) -> Bool { true }

@@ -90,3 +90,17 @@ struct ModelTests {
         #expect(notebook.trashedAt == nil)
     }
 }
+
+struct PageHeadingTests {
+    @Test func aPageKeepsItsHeadingOnTheWire() throws {
+        let page = Page(id: uuid(3), notebookID: uuid(2), sort: "i", heading: "Do 19.11. · Mathe")
+        let record = SyncRecord(kind: .page, id: uuid(3), parentID: uuid(2), payload: try page.change().payload, seq: 1)
+
+        #expect(try Page.decode(record).heading == "Do 19.11. · Mathe")
+    }
+
+    @Test func aPageWithoutOneHasNone() throws {
+        let record = SyncRecord(kind: .page, id: uuid(3), parentID: uuid(2), payload: .object(["sort": .string("i")]), seq: 1)
+        #expect(try Page.decode(record).heading == nil)
+    }
+}

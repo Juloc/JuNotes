@@ -11,6 +11,9 @@ struct RootView: View {
         @Bindable var model = model
         NavigationSplitView {
             List(selection: Binding(get: { model.sidebar }, set: { item in Task { await model.select(item) } })) {
+                Section {
+                    Label("Heute", systemImage: "sun.max").tag(SidebarItem.today)
+                }
                 Section("Fächer") {
                     ForEach(model.subjects) { subject in
                         Label { Text(subject.name) } icon: {
@@ -20,6 +23,7 @@ struct RootView: View {
                     }
                 }
                 Section {
+                    Label("Noten", systemImage: "list.number").tag(SidebarItem.grades)
                     Label("Papierkorb", systemImage: "trash").tag(SidebarItem.trash)
                 }
             }
@@ -28,18 +32,12 @@ struct RootView: View {
                 ToolbarItem(placement: .primaryAction) { Button("Neues Fach", systemImage: "plus") { showNewSubject = true } }
                 ToolbarItem(placement: .bottomBar) { Button("Einstellungen", systemImage: "gearshape") { showSettings = true } }
             }
-            .overlay {
-                if model.subjects.isEmpty {
-                    ContentUnavailableView {
-                        Label("Noch kein Fach", systemImage: "books.vertical")
-                    } actions: {
-                        Button("Erstes Fach anlegen") { showNewSubject = true }.buttonStyle(.borderedProminent)
-                    }
-                }
-            }
         } detail: {
-            NavigationStack {
-                if model.sidebar == .trash { TrashView() } else { NotebookListView() }
+            switch model.sidebar {
+            case .today: NavigationStack { TodayView() }
+            case .grades: NavigationStack { GradesView() }
+            case .trash: NavigationStack { TrashView() }
+            default: NotebookListView()
             }
         }
         // The status line is always visible: what is saved, synced and backed up.

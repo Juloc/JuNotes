@@ -48,3 +48,15 @@ extension Page {
         return copy
     }
 }
+
+/// The line "Neue Seite für jetzt" puts at the top of a page.
+public enum PageHeading {
+    private static let weekdays = ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"]
+
+    /// "Do 19.11. · Mathe"
+    public static func make(date: Date, subject: String, calendar: Calendar = .current) -> String {
+        let parts = calendar.dateComponents([.weekday, .day, .month], from: date)
+        let weekday = weekdays[((parts.weekday ?? 1) - 1) % 7]
+        return "\(weekday) \(parts.day ?? 1).\(parts.month ?? 1). · \(subject)"
+    }
+}

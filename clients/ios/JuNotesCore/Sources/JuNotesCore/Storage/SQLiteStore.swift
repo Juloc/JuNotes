@@ -158,6 +158,10 @@ public actor SQLiteStore: SyncStore {
             .sorted { ($0.sort, $0.id.uuidString) < ($1.sort, $1.id.uuidString) }
     }
 
+    public func grades(subjectID: UUID? = nil) throws -> [Grade] {
+        try decoded(kind: .grade, parent: subjectID, filterParent: subjectID != nil).compactMap { try? Grade.decode($0) }.sorted { $0.date > $1.date }
+    }
+
     public func strokes(pageID: UUID) throws -> [Stroke] {
         try decoded(kind: .stroke, parent: pageID, filterParent: true).compactMap { try? Stroke.decode($0).stroke }
     }

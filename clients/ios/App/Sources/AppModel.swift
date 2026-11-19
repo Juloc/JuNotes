@@ -3,7 +3,9 @@ import JuNotesCore
 import Observation
 
 enum SidebarItem: Hashable {
+    case today
     case subject(UUID)
+    case grades
     case trash
 }
 
@@ -16,9 +18,15 @@ final class AppModel {
     var subjects: [Subject] = []
     var notebooks: [Notebook] = []
     var trashed: [Notebook] = []
+    var grades: [Grade] = []
+    var events: [CalendarEvent] = []
+    var news: [SchoolNews] = []
+    /// Set when "Neue Seite für jetzt" made a page: the notebook list opens that notebook.
+    var pendingNotebookID: UUID?
     var sidebar: SidebarItem?
     var settings: ServerSettings
 
+    private let schoolCache: URL
     private var syncTask: Task<Void, Never>?
     private var syncing = false
 
@@ -36,6 +44,9 @@ final class AppModel {
         let settings = ServerSettings.load()
         self.settings = settings
         snapshot = SyncSnapshot(isConfigured: settings.isComplete, localWriteFailed: failed)
+        schoolCache = directory.appendingPathComponent("school.json")
+        sidebar = .today
+        loadSchoolCache()
     }
 
     var selectedSubject: Subject? {
@@ -46,7 +57,7 @@ final class AppModel {
 
     func reload() async {
         subjects = (try? await store.subjects()) ?? []
-        if sidebar == nil { sidebar = subjects.first.map { .subject($0.id) } }
+        grades = (try? await store.grades()) ?? []
         await reloadNotebooks()
         trashed = ((try? await store.trashedNotebooks()) ?? []).sorted { ($0.trashedAt ?? .distantPast) > ($1.trashedAt ?? .distantPast) }
     }
@@ -134,6 +145,7 @@ final class AppModel {
         snapshot.record(result, pending: (try? await store.pendingCount()) ?? pending)
         if case .synced = result {
             if let info = try? await transport.info() { snapshot.lastBackupAt = info.lastBackupAt }
+            await refreshSchool(using: transport)
             await reload()
         }
     }
@@ -142,5 +154,69 @@ final class AppModel {
         new.save()
         settings = new
         await syncNow()
+    }
+
+    // MARK: School
+
+    private struct SchoolCache: Codable {
+        var events: [CalendarEvent]
+        var news: [SchoolNews]
+    }
+
+    private func loadSchoolCache() {
+        guard let data = try? Data(contentsOf: schoolCache), let cache = try? JSONDecoder().decode(SchoolCache.self, from: data) else { return }
+        events = cache.events
+        news = cache.news
+    }
+
+    /// The timetable and news from the server; the last good copy stays on the device, so "Heute" works offline.
+    private func refreshSchool(using transport: URLSessionTransport) async {
+        let now = Date()
+        guard let fetched = try? await transport.calendar(from: now.addingTimeInterval(-86400), to: now.addingTimeInterval(60 * 86400)) else { return }
+        events = fetched
+        if let items = try? await transport.news(limit: 20) { news = items }
+        if let data = try? JSONEncoder().encode(SchoolCache(events: events, news: news)) { try? data.write(to: schoolCache, options: .atomic) }
+    }
+
+    func cockpit(now: Date = Date()) -> Cockpit {
+        Cockpit(now: now, timetable: Timetable(events: events), subjects: subjects)
+    }
+
+    /// "Neue Seite für jetzt": the notebook of the lesson that runs, with a fresh page headed by the day and the subject.
+    func startPageForNow() async {
+        let now = Date()
+        guard let subject = cockpit(now: now).suggestedSubject else { return }
+
+        let existing = ((try? await store.notebooks(subjectID: subject.id)) ?? []).filter { $0.type == .pages }
+        let notebook: Notebook
+        if let latest = existing.last {
+            notebook = latest
+        } else {
+            notebook = Notebook(subjectID: subject.id, title: subject.name)
+            await write { try await self.store.put(notebook) }
+        }
+
+        let pages = (try? await store.pages(notebookID: notebook.id)) ?? []
+        let heading = PageHeading.make(date: now, subject: subject.name)
+        let page = Page(notebookID: notebook.id, sort: PageOrder.key(after: pages.last?.sort, before: nil), heading: heading)
+        await write { try await self.store.put(page) }
+
+        sidebar = .subject(subject.id)
+        await reloadNotebooks()
+        pendingNotebookID = notebook.id
+    }
+
+    // MARK: Grades
+
+    func grades(of subject: Subject) -> [Grade] { grades.filter { $0.subjectID == subject.id } }
+
+    func addGrade(_ grade: Grade) async {
+        await write { try await self.store.put(grade) }
+        grades = (try? await store.grades()) ?? grades
+    }
+
+    func deleteGrade(_ grade: Grade) async {
+        await write { try await self.store.write(grade.deletion()) }
+        grades = (try? await store.grades()) ?? grades
     }
 }

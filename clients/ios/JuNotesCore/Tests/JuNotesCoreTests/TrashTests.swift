@@ -32,3 +32,15 @@ struct TrashTests {
 
     @Test func thePurgeDateIsThirtyDaysOut() { #expect(Trash.purgeDate(trashedAt: now) == now + 30 * 86400) }
 }
+
+struct PageHeadingMakeTests {
+    @Test func theHeadingNamesTheDayAndTheSubject() {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "Europe/Berlin")!
+        let thursday = calendar.date(from: DateComponents(year: 2026, month: 11, day: 19, hour: 8))!
+        let sunday = calendar.date(from: DateComponents(year: 2026, month: 11, day: 22, hour: 8))!
+
+        #expect(PageHeading.make(date: thursday, subject: "Mathe", calendar: calendar) == "Do 19.11. · Mathe")
+        #expect(PageHeading.make(date: sunday, subject: "Bio", calendar: calendar) == "So 22.11. · Bio")
+    }
+}

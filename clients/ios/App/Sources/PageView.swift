@@ -19,6 +19,14 @@ struct PageView: View {
         ZStack {
             Color.white
             PageBackground(template: page.template ?? notebook.template)
+            if let heading = page.heading {
+                VStack {
+                    Text(heading).font(.footnote).foregroundStyle(Color(white: 0.45)).padding(.leading, displayWidth * 0.12).padding(.top, 14)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    Spacer()
+                }
+                .allowsHitTesting(false)
+            }
             if let strokes {
                 PencilCanvas(
                     pageID: page.id,
