@@ -87,7 +87,7 @@ namespace JuNotes.Backend.Service
                     throw new SyncValidationException("Every change needs an id.");
                 }
 
-                if ((change.Kind is EntityKinds.Page or EntityKinds.Stroke or EntityKinds.Grade) && change.ParentId is null)
+                if ((change.Kind is EntityKinds.Page or EntityKinds.Stroke or EntityKinds.Grade or EntityKinds.Card) && change.ParentId is null)
                 {
                     throw new SyncValidationException($"A {change.Kind} needs a parent.");
                 }

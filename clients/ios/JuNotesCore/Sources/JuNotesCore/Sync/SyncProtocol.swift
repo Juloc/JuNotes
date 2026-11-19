@@ -6,6 +6,7 @@ public enum EntityKind: String, Sendable, Codable, Equatable {
     case page
     case stroke
     case grade
+    case card
 }
 
 /// One entity created, changed or deleted. The wire format of the server's `/api/v1/sync` endpoints.

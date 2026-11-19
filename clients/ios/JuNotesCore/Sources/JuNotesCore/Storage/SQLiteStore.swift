@@ -163,6 +163,10 @@ public actor SQLiteStore: SyncStore {
         try decoded(kind: .grade, parent: subjectID, filterParent: subjectID != nil).compactMap { try? Grade.decode($0) }.sorted { $0.date > $1.date }
     }
 
+    public func cards(subjectID: UUID? = nil) throws -> [Flashcard] {
+        try decoded(kind: .card, parent: subjectID, filterParent: subjectID != nil).compactMap { try? Flashcard.decode($0) }
+    }
+
     public func strokes(pageID: UUID) throws -> [Stroke] {
         try decoded(kind: .stroke, parent: pageID, filterParent: true).compactMap { try? Stroke.decode($0).stroke }
     }

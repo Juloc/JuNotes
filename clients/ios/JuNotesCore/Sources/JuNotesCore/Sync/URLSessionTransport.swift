@@ -56,25 +56,30 @@ public struct URLSessionTransport: SyncTransport {
         }
     }
 
-    func body(of request: URLRequest) async throws -> Data {
-        let data: Data
-        let response: URLResponse
+    /// The answer to a request whatever its status; only a failure to get any answer is an error here.
+    func exchange(_ request: URLRequest) async throws -> (data: Data, status: Int) {
         do {
-            (data, response) = try await session.data(for: request)
+            let (data, response) = try await session.data(for: request)
+            guard let http = response as? HTTPURLResponse else { throw TransportError.serverUnreachable }
+            return (data, http.statusCode)
         } catch let error as URLError {
             throw Self.transportError(for: error)
+        } catch let error as TransportError {
+            throw error
         } catch {
             throw TransportError.serverUnreachable
         }
+    }
 
-        guard let http = response as? HTTPURLResponse else { throw TransportError.serverUnreachable }
-        switch http.statusCode {
+    func body(of request: URLRequest) async throws -> Data {
+        let (data, status) = try await exchange(request)
+        switch status {
         case 200..<300:
             return data
         case 401, 403:
             throw TransportError.unauthorized
         case 400..<500:
-            throw TransportError.rejected(Self.detail(in: data) ?? "HTTP \(http.statusCode)")
+            throw TransportError.rejected(Self.detail(in: data) ?? "HTTP \(status)")
         default:
             // 5xx, including the 503 of a server whose sync is not set up yet.
             throw TransportError.serverUnreachable
