@@ -3,304 +3,588 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>JuNotes – Entwurf</title>
+<title>JuNotes – Entwurf 2</title>
 <style>
 :root{
-  --bg:#f2f2f7; --paper:#fff; --panel:#ffffffcc; --side:#f2f2f7; --line:#c6c6c8; --text:#1c1c1e; --muted:#6c6c70;
-  --accent:#007aff; --ink:#1d3a8a; --rule:#cfe0f5; --margin:#f4a3a3; --glass:#ffffffb8; --hover:#0000000a; --sel:#007aff1f;
-  --ok:#34c759; --wait:#ff9500; --bad:#ff3b30;
+  --bg:#f5f3fb; --surface:#fff; --surface2:#f0eefa; --text:#1b1a23; --muted:#6d6a7d; --line:#e4e0f1;
+  --accent:#6c5ce7; --accent-soft:#ece9fd; --accent-text:#5446c9; --ok:#2fb36d; --warn:#f59f0b; --bad:#e5484d;
+  --glass:#ffffffcc; --paper:#fff; --ink:#27257a; --rule:#d9e4f7; --margin:#f3aaaa;
+  --math:#4c7cf0; --german:#f59f0b; --english:#2fb36d; --bio:#14b8a6; --radius:16px;
 }
-@media (prefers-color-scheme:dark){:root{
-  --bg:#000; --paper:#1c1c1e; --panel:#2c2c2ecc; --side:#1c1c1e; --line:#38383a; --text:#f5f5f7; --muted:#98989d;
-  --accent:#0a84ff; --ink:#9db7ff; --rule:#2e3a4d; --margin:#7a3a3a; --glass:#2c2c2eb8; --hover:#ffffff12; --sel:#0a84ff33;
+html.dark{
+  --bg:#0f0e15; --surface:#1a1925; --surface2:#232233; --text:#f2f1f7; --muted:#a09db3; --line:#2d2b40;
+  --accent:#8b7df5; --accent-soft:#2a2650; --accent-text:#b7adff; --glass:#1a1925cc; --paper:#fdfcff;
+}
+@media (prefers-color-scheme:dark){html:not(.light):not(.dark){
+  --bg:#0f0e15; --surface:#1a1925; --surface2:#232233; --text:#f2f1f7; --muted:#a09db3; --line:#2d2b40;
+  --accent:#8b7df5; --accent-soft:#2a2650; --accent-text:#b7adff; --glass:#1a1925cc; --paper:#fdfcff;
 }}
 *{box-sizing:border-box;margin:0}
 html,body{height:100%}
-body{font:15px/1.4 -apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",system-ui,sans-serif;color:var(--text);background:var(--bg);overflow:hidden}
+body{font:15px/1.45 -apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",system-ui,sans-serif;color:var(--text);background:var(--bg);overflow:hidden}
 button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
-.app{display:grid;grid-template-columns:270px minmax(0,1fr);grid-template-rows:minmax(0,1fr) auto;height:100vh}
-.app.nosidebar{grid-template-columns:0 minmax(0,1fr)}
-.app.nosidebar .side{display:none}
+.i{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.i.s{width:16px;height:16px}
+h1{font-size:30px;letter-spacing:-.02em;line-height:1.15}
+h2{font-size:17px;letter-spacing:-.01em}
+.muted{color:var(--muted)} .small{font-size:13px}
+.app{display:grid;grid-template-columns:268px minmax(0,1fr);grid-template-rows:minmax(0,1fr) auto;height:100vh}
+.app.collapsed{grid-template-columns:0 minmax(0,1fr)}.app.collapsed .side{display:none}
 
 /* sidebar */
-.side{background:var(--side);border-right:.5px solid var(--line);overflow:auto;padding:18px 12px;grid-row:1}
-.side h2{font-size:26px;font-weight:700;letter-spacing:-.02em;padding:0 8px 12px}
-.now{background:var(--paper);border-radius:14px;padding:12px;margin:0 4px 16px;box-shadow:0 0 0 .5px var(--line)}
-.now small{color:var(--muted);display:block}
-.now b{display:block;margin:2px 0 8px}
-.btn{background:var(--accent);color:#fff;border-radius:10px;padding:8px 12px;font-weight:600;display:inline-flex;gap:6px;align-items:center}
-.btn.ghost{background:var(--sel);color:var(--accent)}
-.sec{font-size:12px;font-weight:600;color:var(--muted);padding:10px 10px 4px;text-transform:uppercase;letter-spacing:.04em}
-.row{display:flex;align-items:center;gap:10px;width:100%;padding:8px 10px;border-radius:10px;text-align:left}
-.row:hover{background:var(--hover)}
-.row.sel{background:var(--sel)}
-.dot{width:26px;height:26px;border-radius:7px;display:grid;place-items:center;color:#fff;font-size:14px;flex:none}
-.row .meta{margin-left:auto;color:var(--muted);font-size:13px}
+.side{background:var(--surface);border-right:1px solid var(--line);padding:18px 14px;overflow:auto;display:flex;flex-direction:column;gap:2px;grid-row:1}
+.brand{display:flex;align-items:center;gap:10px;padding:2px 8px 14px;font-weight:700;font-size:19px;letter-spacing:-.02em}
+.logo{width:34px;height:34px;border-radius:10px;background:linear-gradient(135deg,#8b7df5,#5b4bd6);display:grid;place-items:center;color:#fff}
+.nav{display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:12px;width:100%;text-align:left;min-height:44px;color:var(--text)}
+.nav:hover{background:var(--surface2)} .nav.on{background:var(--accent-soft);color:var(--accent-text);font-weight:600}
+.nav .badge{margin-left:auto;background:var(--accent);color:#fff;border-radius:999px;font-size:12px;font-weight:600;padding:1px 8px}
+.nav .sw{width:26px;height:26px;border-radius:8px;display:grid;place-items:center;color:#fff;font-size:12px;font-weight:700;flex:none}
+.sec{font-size:12px;font-weight:600;color:var(--muted);letter-spacing:.05em;text-transform:uppercase;padding:16px 12px 6px}
+.grow{flex:1}
+.side .foot{display:flex;gap:8px;padding:10px 4px 0;border-top:1px solid var(--line);margin-top:8px}
+.side .foot button{flex:1;display:flex;align-items:center;justify-content:center;gap:8px;padding:10px;border-radius:12px;background:var(--surface2);font-size:13px}
 
 /* main */
-.main{display:flex;flex-direction:column;min-width:0;min-height:0;position:relative;grid-row:1}
-.bar{display:flex;align-items:center;gap:8px;padding:10px 14px;background:var(--glass);backdrop-filter:blur(20px) saturate(1.6);-webkit-backdrop-filter:blur(20px) saturate(1.6);border-bottom:.5px solid var(--line);z-index:5}
-.bar .title{font-weight:600;white-space:nowrap}
-.bar .sub{color:var(--muted);font-size:13px;white-space:nowrap}
-.bar .mid{flex:1;text-align:center}
-.pill{padding:7px 12px;border-radius:999px;background:var(--hover);display:inline-flex;gap:6px;align-items:center;font-weight:500}
-.pill:hover{background:var(--sel);color:var(--accent)}
-.icon{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;font-size:18px}
-.icon:hover{background:var(--hover)}
-.scroll{flex:1;overflow:auto;padding:26px 0 120px;background:var(--bg);scroll-behavior:smooth}
-.page{width:min(720px,calc(100% - 48px));aspect-ratio:210/297;margin:0 auto 22px;background:var(--paper);border-radius:6px;box-shadow:0 1px 3px #0003,0 0 0 .5px var(--line);position:relative;overflow:hidden;
-  background-image:linear-gradient(var(--rule) 1px,transparent 1px);background-size:100% 34px;background-position:0 50px}
-.page::before{content:"";position:absolute;left:68px;top:0;bottom:0;width:1px;background:var(--margin)}
-.page .no{position:absolute;right:14px;bottom:10px;font-size:12px;color:var(--muted)}
-.hand{position:absolute;left:84px;right:30px;top:20px;font:600 21px/34px "Bradley Hand","Noteworthy","Segoe Print","Comic Sans MS",cursive;color:var(--ink);transform:rotate(-.4deg)}
-.hand .h{font-size:25px}
-.hand mark{background:#ffe06680;color:inherit;padding:0 2px;border-radius:3px}
+.main{position:relative;min-width:0;min-height:0;overflow:hidden;grid-row:1}
+.view{display:none;height:100%;overflow:auto;padding:28px 32px 40px}
+.view.on{display:block}
+.head{display:flex;align-items:flex-start;gap:14px;margin-bottom:22px}
+.head .t{flex:1}.head .sub{color:var(--muted);margin-top:4px}
+.btn{display:inline-flex;align-items:center;gap:8px;padding:10px 16px;border-radius:12px;background:var(--accent);color:#fff;font-weight:600;min-height:44px}
+.btn.soft{background:var(--accent-soft);color:var(--accent-text)} .btn.plain{background:var(--surface);box-shadow:inset 0 0 0 1px var(--line);color:var(--text)}
+.btn.sm{padding:6px 12px;min-height:34px;font-size:14px;border-radius:10px}
+.icon-btn{width:44px;height:44px;border-radius:12px;display:grid;place-items:center;background:var(--surface);box-shadow:inset 0 0 0 1px var(--line)}
+.grid{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:16px}
+.card{background:var(--surface);border-radius:var(--radius);padding:18px 20px;box-shadow:0 1px 2px #2b1f6a0d,inset 0 0 0 1px var(--line);min-width:0}
+.card h2{display:flex;align-items:center;gap:8px;margin-bottom:12px}
+.card h2 .more{margin-left:auto;font-size:13px;font-weight:500;color:var(--accent-text)}
+.c4{grid-column:span 4}.c5{grid-column:span 5}.c6{grid-column:span 6}.c7{grid-column:span 7}.c8{grid-column:span 8}.c12{grid-column:span 12}
+.chip{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:999px;font-size:12.5px;font-weight:600;background:var(--surface2);color:var(--muted);white-space:nowrap}
+.chip.ok{background:#2fb36d22;color:#1f8c53}.chip.warn{background:#f59f0b24;color:#b57105}.chip.bad{background:#e5484d1f;color:#c4343a}.chip.new{background:var(--accent-soft);color:var(--accent-text)}
+html.dark .chip.ok{color:#5fd596}html.dark .chip.warn{color:#f7b84a}html.dark .chip.bad{color:#f27a7e}
+.dot{width:10px;height:10px;border-radius:50%;display:inline-block;flex:none}
+.bar{height:8px;border-radius:99px;background:var(--surface2);overflow:hidden}.bar>i{display:block;height:100%;border-radius:99px;background:var(--accent)}
+.ring{--p:50;--c:var(--accent);width:84px;height:84px;border-radius:50%;background:conic-gradient(var(--c) calc(var(--p)*1%),var(--surface2) 0);display:grid;place-items:center;flex:none}
+.ring>span{width:64px;height:64px;border-radius:50%;background:var(--surface);display:grid;place-items:center;font-weight:700;font-size:19px;text-align:center;line-height:1.1}
+.ring small{display:block;font-size:11px;font-weight:500;color:var(--muted)}
+
+/* today */
+.hero{display:flex;gap:22px;align-items:center;background:linear-gradient(135deg,var(--accent-soft),var(--surface));}
+.hero .big{font-size:34px;font-weight:700;letter-spacing:-.02em;line-height:1.1;margin:8px 0 4px}
+.hero .actions{display:flex;gap:10px;margin-top:16px;flex-wrap:wrap}
+.week{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;text-align:center}
+.week div{padding:8px 0;border-radius:12px;font-size:13px}.week b{display:block;font-size:17px}
+.week .today{background:var(--accent);color:#fff}
+.week .pips{display:flex;gap:3px;justify-content:center;margin-top:4px;min-height:6px}.week .pips i{width:6px;height:6px;border-radius:50%;background:var(--accent)}.week .today .pips i{background:#fff}.week .pips i.x{background:var(--warn)}
+.tl{display:flex;flex-direction:column;gap:6px}
+.tl .row{display:flex;gap:12px;align-items:center;padding:10px 12px;border-radius:12px;background:var(--surface2)}
+.tl .row time{width:48px;color:var(--muted);font-variant-numeric:tabular-nums;font-size:14px}
+.tl .row.now{background:var(--accent-soft);box-shadow:inset 3px 0 0 var(--accent)}.tl .row.done{opacity:.55}
+.tl .row.off b{text-decoration:line-through;color:var(--muted)}
+.tl .row .r{margin-left:auto;color:var(--muted);font-size:13px}
+.exam{display:flex;gap:14px;align-items:center;padding:12px 0;border-bottom:1px solid var(--line)}.exam:last-child{border:0}
+.exam .d{width:54px;height:54px;border-radius:14px;background:var(--surface2);display:grid;place-items:center;text-align:center;line-height:1.05;font-weight:700;flex:none}
+.exam .d small{display:block;font-weight:500;color:var(--muted);font-size:11px;text-transform:uppercase}
+.exam .d.soon{background:#f59f0b24}
+.exam .m{flex:1;min-width:0}
+.todo{display:flex;align-items:center;gap:12px;padding:10px 0;border-top:1px solid var(--line);width:100%;text-align:left;min-height:44px}
+.todo .box{width:24px;height:24px;border-radius:8px;box-shadow:inset 0 0 0 2px var(--line);display:grid;place-items:center;color:#fff;flex:none}
+.todo.done .box{background:var(--ok);box-shadow:none}.todo.done span.t{text-decoration:line-through;color:var(--muted)}
+.todo .mins{margin-left:auto;color:var(--muted);font-size:13px}
+.books{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:14px}
+.nb{cursor:pointer}
+.cover{aspect-ratio:.8;border-radius:12px;background:var(--paper);box-shadow:inset 0 0 0 1px var(--line);position:relative;overflow:hidden;
+  background-image:repeating-linear-gradient(transparent 0 15px,var(--rule) 15px 16px);background-position:0 22px}
+.cover:before{content:"";position:absolute;left:18px;top:0;bottom:0;width:1px;background:var(--margin)}
+.cover i{position:absolute;left:26px;right:12px;height:5px;border-radius:3px;background:var(--ink);opacity:.55}
+.cover .tag{position:absolute;left:8px;top:8px;right:auto;height:auto;width:auto;background:var(--c);opacity:1;color:#fff;font:600 11px/1 system-ui;padding:4px 7px;border-radius:7px}
+.nb strong{display:block;margin-top:8px;font-size:14.5px}.nb small{color:var(--muted)}
+.news{display:flex;gap:12px;padding:10px 0;border-top:1px solid var(--line)}.news:first-of-type{border:0}
+
+/* subject */
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:16px}
+.stat{padding:16px 18px}.stat b{font-size:26px;display:block;letter-spacing:-.02em}.stat span{color:var(--muted);font-size:13px}
+.list .li{display:flex;align-items:center;gap:12px;padding:12px 0;border-top:1px solid var(--line)}.list .li:first-child{border:0}
+.li .ic{width:38px;height:38px;border-radius:11px;display:grid;place-items:center;background:var(--surface2);flex:none}
+.li .m{flex:1;min-width:0}.li .m small{color:var(--muted);display:block}
+.spark{display:flex;align-items:flex-end;gap:5px;height:60px}.spark i{flex:1;border-radius:5px 5px 2px 2px;background:var(--accent-soft);position:relative}.spark i:last-child{background:var(--accent)}
+
+/* book */
+.view.book{padding:0;display:none;grid-template-rows:auto minmax(0,1fr);height:100%}.view.book.on{display:grid}
+.topbar{display:flex;align-items:center;gap:10px;padding:10px 16px;background:var(--glass);backdrop-filter:blur(22px) saturate(1.6);-webkit-backdrop-filter:blur(22px) saturate(1.6);border-bottom:1px solid var(--line);z-index:5}
+.crumb{display:flex;align-items:center;gap:6px;color:var(--muted);min-width:0;white-space:nowrap}.crumb b{color:var(--text)}
+.pos{padding:7px 14px;border-radius:999px;background:var(--surface2);font-weight:600;font-size:14px}
+.menu{position:absolute;right:16px;top:60px;width:340px;background:var(--glass);backdrop-filter:blur(26px) saturate(1.6);-webkit-backdrop-filter:blur(26px) saturate(1.6);border-radius:18px;box-shadow:0 14px 44px #1b103d40,inset 0 0 0 1px var(--line);padding:8px;display:none;z-index:20}
+.menu.on{display:block}
+.menu button{display:flex;gap:12px;width:100%;padding:10px 12px;border-radius:12px;text-align:left;align-items:flex-start;min-height:44px}
+.menu button:hover{background:var(--accent-soft)}.menu small{display:block;color:var(--muted)}
+.studio{display:grid;grid-template-columns:96px minmax(0,1fr) 300px;min-height:0;position:relative}
+.studio.noinsp{grid-template-columns:96px minmax(0,1fr)}.studio.noinsp .insp{display:none}
+.rail{overflow:auto;padding:14px 12px;background:var(--surface);border-right:1px solid var(--line);display:flex;flex-direction:column;gap:12px;align-items:center}
+.th{width:64px;text-align:center;font-size:12px;color:var(--muted);cursor:pointer}
+.th .p{aspect-ratio:.707;border-radius:6px;background:var(--paper);box-shadow:inset 0 0 0 1px var(--line);margin-bottom:4px;background-image:repeating-linear-gradient(transparent 0 7px,var(--rule) 7px 8px)}
+.th.on .p{box-shadow:inset 0 0 0 2.5px var(--accent)}.th.on{color:var(--accent-text);font-weight:600}
+.th .auto{opacity:.5}
+.th.add .p{display:grid;place-items:center;color:var(--accent);background:var(--accent-soft);background-image:none}
+.stage{overflow:auto;padding:26px 20px 120px;background:var(--bg);position:relative}
+.sheet{position:relative;width:min(700px,100%);aspect-ratio:210/297;margin:0 auto 24px;background:var(--paper);border-radius:6px;box-shadow:0 2px 12px #2b1f6a1f;overflow:hidden;color:#111;container-type:inline-size;
+  background-image:repeating-linear-gradient(transparent 0 calc(4.7cqw - 1px),var(--rule) calc(4.7cqw - 1px) 4.7cqw);background-position:0 7.5cqw}
+.sheet:before{content:"";position:absolute;left:10.8cqw;top:0;bottom:0;width:1px;background:var(--margin)}
+.hw{position:absolute;inset:0;padding:3cqw 5cqw 0 13cqw;font:600 2.7cqw/4.7cqw "Bradley Hand","Noteworthy","Segoe Print","Comic Sans MS",cursive;color:var(--ink)}
+.hw .stamp{position:absolute;left:13cqw;top:1.2cqw;font:500 2cqw system-ui;color:#8d8aa3}
+.pill{display:inline-block;padding:0 2.2cqw;border-radius:2cqw;font-weight:700;margin:1.6cqw 0 .4cqw}
+.pill.a{background:#d9d3ff}.pill.b{background:#cdebd9}.pill.c{background:#ffe3a8}
+.fbox{display:inline-block;border:.35cqw solid #8b7df5;background:#efecff;border-radius:1.2cqw;padding:.2cqw 3cqw;font-size:3.4cqw;margin:.8cqw 0}
+.hl{background:linear-gradient(transparent 20%,#ffe27a99 20% 90%,transparent 90%)}
+.fig{position:absolute;right:5cqw;top:19cqw;width:24cqw}
 canvas.draw{position:absolute;inset:0;width:100%;height:100%;touch-action:none;cursor:crosshair}
-.page.auto{opacity:.55}
-.autonote{position:absolute;left:0;right:0;top:46%;text-align:center;color:var(--muted);font-size:14px}
+.add-box{position:absolute;left:3cqw;right:3cqw;bottom:3cqw;background:#e1f5e6;border-radius:2cqw;padding:1.8cqw 2.4cqw;font:500 2.2cqw/1.4 system-ui;color:#124a25}
+.palette{position:absolute;left:50%;bottom:18px;transform:translateX(-50%);display:flex;align-items:center;gap:2px;padding:8px;border-radius:24px;background:var(--glass);backdrop-filter:blur(26px) saturate(1.6);-webkit-backdrop-filter:blur(26px) saturate(1.6);box-shadow:0 10px 34px #1b103d40,inset 0 0 0 1px var(--line);z-index:6}
+.tool{width:46px;height:46px;border-radius:14px;display:grid;place-items:center}.tool:hover{background:var(--surface2)}.tool.on{background:var(--accent-soft);color:var(--accent-text)}
+.sep{width:1px;height:28px;background:var(--line);margin:0 6px}
+.sw{width:28px;height:28px;border-radius:50%;margin:0 4px;box-shadow:inset 0 0 0 1px #0003;border:3px solid transparent;background-clip:padding-box}.sw.on{box-shadow:0 0 0 2.5px var(--accent)}
+.insp{overflow:auto;padding:16px;background:var(--surface);border-left:1px solid var(--line);display:flex;flex-direction:column;gap:16px}
+.insp h3{font-size:12px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);margin-bottom:8px}
+.kv{display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--line);font-size:14px}.kv:last-child{border:0}
+.act{display:flex;gap:12px;align-items:center;width:100%;padding:10px;border-radius:12px;text-align:left;background:var(--surface2);margin-bottom:6px;min-height:50px}
+.act:hover{background:var(--accent-soft)}.act small{display:block;color:var(--muted)}
+.act .ic{width:34px;height:34px;border-radius:10px;background:var(--surface);display:grid;place-items:center;color:var(--accent);flex:none}
 
-/* floating tools */
-.tools{position:absolute;left:50%;bottom:16px;transform:translateX(-50%);display:flex;gap:4px;padding:8px;border-radius:22px;background:var(--glass);backdrop-filter:blur(24px) saturate(1.6);-webkit-backdrop-filter:blur(24px) saturate(1.6);box-shadow:0 6px 24px #0003,0 0 0 .5px var(--line);z-index:6}
-.tool{width:42px;height:42px;border-radius:13px;display:grid;place-items:center;font-size:20px}
-.tool:hover{background:var(--hover)}
-.tool.on{background:var(--sel);color:var(--accent)}
-.sw{width:26px;height:26px;border-radius:50%;margin:8px 3px;box-shadow:0 0 0 .5px #0004 inset;border:2px solid transparent}
-.sw.on{border-color:var(--accent);outline:2px solid var(--paper);outline-offset:-4px}
-.sep{width:1px;background:var(--line);margin:6px 4px}
+/* cards */
+.study{display:grid;grid-template-columns:260px minmax(0,1fr);gap:20px;align-items:start}
+.deck{display:flex;align-items:center;gap:10px;padding:12px;border-radius:12px;width:100%;text-align:left;min-height:48px}.deck:hover{background:var(--surface2)}.deck.on{background:var(--accent-soft)}
+.flash{max-width:640px;margin:10px auto 0;text-align:center}
+.fc{min-height:260px;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:14px;padding:30px;border-radius:24px;background:var(--surface);box-shadow:0 8px 30px #2b1f6a14,inset 0 0 0 1px var(--line)}
+.fc .q{font-size:26px;font-weight:600;letter-spacing:-.01em}.fc .a{font-size:21px;color:var(--accent-text)}
+.rates{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:16px}
+.rate{padding:12px 6px;border-radius:14px;font-weight:600;min-height:58px}.rate small{display:block;font-weight:500;opacity:.8}
+.r1{background:#e5484d22;color:#c4343a}.r2{background:#f59f0b24;color:#a76400}.r3{background:#2fb36d22;color:#1b8a4f}.r4{background:#4c7cf022;color:#2f5fd0}
+html.dark .r1{color:#f27a7e}html.dark .r2{color:#f7b84a}html.dark .r3{color:#5fd596}html.dark .r4{color:#8fb0ff}
 
-/* status line */
-.status{grid-column:1/-1;grid-row:2;display:flex;gap:18px;padding:7px 16px;background:var(--glass);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-top:.5px solid var(--line);font-size:13px;align-items:center;cursor:pointer;user-select:none;z-index:7}
-.seg{display:inline-flex;gap:6px;align-items:center;white-space:nowrap}
-.seg i{width:9px;height:9px;border-radius:50%;display:inline-block}
-.ok i{background:var(--ok)}.wait i{background:var(--wait)}.bad i{background:var(--bad)}
+/* grades */
+.grade-row{display:flex;align-items:center;gap:14px;padding:12px;border-radius:14px;width:100%;text-align:left;min-height:60px}.grade-row:hover{background:var(--surface2)}.grade-row.on{background:var(--accent-soft)}
+.avg{font-size:22px;font-weight:700;font-variant-numeric:tabular-nums;width:56px;text-align:right}
+input[type=range]{width:100%;accent-color:var(--accent);height:32px}
+.answer{padding:14px 16px;border-radius:14px;background:var(--accent-soft);color:var(--accent-text);font-weight:600;margin-top:12px}
+
+/* status */
+.status{grid-column:1/-1;grid-row:2;display:flex;gap:20px;align-items:center;padding:8px 18px;background:var(--glass);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-top:1px solid var(--line);font-size:13px;cursor:pointer;user-select:none;z-index:9}
+.seg{display:inline-flex;gap:7px;align-items:center;white-space:nowrap}.seg i{width:9px;height:9px;border-radius:50%}
+.seg.ok i{background:var(--ok)}.seg.wait i{background:var(--warn)}.seg.bad i{background:var(--bad)}
 .status .hint{margin-left:auto;color:var(--muted);font-size:12px}
 
 /* overlays */
-.scrim{position:fixed;inset:0;background:#0006;display:none;place-items:center;z-index:20}
-.scrim.open{display:grid}
-.sheet{width:min(460px,calc(100% - 32px));background:var(--paper);border-radius:20px;padding:22px;box-shadow:0 20px 60px #0006}
-.sheet h3{font-size:20px;margin-bottom:4px}
-.sheet p.s{color:var(--muted);margin-bottom:14px}
-.opt{display:flex;gap:12px;align-items:center;padding:12px;border-radius:12px;border:1.5px solid var(--line);margin-bottom:8px;width:100%;text-align:left}
-.opt.on{border-color:var(--accent);background:var(--sel)}
-.opt small{color:var(--muted);display:block}
-.actions{display:flex;justify-content:flex-end;gap:8px;margin-top:14px}
-.menu{position:absolute;right:14px;top:56px;width:310px;background:var(--glass);backdrop-filter:blur(24px) saturate(1.6);-webkit-backdrop-filter:blur(24px) saturate(1.6);border-radius:16px;box-shadow:0 10px 40px #0004,0 0 0 .5px var(--line);padding:6px;display:none;z-index:10}
-.menu.open{display:block}
-.menu button{display:flex;gap:12px;width:100%;padding:10px;border-radius:10px;text-align:left;align-items:flex-start}
-.menu button:hover{background:var(--sel)}
-.menu small{color:var(--muted);display:block}
-.menu .ic{font-size:20px;width:26px;text-align:center}
-.card{background:var(--bg);border-radius:14px;padding:16px;margin:10px 0}
-.card .q{font-weight:600;font-size:17px;margin-bottom:8px}
-.src{font-size:12px;color:var(--accent)}
-.search{width:min(560px,calc(100% - 32px));align-self:start;margin-top:12vh}
-.search input{width:100%;font:inherit;font-size:18px;padding:12px 14px;border-radius:12px;border:0;background:var(--bg);color:var(--text);outline:2px solid var(--accent)}
-.hit{display:flex;gap:12px;padding:10px 4px;border-bottom:.5px solid var(--line)}
-.thumb{width:54px;aspect-ratio:210/297;background:var(--paper);border:.5px solid var(--line);border-radius:3px;flex:none;position:relative;background-image:linear-gradient(var(--rule) 1px,transparent 1px);background-size:100% 6px}
-.thumb i{position:absolute;left:8px;right:8px;top:30%;height:6px;background:#ffd60a99;border-radius:2px}
-.toast{position:fixed;left:50%;bottom:70px;transform:translate(-50%,20px);background:#1c1c1ee6;color:#fff;padding:10px 16px;border-radius:14px;opacity:0;transition:.25s;z-index:30;pointer-events:none;max-width:90%}
-.toast.show{opacity:1;transform:translate(-50%,0)}
-@media (max-width:820px){.app{grid-template-columns:0 minmax(0,1fr)}.side{display:none}.bar .sub{display:none}}
-@media (prefers-reduced-motion:reduce){*{transition:none!important;scroll-behavior:auto!important}}
+.scrim{position:fixed;inset:0;background:#120c2a66;display:none;place-items:center;z-index:50;padding:20px}.scrim.on{display:grid}
+.modal{width:min(520px,100%);background:var(--surface);border-radius:24px;padding:24px;box-shadow:0 24px 70px #0006;max-height:90vh;overflow:auto}
+.modal h3{font-size:21px;margin-bottom:4px}.modal .actions{display:flex;justify-content:flex-end;gap:10px;margin-top:18px}
+.opt{display:flex;gap:12px;align-items:center;padding:13px 14px;border-radius:14px;box-shadow:inset 0 0 0 1.5px var(--line);margin-top:8px;width:100%;text-align:left;min-height:56px}
+.opt.on{box-shadow:inset 0 0 0 2px var(--accent);background:var(--accent-soft)}.opt small{color:var(--muted);display:block}
+.radio{width:22px;height:22px;border-radius:50%;box-shadow:inset 0 0 0 2px var(--line);flex:none}.opt.on .radio{box-shadow:inset 0 0 0 6px var(--accent)}
+.search-box{width:100%;font:inherit;font-size:18px;padding:14px 16px;border-radius:14px;border:0;background:var(--surface2);color:var(--text);outline:2px solid var(--accent)}
+.hit{display:flex;gap:12px;padding:12px 4px;border-bottom:1px solid var(--line);cursor:pointer}.hit mark{background:#ffe27acc;color:inherit;border-radius:3px;padding:0 2px}
+.toast{position:fixed;left:50%;bottom:64px;transform:translate(-50%,20px);background:#241d4be6;color:#fff;padding:11px 18px;border-radius:14px;opacity:0;transition:.25s;z-index:80;pointer-events:none}.toast.on{opacity:1;transform:translate(-50%,0)}
+@media (max-width:980px){.app{grid-template-columns:0 minmax(0,1fr)}.side{display:none}.grid>*{grid-column:span 12!important}.stats{grid-template-columns:repeat(2,1fr)}.study{grid-template-columns:1fr}.studio{grid-template-columns:76px minmax(0,1fr)}.insp{display:none}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
 </head>
 <body>
-<div class="app" id="app">
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+<symbol id="i-home" viewBox="0 0 24 24"><path d="M3 11l9-8 9 8v9a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1z"/></symbol>
+<symbol id="i-cards" viewBox="0 0 24 24"><path d="M12 3l9 5-9 5-9-5z"/><path d="M3 12.5l9 5 9-5"/><path d="M3 17l9 5 9-5"/></symbol>
+<symbol id="i-bars" viewBox="0 0 24 24"><path d="M5 20V11M12 20V4M19 20v-6M3 20h18"/></symbol>
+<symbol id="i-trash" viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></symbol>
+<symbol id="i-gear" viewBox="0 0 24 24"><path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/></symbol>
+<symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></symbol>
+<symbol id="i-scan" viewBox="0 0 24 24"><path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2M7 12h10"/></symbol>
+<symbol id="i-spark" viewBox="0 0 24 24"><path d="M12 3l1.8 4.7 4.7 1.8-4.7 1.8L12 16l-1.8-4.7-4.7-1.8 4.7-1.8z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/></symbol>
+<symbol id="i-pen" viewBox="0 0 24 24"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></symbol>
+<symbol id="i-mark" viewBox="0 0 24 24"><path d="M9 11l6 6M4 20l4-1 9-9-3-3-9 9z"/></symbol>
+<symbol id="i-eraser" viewBox="0 0 24 24"><path d="M20 20H9l-5-5 10-10 6 6-8 9"/><path d="M8 11l5 5"/></symbol>
+<symbol id="i-lasso" viewBox="0 0 24 24"><ellipse cx="12" cy="9" rx="9" ry="5" stroke-dasharray="3 3"/><path d="M9 13c0 3 1 5 3 7"/></symbol>
+<symbol id="i-image" viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="14" rx="2"/><path d="M4 16l5-5 4 4 3-3 4 4"/><circle cx="9" cy="9" r="1"/></symbol>
+<symbol id="i-text" viewBox="0 0 24 24"><path d="M5 6V4h14v2M12 4v16M9 20h6"/></symbol>
+<symbol id="i-shape" viewBox="0 0 24 24"><rect x="4" y="12" width="8" height="8" rx="1"/><path d="M16 3l5 8h-10z"/></symbol>
+<symbol id="i-undo" viewBox="0 0 24 24"><path d="M9 14L4 9l5-5M4 9h10a6 6 0 0 1 0 12h-3"/></symbol>
+<symbol id="i-redo" viewBox="0 0 24 24"><path d="M15 14l5-5-5-5M20 9H10a6 6 0 0 0 0 12h3"/></symbol>
+<symbol id="i-share" viewBox="0 0 24 24"><path d="M12 3v12M8 7l4-4 4 4M5 12v8h14v-8"/></symbol>
+<symbol id="i-left" viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></symbol>
+<symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12l5 5 9-10"/></symbol>
+<symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+<symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+<symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+<symbol id="i-panel" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M15 5v14"/></symbol>
+<symbol id="i-side" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M9 5v14"/></symbol>
+<symbol id="i-doc" viewBox="0 0 24 24"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4M9 13h6M9 17h6"/></symbol>
+<symbol id="i-target" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/></symbol>
+<symbol id="i-flag" viewBox="0 0 24 24"><path d="M5 21V4M5 4h12l-2 4 2 4H5"/></symbol>
+<symbol id="i-moon" viewBox="0 0 24 24"><path d="M20 14.5A8 8 0 0 1 9.5 4 8 8 0 1 0 20 14.5z"/></symbol>
+<symbol id="i-chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></symbol>
+</defs></svg>
 
+<div class="app" id="app">
   <aside class="side">
-    <h2>Fächer</h2>
-    <div class="now">
-      <small>Laut Stundenplan jetzt</small>
-      <b>Mathe, 3. Stunde</b>
-      <button class="btn" id="nowBtn">＋ Neue Seite für jetzt</button>
-    </div>
-    <div id="subjects"></div>
-    <div class="sec" id="booksTitle">Hefte</div>
-    <div id="books"></div>
+    <div class="brand"><div class="logo"><svg class="i"><use href="#i-pen"/></svg></div>JuNotes</div>
+    <button class="nav on" data-go="today"><svg class="i"><use href="#i-home"/></svg>Heute</button>
+    <button class="nav" data-go="cards"><svg class="i"><use href="#i-cards"/></svg>Karteikarten<span class="badge">12</span></button>
+    <button class="nav" data-go="grades"><svg class="i"><use href="#i-bars"/></svg>Noten</button>
+    <div class="sec">Fächer</div>
+    <button class="nav" data-go="subject"><span class="sw" style="background:var(--math)">∑</span>Mathe</button>
+    <button class="nav" data-go="subject"><span class="sw" style="background:var(--german)">Aa</span>Deutsch</button>
+    <button class="nav" data-go="subject"><span class="sw" style="background:var(--english)">En</span>Englisch</button>
+    <button class="nav" data-go="subject"><span class="sw" style="background:var(--bio)">Bi</span>Biologie</button>
+    <button class="nav" data-act="newsubject"><svg class="i"><use href="#i-plus"/></svg><span class="muted">Fach hinzufügen</span></button>
+    <div class="grow"></div>
+    <button class="nav" data-act="trash"><svg class="i"><use href="#i-trash"/></svg>Papierkorb</button>
+    <button class="nav" data-act="settings"><svg class="i"><use href="#i-gear"/></svg>Einstellungen</button>
+    <div class="foot"><button id="dark"><svg class="i s"><use href="#i-moon"/></svg>Dunkel</button><button data-act="search"><svg class="i s"><use href="#i-search"/></svg>Suchen</button></div>
   </aside>
 
   <main class="main">
-    <div class="bar">
-      <button class="icon" id="toggleSide" aria-label="Seitenleiste">▤</button>
-      <div><div class="title" id="docTitle">Bruchrechnung</div><div class="sub" id="docSub">Mathe · Heft</div></div>
-      <div class="mid"><span class="pill" id="pos">Seite 1 von 3</span></div>
-      <button class="pill" id="scanBtn">📷 Scannen</button>
-      <button class="pill" id="learnBtn">✨ Lernen</button>
-      <button class="icon" id="searchBtn" aria-label="Suchen">⌕</button>
-    </div>
-
-    <div class="menu" id="learnMenu">
-      <button data-learn="quiz"><span class="ic">❓</span><span><b>Abfragen</b><small>Fragen zu dieser Seite, du antwortest</small></span></button>
-      <button data-learn="test"><span class="ic">📝</span><span><b>Probetest</b><small>Als neues Heft zum Beschreiben, mit Lösung</small></span></button>
-      <button data-learn="cards"><span class="ic">🗂</span><span><b>Karteikarten</b><small>Mit Wiederholungsplan</small></span></button>
-      <button data-learn="check"><span class="ic">🔍</span><span><b>Ergänzen &amp; Prüfen</b><small>Lücken und Fehler am Rand markieren</small></span></button>
-      <button data-learn="copy"><span class="ic">✍️</span><span><b>Abschreib-Modus</b><small>Kurz ansehen, aus dem Gedächtnis schreiben</small></span></button>
-    </div>
-
-    <div class="scroll" id="scroll">
-      <div class="page" data-n="1">
-        <div class="hand">
-          <div class="h">Brüche addieren</div>
-          Gleiche Nenner: nur die Zähler<br>
-          addieren, Nenner bleibt.<br>
-          <mark>3/8 + 2/8 = 5/8</mark><br>
-          Verschiedene Nenner: erst<br>
-          auf den Hauptnenner erweitern.<br>
-          1/2 + 1/3 = 3/6 + 2/6 = 5/6<br>
-          Danach kürzen, wenn möglich!
+    <!-- HEUTE -->
+    <section class="view on" id="view-today">
+      <div class="head"><div class="t"><h1>Guten Morgen</h1><div class="sub">Donnerstag, 19. November</div></div>
+        <button class="icon-btn" data-act="search" aria-label="Suchen"><svg class="i"><use href="#i-search"/></svg></button>
+        <button class="btn" data-act="scan"><svg class="i"><use href="#i-scan"/></svg>Scannen</button></div>
+      <div class="grid">
+        <div class="card hero c8">
+          <div style="flex:1;min-width:0">
+            <span class="chip new"><svg class="i s"><use href="#i-clock"/></svg>Jetzt · 3. Stunde</span>
+            <div class="big">Mathe</div>
+            <div class="muted">Bruchrechnung · Raum 204 · noch 22 Minuten</div>
+            <div class="bar" style="margin-top:14px;max-width:340px"><i style="width:51%"></i></div>
+            <div class="actions">
+              <button class="btn" data-act="newpage"><svg class="i"><use href="#i-plus"/></svg>Neue Seite für Mathe</button>
+              <button class="btn soft" data-go="book"><svg class="i"><use href="#i-doc"/></svg>Heft öffnen</button>
+            </div>
+          </div>
+          <div class="ring" style="--p:51;width:128px;height:128px"><span style="width:104px;height:104px;font-size:30px">22<small>Minuten</small></span></div>
         </div>
-        <canvas class="draw"></canvas><div class="no">1</div>
-      </div>
-      <div class="page" data-n="2">
-        <div class="hand">
-          <div class="h">Übungen</div>
-          a) 1/4 + 1/4 = 2/4 = 1/2<br>
-          b) 2/3 + 1/6 = 4/6 + 1/6 = 5/6<br>
-          c) 3/5 − 1/10 = 6/10 − 1/10 = 1/2
+        <div class="card c4">
+          <h2>Diese Woche <span class="more">KW 47</span></h2>
+          <div class="week">
+            <div>Mo<b>16</b><span class="pips"><i></i><i></i></span></div><div>Di<b>17</b><span class="pips"><i></i></span></div><div>Mi<b>18</b><span class="pips"><i></i><i class="x"></i></span></div>
+            <div class="today">Do<b>19</b><span class="pips"><i></i><i></i></span></div><div>Fr<b>20</b><span class="pips"><i></i></span></div><div>Sa<b>21</b><span class="pips"></span></div><div>So<b>22</b><span class="pips"></span></div>
+          </div>
+          <div class="small muted" style="margin-top:12px"><span class="dot" style="background:var(--warn)"></span> Klassenarbeit in 7 Tagen</div>
         </div>
-        <canvas class="draw"></canvas><div class="no">2</div>
-      </div>
-      <div class="page auto" data-n="3">
-        <div class="autonote">Leere Seite, entsteht von selbst, wenn du unten weiterschreibst.<br>Wird beim Schließen still entfernt, wenn sie leer bleibt.</div>
-        <canvas class="draw"></canvas><div class="no">3</div>
-      </div>
-    </div>
 
-    <div class="tools" id="tools">
-      <button class="tool on" data-tool="pen" title="Stift">✎</button>
-      <button class="tool" data-tool="marker" title="Textmarker">🖍</button>
-      <button class="tool" data-tool="eraser" title="Radierer">⌫</button>
-      <button class="tool" data-tool="lasso" title="Auswahl">◌</button>
-      <span class="sep"></span>
-      <button class="sw on" style="background:#1d3a8a" data-color="#1d3a8a" aria-label="Blau"></button>
-      <button class="sw" style="background:#1c1c1e" data-color="#1c1c1e" aria-label="Schwarz"></button>
-      <button class="sw" style="background:#e5342c" data-color="#e5342c" aria-label="Rot"></button>
-      <button class="sw" style="background:#2fa84f" data-color="#2fa84f" aria-label="Grün"></button>
-    </div>
+        <div class="card c5">
+          <h2><svg class="i"><use href="#i-clock"/></svg>Stundenplan heute</h2>
+          <div class="tl">
+            <div class="row done"><time>08:00</time><b>Deutsch</b><span class="r">R 112</span></div>
+            <div class="row now"><time>08:50</time><b>Mathe</b><span class="chip new">läuft</span><span class="r">R 204</span></div>
+            <div class="row off"><time>09:55</time><b>Englisch</b><span class="chip bad">entfällt</span></div>
+            <div class="row"><time>11:00</time><b>Biologie</b><span class="r">Labor</span></div>
+          </div>
+        </div>
+        <div class="card c7">
+          <h2><svg class="i"><use href="#i-flag"/></svg>Arbeiten und Tests</h2>
+          <div class="exam"><div class="d soon"><span>26<small>Nov</small></span></div><div class="m"><b>Klassenarbeit Mathe</b><div class="small muted">in 7 Tagen · Lernplan 3 von 9 erledigt</div><div class="bar" style="margin-top:6px"><i style="width:33%"></i></div></div><button class="btn soft sm" data-act="plan">Lernplan</button></div>
+          <div class="exam"><div class="d soon"><span>23<small>Nov</small></span></div><div class="m"><b>Vokabeltest Englisch</b><div class="small muted">in 4 Tagen · noch kein Lernplan</div></div><button class="btn sm" data-act="plan">Plan erstellen</button></div>
+          <div class="small muted" style="margin:12px 0 4px">Lernen für die Arbeit · heute 43 Min.</div>
+          <button class="todo done" data-todo><span class="box"><svg class="i s"><use href="#i-check"/></svg></span><span class="t">Lernen: Brüche erweitern</span><span class="mins">25 Min.</span></button>
+          <button class="todo" data-todo><span class="box"><svg class="i s"><use href="#i-check"/></svg></span><span class="t">Üben: Brüche addieren</span><span class="mins">10 Min.</span></button>
+          <button class="todo" data-todo><span class="box"><svg class="i s"><use href="#i-check"/></svg></span><span class="t">Wiederholen: Kürzen</span><span class="mins">8 Min.</span></button>
+        </div>
+
+        <div class="card c4">
+          <h2><svg class="i"><use href="#i-cards"/></svg>Karteikarten</h2>
+          <div style="display:flex;gap:16px;align-items:center"><div class="ring" style="--p:62"><span>12<small>fällig</small></span></div><div><b>etwa 8 Minuten</b><div class="small muted">dazu 10 neue Karten</div></div></div>
+          <button class="btn" style="margin-top:14px;width:100%;justify-content:center" data-go="cards">Jetzt lernen</button>
+        </div>
+        <div class="card c8">
+          <h2>Zuletzt geöffnet <span class="more">Alle Hefte</span></h2>
+          <div class="books">
+            <div class="nb" data-go="book"><div class="cover" style="--c:var(--math)"><span class="tag">Mathe</span><i style="top:40px;width:60%"></i><i style="top:56px;width:70%"></i><i style="top:72px;width:45%"></i><i style="top:104px;width:65%"></i></div><strong>Bruchrechnung</strong><small>heute 08:52 · 7 Seiten</small></div>
+            <div class="nb" data-go="book"><div class="cover" style="--c:var(--german)"><span class="tag">Deutsch</span><i style="top:40px;width:62%"></i><i style="top:56px;width:50%"></i><i style="top:72px;width:68%"></i></div><strong>Gedichte</strong><small>Mo 16.11. · 8 Seiten</small></div>
+            <div class="nb" data-go="book"><div class="cover" style="--c:var(--bio)"><span class="tag">Biologie</span><i style="top:40px;width:55%"></i><i style="top:56px;width:66%"></i></div><strong>Die Zelle</strong><small>Mi 11.11. · 7 Seiten</small></div>
+            <div class="nb" data-go="book"><div class="cover" style="--c:var(--math)"><span class="tag">Mathe</span><i style="top:40px;width:58%"></i></div><strong>Probetest Brüche</strong><small>gestern · 3 Seiten</small></div>
+          </div>
+        </div>
+        <div class="card c12">
+          <h2>Von der Schule <span class="more">alle ansehen</span></h2>
+          <div class="news"><span class="dot" style="background:var(--accent);margin-top:7px"></span><div><b>Elternabend am Dienstag</b><div class="small muted">Um 19 Uhr in der Aula. Bitte Anmeldung bis Freitag.</div></div></div>
+          <div class="news"><span class="dot" style="background:var(--accent);margin-top:7px"></span><div><b>Sportfest verschoben</b><div class="small muted">Das Sportfest findet wegen der Wetterlage eine Woche später statt.</div></div></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- FACH -->
+    <section class="view" id="view-subject">
+      <div class="head"><span class="sw" style="width:56px;height:56px;border-radius:16px;background:var(--math);display:grid;place-items:center;color:#fff;font:700 24px system-ui">∑</span>
+        <div class="t"><h1>Mathe</h1><div class="sub">Klasse 9a · 4 Stunden pro Woche</div></div>
+        <button class="btn soft" data-act="scan"><svg class="i"><use href="#i-scan"/></svg>Scannen</button><button class="btn" data-act="newnotebook"><svg class="i"><use href="#i-plus"/></svg>Neues Heft</button></div>
+      <div class="stats">
+        <div class="card stat"><b>3</b><span>Hefte</span></div><div class="card stat"><b>24</b><span>Karten · 12 fällig</span></div>
+        <div class="card stat"><b>2,3 <span style="color:var(--ok);font-size:16px">↗</span></b><span>Notenschnitt</span></div><div class="card stat"><b>26.11.</b><span>nächste Arbeit</span></div>
+      </div>
+      <div class="grid">
+        <div class="card c7">
+          <h2>Hefte und Lernstand</h2>
+          <div class="list">
+            <div class="li" data-go="book" style="cursor:pointer"><div class="ic" style="color:var(--math)"><svg class="i"><use href="#i-doc"/></svg></div><div class="m"><b>Bruchrechnung</b><small>7 Seiten · heute 08:52</small></div><span class="chip warn">Wiederholen</span></div>
+            <div class="li"><div class="ic" style="color:var(--math)"><svg class="i"><use href="#i-doc"/></svg></div><div class="m"><b>Gleichungen</b><small>12 Seiten · Mo 9.11.</small></div><span class="chip ok">Sicher</span></div>
+            <div class="li"><div class="ic" style="color:var(--math)"><svg class="i"><use href="#i-doc"/></svg></div><div class="m"><b>Probetest Brüche</b><small>3 Seiten · gestern</small></div><span class="chip new">Neu</span></div>
+          </div>
+          <h2 style="margin-top:20px">Scans und PDFs</h2>
+          <div class="list">
+            <div class="li"><div class="ic"><svg class="i"><use href="#i-scan"/></svg></div><div class="m"><b>Arbeitsblatt Brüche</b><small>2 Scans · 12.11. · Text erkannt</small></div><span class="chip ok">auf dem Server</span></div>
+            <div class="li"><div class="ic"><svg class="i"><use href="#i-doc"/></svg></div><div class="m"><b>Mathe-Heft Klasse 8</b><small>PDF aus GoodNotes · 48 Seiten</small></div></div>
+          </div>
+        </div>
+        <div class="card c5">
+          <h2>Noten</h2>
+          <div class="spark"><i style="height:55%"></i><i style="height:80%"></i><i style="height:45%"></i><i style="height:70%"></i><i style="height:88%"></i></div>
+          <div class="small muted" style="margin-top:8px">2,0 · 3,0 · 2,3 · 2,7 · 2,0 (zuletzt)</div>
+          <h2 style="margin-top:20px">Nächste Stunden</h2>
+          <div class="tl"><div class="row"><time>Do</time><b>08:50 Mathe</b><span class="r">R 204</span></div><div class="row"><time>Fr</time><b>10:30 Mathe</b><span class="r">R 204</span></div><div class="row"><time>Mo</time><b>09:55 Mathe</b><span class="r">R 204</span></div></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- HEFT -->
+    <section class="view book" id="view-book">
+      <div class="topbar">
+        <button class="icon-btn" data-go="subject" aria-label="Zurück"><svg class="i"><use href="#i-left"/></svg></button>
+        <button class="icon-btn" id="sidebar-toggle" aria-label="Seitenleiste"><svg class="i"><use href="#i-side"/></svg></button>
+        <div class="crumb"><span>Mathe</span><svg class="i s"><use href="#i-chev"/></svg><b>Bruchrechnung</b></div>
+        <span class="pos" id="pos" style="margin-left:auto">Seite 3 von 7</span>
+        <button class="btn plain sm" data-act="scan"><svg class="i s"><use href="#i-scan"/></svg>Scannen</button>
+        <button class="btn soft sm" id="learn-btn"><svg class="i s"><use href="#i-spark"/></svg>Lernen</button>
+        <button class="icon-btn" data-act="share" aria-label="Teilen"><svg class="i"><use href="#i-share"/></svg></button>
+        <button class="icon-btn" id="insp-toggle" aria-label="Informationen"><svg class="i"><use href="#i-panel"/></svg></button>
+      </div>
+      <div class="menu" id="learn-menu">
+        <button data-learn="quiz"><svg class="i" style="margin-top:2px;color:var(--accent)"><use href="#i-spark"/></svg><span><b>Abfragen</b><small>Fragen zu dieser Seite, du antwortest</small></span></button>
+        <button data-learn="test"><svg class="i" style="margin-top:2px;color:var(--accent)"><use href="#i-doc"/></svg><span><b>Probetest</b><small>Als eigenes Heft, Lösungen zum Aufdecken</small></span></button>
+        <button data-learn="cards"><svg class="i" style="margin-top:2px;color:var(--accent)"><use href="#i-cards"/></svg><span><b>Karteikarten</b><small>Mit Wiederholungsplan</small></span></button>
+        <button data-learn="check"><svg class="i" style="margin-top:2px;color:var(--accent)"><use href="#i-check"/></svg><span><b>Ergänzen und Prüfen</b><small>Lücken und Fehler markieren</small></span></button>
+        <button data-learn="copy"><svg class="i" style="margin-top:2px;color:var(--accent)"><use href="#i-pen"/></svg><span><b>Abschreib-Modus</b><small>Kurz ansehen, aus dem Gedächtnis schreiben</small></span></button>
+      </div>
+      <div class="studio" id="studio">
+        <div class="rail" id="rail"></div>
+        <div class="stage" id="stage">
+          <div class="sheet" id="sheet">
+            <div class="hw">
+              <div class="stamp">Do 19.11. · Mathe</div>
+              <div style="margin-top:7cqw"><span class="pill a">Brüche addieren</span></div>
+              <div>Gleiche Nenner: nur die Zähler</div><div>addieren, der Nenner bleibt.</div>
+              <div class="fbox">3/8 + 2/8 = 5/8</div>
+              <div><span class="pill b">Beispiel</span></div>
+              <div>1/2 + 1/3 = <span class="hl">3/6 + 2/6 = 5/6</span></div>
+              <div>Erst auf den Hauptnenner erweitern!</div>
+              <div><span class="pill c">Wichtig</span></div>
+              <div>Danach kürzen, wenn es geht.</div>
+              <svg class="fig" viewBox="0 0 100 100" aria-hidden="true"><circle cx="50" cy="50" r="44" fill="#fff" stroke="#27257a" stroke-width="2.5"/><path d="M50 50 L50 6 A44 44 0 0 1 94 50 Z" fill="#d9d3ff" stroke="#27257a" stroke-width="2"/><path d="M50 50 L94 50 A44 44 0 0 1 50 94 Z" fill="#cdebd9" stroke="#27257a" stroke-width="2"/><path d="M50 50L50 94M50 50L6 50" stroke="#27257a" stroke-width="2"/></svg>
+            </div>
+            <div class="add-box"><b>Ergänzung der KI, von dir übernommen</b><br>Beim Kürzen immer durch den größten gemeinsamen Teiler teilen.</div>
+            <canvas class="draw" id="draw"></canvas>
+          </div>
+          <div class="muted small" style="text-align:center;margin:-10px 0 20px">Seite 3 · wird nach dem Schreiben von selbst gesichert</div>
+        </div>
+        <aside class="insp">
+          <div><h3>Diese Seite</h3><div class="kv"><span>Stunde</span><span>Do 19.11., 3. Std.</span></div><div class="kv"><span>Gespeichert</span><span style="color:var(--ok)">auf dem iPad ✓</span></div><div class="kv"><span>Server</span><span style="color:var(--ok)">vor 2 Min. ✓</span></div><div class="kv"><span>Text erkannt</span><span>87 Wörter</span></div></div>
+          <div><h3>Aus dieser Seite lernen</h3>
+            <button class="act" data-learn="quiz"><span class="ic"><svg class="i"><use href="#i-spark"/></svg></span><span><b>Abfragen</b><small>5 Fragen</small></span></button>
+            <button class="act" data-learn="cards"><span class="ic"><svg class="i"><use href="#i-cards"/></svg></span><span><b>Karteikarten</b><small>bis zu 12 Karten</small></span></button>
+            <button class="act" data-learn="check"><span class="ic"><svg class="i"><use href="#i-check"/></svg></span><span><b>Prüfen</b><small>Lücken suchen</small></span></button>
+          </div>
+          <div><h3>Lernstand</h3><div class="bar"><i style="width:58%"></i></div><div class="small muted" style="margin-top:6px">14 von 24 Karten sicher</div></div>
+        </aside>
+        <div class="palette" id="palette">
+          <button class="tool on" data-tool="pen" aria-label="Stift"><svg class="i"><use href="#i-pen"/></svg></button>
+          <button class="tool" data-tool="marker" aria-label="Textmarker"><svg class="i"><use href="#i-mark"/></svg></button>
+          <button class="tool" data-tool="eraser" aria-label="Radierer"><svg class="i"><use href="#i-eraser"/></svg></button>
+          <button class="tool" data-tool="lasso" aria-label="Auswahl"><svg class="i"><use href="#i-lasso"/></svg></button>
+          <button class="tool" aria-label="Bild"><svg class="i"><use href="#i-image"/></svg></button>
+          <button class="tool" aria-label="Text"><svg class="i"><use href="#i-text"/></svg></button>
+          <span class="sep"></span>
+          <button class="sw on" style="background:#27257a" data-color="#27257a" aria-label="Blau"></button>
+          <button class="sw" style="background:#1c1c1e" data-color="#1c1c1e" aria-label="Schwarz"></button>
+          <button class="sw" style="background:#e5342c" data-color="#e5342c" aria-label="Rot"></button>
+          <button class="sw" style="background:#2fa84f" data-color="#2fa84f" aria-label="Grün"></button>
+          <span class="sep"></span>
+          <button class="tool" data-act="undo" aria-label="Rückgängig"><svg class="i"><use href="#i-undo"/></svg></button>
+        </div>
+      </div>
+    </section>
+
+    <!-- KARTEIKARTEN -->
+    <section class="view" id="view-cards">
+      <div class="head"><div class="t"><h1>Karteikarten</h1><div class="sub">Der Wiederholungsplan sagt, was heute dran ist</div></div></div>
+      <div class="study">
+        <div class="card" style="padding:10px">
+          <button class="deck on"><span class="ring" style="--p:62;width:40px;height:40px"><span style="width:30px;height:30px;font-size:12px">12</span></span><span><b>Alle Fächer</b><div class="small muted">12 fällig · 10 neu</div></span></button>
+          <button class="deck"><span class="sw" style="width:40px;height:40px;border-radius:12px;background:var(--math);display:grid;place-items:center;color:#fff;font-weight:700">∑</span><span><b>Mathe</b><div class="small muted">7 fällig · 24 Karten</div></span></button>
+          <button class="deck"><span class="sw" style="width:40px;height:40px;border-radius:12px;background:var(--english);display:grid;place-items:center;color:#fff;font-weight:700">En</span><span><b>Englisch</b><div class="small muted">5 fällig · 31 Karten</div></span></button>
+          <button class="deck"><span class="sw" style="width:40px;height:40px;border-radius:12px;background:var(--bio);display:grid;place-items:center;color:#fff;font-weight:700">Bi</span><span><b>Biologie</b><div class="small muted">für heute fertig</div></span></button>
+        </div>
+        <div class="flash" id="flash"></div>
+      </div>
+    </section>
+
+    <!-- NOTEN -->
+    <section class="view" id="view-grades">
+      <div class="head"><div class="t"><h1>Noten</h1><div class="sub">Schnitt je Fach und was du für dein Ziel brauchst</div></div><button class="btn" data-act="newgrade"><svg class="i"><use href="#i-plus"/></svg>Note eintragen</button></div>
+      <div class="grid">
+        <div class="card c5">
+          <div style="display:flex;gap:18px;align-items:center;margin-bottom:10px"><div class="ring" style="--p:62;width:104px;height:104px"><span style="width:80px;height:80px;font-size:26px">2,4<small>Gesamt</small></span></div><div><b>Gesamtschnitt</b><div class="small muted">Jedes Fach zählt einmal</div></div></div>
+          <div id="grade-list"></div>
+        </div>
+        <div class="card c7">
+          <h2 id="grade-title">Mathe</h2>
+          <div class="spark" id="grade-spark"></div>
+          <div id="grade-items" style="margin-top:14px"></div>
+          <h2 style="margin-top:22px"><svg class="i"><use href="#i-target"/></svg>Was brauche ich?</h2>
+          <div class="small muted">Mein Ziel für den Schnitt: <b id="goal-v">2,0</b></div>
+          <input type="range" id="goal" min="10" max="40" value="20" aria-label="Zielschnitt">
+          <div class="small muted" style="margin-top:6px">Nächste Note ist: <select id="goal-w" style="font:inherit;padding:4px 8px;border-radius:8px;border:1px solid var(--line);background:var(--surface);color:var(--text)"><option value="2">Klassenarbeit (zählt doppelt)</option><option value="1">Mündlich oder Test</option></select></div>
+          <div class="answer" id="goal-a"></div>
+        </div>
+      </div>
+    </section>
   </main>
 
-  <div class="status" id="status" title="Zum Ausprobieren anklicken"></div>
+  <footer class="status" id="status" title="Zum Ausprobieren anklicken"></footer>
 </div>
 
-<div class="scrim" id="scanScrim">
-  <div class="sheet">
-    <h3>Wohin mit dem Scan?</h3>
-    <p class="s">2 Seiten erkannt. Du wirst nur einmal gefragt.</p>
-    <button class="opt on" data-dest="a"><span class="dot" style="background:#0a84ff">∑</span><span><b>Mathe · Bruchrechnung</b><small>Passt zur Stunde laut Stundenplan, nach Seite 2 einfügen</small></span></button>
-    <button class="opt" data-dest="b"><span class="dot" style="background:#8e8e93">▤</span><span><b>Als neues Arbeitsblatt</b><small>Eigenes Heft im Fach Mathe</small></span></button>
-    <button class="opt" data-dest="c"><span class="dot" style="background:#8e8e93">…</span><span><b>Anderes Fach oder Heft</b><small>Auswahl öffnen</small></span></button>
-    <div class="actions"><button class="btn ghost" data-close>Abbrechen</button><button class="btn" id="scanOk">Einfügen</button></div>
+<!-- Overlays -->
+<div class="scrim" id="scan"><div class="modal"><h3>Wohin mit dem Scan?</h3><div class="muted" style="margin-bottom:6px">2 Seiten erkannt. Du wirst nur einmal gefragt.</div>
+  <button class="opt on"><span class="radio"></span><span><b>Mathe · Bruchrechnung</b><small>Passt zur Stunde laut Stundenplan, nach Seite 3 einfügen</small></span></button>
+  <button class="opt"><span class="radio"></span><span><b>Als neues Arbeitsblatt</b><small>Eigenes Heft im Fach Mathe</small></span></button>
+  <button class="opt"><span class="radio"></span><span><b>Anderes Heft wählen</b><small>Fach und Heft aussuchen</small></span></button>
+  <div class="actions"><button class="btn plain" data-close>Verwerfen</button><button class="btn" data-close data-toast="2 Seiten eingefügt. Text wird im Hintergrund gelesen.">Einfügen</button></div></div></div>
+
+<div class="scrim" id="learn"><div class="modal" id="learn-body"></div></div>
+
+<div class="scrim" id="plan"><div class="modal"><h3>Lernplan: Klassenarbeit Mathe</h3><div class="muted small" style="margin-bottom:8px">Bis Mittwoch 25.11. · 45 Minuten pro Tag · 3 Themen</div>
+  <div class="list">
+    <div class="li"><b style="width:70px">Do 19.</b><div class="m small">Lernen: Brüche erweitern · Üben: Brüche addieren</div><span class="chip">43 Min.</span></div>
+    <div class="li"><b style="width:70px">Fr 20.</b><div class="m small">Lernen: Kürzen</div><span class="chip">25 Min.</span></div>
+    <div class="li"><b style="width:70px">Sa 21.</b><div class="m small">Üben: Kürzen · Lernen: Gleichungen</div><span class="chip">35 Min.</span></div>
+    <div class="li"><b style="width:70px">Mo 23.</b><div class="m small">Wiederholen: Brüche addieren</div><span class="chip">8 Min.</span></div>
+    <div class="li"><b style="width:70px">Mo 23.</b><div class="m small">Vokabeltest Englisch ist am selben Tag: kurzer Tag</div><span class="chip warn">Hinweis</span></div>
+    <div class="li"><b style="width:70px">Di 24.</b><div class="m small">Probetest schreiben</div><span class="chip">40 Min.</span></div>
+    <div class="li"><b style="width:70px">Mi 25.</b><div class="m small">Letzter Blick auf alles</div><span class="chip">20 Min.</span></div>
   </div>
-</div>
+  <div class="actions"><button class="btn plain" data-close>Schließen</button><button class="btn" data-close data-toast="Plan behalten. Er erscheint täglich unter Heute.">Plan behalten</button></div></div></div>
 
-<div class="scrim" id="learnScrim">
-  <div class="sheet" id="learnSheet"></div>
-</div>
-
-<div class="scrim" id="searchScrim">
-  <div class="sheet search">
-    <input id="q" value="Bruch" aria-label="Suchen">
-    <div id="hits"></div>
-  </div>
-</div>
+<div class="scrim" id="search"><div class="modal" style="align-self:start;margin-top:8vh"><input class="search-box" id="q" value="nenner" aria-label="Suchen"><div id="hits"></div></div></div>
 
 <div class="toast" id="toast"></div>
 
 <script>
-const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
-const subjects=[
-  {id:'m',n:'Mathe',c:'#0a84ff',i:'∑',books:[['Bruchrechnung','3 Seiten'],['Gleichungen','12 Seiten'],['Arbeitsblätter','5 Scans']]},
-  {id:'d',n:'Deutsch',c:'#ff9f0a',i:'Aa',books:[['Gedichte','8 Seiten'],['Aufsatz','4 Seiten']]},
-  {id:'e',n:'Englisch',c:'#30d158',i:'En',books:[['Vokabeln','14 Seiten'],['Grammar','6 Seiten']]},
-  {id:'b',n:'Biologie',c:'#64d2ff',i:'Bi',books:[['Zelle','7 Seiten']]},
-];
-let cur=subjects[0], book=0;
-function toast(t){const e=$('#toast');e.textContent=t;e.classList.add('show');clearTimeout(toast.t);toast.t=setTimeout(()=>e.classList.remove('show'),2600)}
-function renderSide(){
-  $('#subjects').innerHTML='<div class="sec">Fächer</div>'+subjects.map(s=>`<button class="row ${s===cur?'sel':''}" data-s="${s.id}"><span class="dot" style="background:${s.c}">${s.i}</span>${s.n}</button>`).join('');
-  $('#booksTitle').textContent='Hefte in '+cur.n;
-  $('#books').innerHTML=cur.books.map((b,i)=>`<button class="row ${i===book?'sel':''}" data-b="${i}"><span>▤</span>${b[0]}<span class="meta">${b[1]}</span></button>`).join('');
-  $('#docTitle').textContent=cur.books[book][0]; $('#docSub').textContent=cur.n+' · Heft';
+const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
+const html=document.documentElement;
+function toast(t){const e=$('#toast');e.textContent=t;e.classList.add('on');clearTimeout(toast.t);toast.t=setTimeout(()=>e.classList.remove('on'),2800)}
+function open(id){$('#'+id).classList.add('on')}
+function show(view){
+  $$('.view').forEach(v=>v.classList.toggle('on',v.id==='view-'+view));
+  $('#learn-menu').classList.remove('on');
+  if(view==='book')buildRail();
 }
 document.addEventListener('click',e=>{
-  const s=e.target.closest('[data-s]'); if(s){cur=subjects.find(x=>x.id===s.dataset.s);book=0;renderSide();return}
-  const b=e.target.closest('[data-b]'); if(b){book=+b.dataset.b;renderSide();return}
+  const go=e.target.closest('[data-go]');if(go){show(go.dataset.go);if(go.classList.contains('nav')){$$('.nav').forEach(n=>n.classList.toggle('on',n===go))}return}
+  const act=e.target.closest('[data-act]');
+  if(act){const a=act.dataset.act;
+    if(a==='scan')open('scan');
+    else if(a==='plan')open('plan');
+    else if(a==='search'){open('search');renderHits();setTimeout(()=>$('#q').focus(),50)}
+    else if(a==='share')toast('Teilen: als PDF oder an Paperless senden');
+    else if(a==='newpage'){show('book');toast('Neue Seite für Mathe angelegt: Do 19.11. · Mathe')}
+    else if(a==='trash')toast('Papierkorb: gelöschte Hefte bleiben 30 Tage');
+    else if(a==='settings')toast('Server, Schlüssel und Sync-Einstellungen');
+    else if(a==='newsubject'||a==='newnotebook'||a==='newgrade')toast('Hier öffnet sich ein kleines Formular');
+    else if(a==='undo')toast('Rückgängig');
+    return}
+  if(e.target.closest('[data-close]')){const c=e.target.closest('[data-close]');if(c.dataset.toast)toast(c.dataset.toast);$$('.scrim').forEach(s=>s.classList.remove('on'));return}
+  if(e.target.classList.contains('scrim')){e.target.classList.remove('on');return}
+  const todo=e.target.closest('[data-todo]');if(todo){todo.classList.toggle('done');return}
+  const learn=e.target.closest('[data-learn]');if(learn){startLearn(learn.dataset.learn);return}
+  if(!e.target.closest('#learn-menu')&&!e.target.closest('#learn-btn'))$('#learn-menu').classList.remove('on');
 });
-renderSide();
-$('#toggleSide').onclick=()=>$('#app').classList.toggle('nosidebar');
-$('#nowBtn').onclick=()=>{cur=subjects[0];book=0;renderSide();$('#scroll').scrollTo({top:1e5});toast('Neue Seite in Mathe, Kopfzeile: heute, 3. Stunde')};
-
-/* page position */
-function pos(){const sc=$('#scroll'),pages=$$('.page');const mid=sc.getBoundingClientRect().top+sc.clientHeight/3;let n=1;pages.forEach((p,i)=>{if(p.getBoundingClientRect().top<=mid)n=i+1});$('#pos').textContent=`Seite ${n} von ${pages.length}`}
-$('#scroll').addEventListener('scroll',pos);pos();
-
-/* tools and drawing */
-let tool='pen',color='#1d3a8a';
-$$('.tool').forEach(b=>b.onclick=()=>{$$('.tool').forEach(x=>x.classList.remove('on'));b.classList.add('on');tool=b.dataset.tool});
-$$('.sw').forEach(b=>b.onclick=()=>{$$('.sw').forEach(x=>x.classList.remove('on'));b.classList.add('on');color=b.dataset.color});
-function wire(c){
-  const fit=()=>{const r=c.getBoundingClientRect();c.width=r.width*devicePixelRatio;c.height=r.height*devicePixelRatio};
-  fit();new ResizeObserver(fit).observe(c);
-  const x=c.getContext('2d');let down=false,last=null;
-  const pt=e=>{const r=c.getBoundingClientRect();return[(e.clientX-r.left)*devicePixelRatio,(e.clientY-r.top)*devicePixelRatio]};
-  c.onpointerdown=e=>{down=true;last=pt(e);c.setPointerCapture(e.pointerId);if(c.closest('.auto')){c.closest('.page').classList.remove('auto');c.closest('.page').querySelector('.autonote').remove();addAuto()}};
-  c.onpointermove=e=>{if(!down||tool==='lasso')return;const p=pt(e);const pr=e.pressure||.5;
-    x.globalCompositeOperation=tool==='eraser'?'destination-out':'source-over';
-    x.strokeStyle=tool==='marker'?'#ffe066':color;x.globalAlpha=tool==='marker'?.5:1;
-    x.lineCap='round';x.lineJoin='round';x.lineWidth=(tool==='marker'?18:tool==='eraser'?26:1.6+pr*3)*devicePixelRatio;
-    x.beginPath();x.moveTo(...last);x.lineTo(...p);x.stroke();last=p};
-  c.onpointerup=c.onpointercancel=()=>down=false;
-}
-function addAuto(){
-  const pages=$$('.page'),n=pages.length+1,p=document.createElement('div');p.className='page auto';p.dataset.n=n;
-  p.innerHTML=`<div class="autonote">Noch eine leere Seite</div><canvas class="draw"></canvas><div class="no">${n}</div>`;
-  $('#scroll').appendChild(p);wire(p.querySelector('canvas'));pos();toast('Neue Seite entstanden, weil du unten weitergeschrieben hast');
-}
-$$('canvas.draw').forEach(wire);
+$('#learn-btn').onclick=e=>{e.stopPropagation();$('#learn-menu').classList.toggle('on')};
+$('#sidebar-toggle').onclick=()=>$('#app').classList.toggle('collapsed');
+$('#insp-toggle').onclick=()=>$('#studio').classList.toggle('noinsp');
+$('#dark').onclick=()=>{const d=!html.classList.contains('dark');html.classList.toggle('dark',d);html.classList.toggle('light',!d)};
+addEventListener('keydown',e=>{if(e.key==='Escape')$$('.scrim').forEach(s=>s.classList.remove('on'));if((e.metaKey||e.ctrlKey)&&e.key==='k'){e.preventDefault();$('[data-act=search]').click()}});
 
 /* status line */
 const states=[
-  {s:['ok','Auf iPad gespeichert'],y:['ok','Synchronisiert heute 14:02'],b:['ok','Backup heute 03:00']},
-  {s:['ok','Auf iPad gespeichert'],y:['wait','Synchronisiere 3 Änderungen'],b:['ok','Backup heute 03:00']},
-  {s:['ok','Auf iPad gespeichert'],y:['wait','Wartet auf WLAN, 12 Änderungen sicher auf dem iPad'],b:['ok','Backup heute 03:00']},
-  {s:['ok','Auf iPad gespeichert'],y:['bad','Server nicht erreichbar, alles ist sicher auf dem iPad'],b:['wait','Backup überfällig, zuletzt 16.11. 03:00']},
-  {s:['bad','Speichern auf dem iPad fehlgeschlagen'],y:['wait','Synchronisierung pausiert'],b:['ok','Backup heute 03:00']},
-];
-let si=0;
-function status(){const t=states[si];$('#status').innerHTML=[t.s,t.y,t.b].map(([c,x])=>`<span class="seg ${c}"><i></i>${x}</span>`).join('')+'<span class="hint">Anklicken: nächster Zustand (Entwurf)</span>'}
+ [['ok','Auf dem iPad gespeichert'],['ok','Synchronisiert heute 14:02'],['ok','Backup heute 03:00']],
+ [['ok','Auf dem iPad gespeichert'],['wait','Synchronisiere 3 Änderungen'],['ok','Backup heute 03:00']],
+ [['ok','Auf dem iPad gespeichert'],['wait','Wartet auf WLAN, 12 Änderungen sicher auf dem iPad'],['ok','Backup heute 03:00']],
+ [['ok','Auf dem iPad gespeichert'],['bad','Server nicht erreichbar, alles ist sicher auf dem iPad'],['wait','Backup überfällig, zuletzt 16.11.']],
+ [['bad','Speichern auf dem iPad fehlgeschlagen'],['wait','Synchronisierung pausiert'],['ok','Backup heute 03:00']]];
+let si=0;function status(){$('#status').innerHTML=states[si].map(([c,t])=>`<span class="seg ${c}"><i></i>${t}</span>`).join('')+'<span class="hint">Anklicken: nächster Zustand (Entwurf)</span>'}
 $('#status').onclick=()=>{si=(si+1)%states.length;status()};status();
 
-/* scan */
-const open=id=>$(id).classList.add('open'), close=id=>$(id).classList.remove('open');
-$('#scanBtn').onclick=()=>open('#scanScrim');
-$$('.opt').forEach(o=>o.onclick=()=>{$$('.opt').forEach(x=>x.classList.remove('on'));o.classList.add('on')});
-$('#scanOk').onclick=()=>{close('#scanScrim');
-  const after=$$('.page')[1],n=document.createElement('div');n.className='page';
-  n.innerHTML='<div class="hand" style="font-family:system-ui;font-weight:500;font-size:15px;color:var(--text)"><div class="h" style="font-size:20px">Arbeitsblatt 4 (gescannt)</div>1) Berechne: 1/3 + 1/4<br>2) Berechne: 2/5 + 3/10<br>3) Kürze: 12/18</div><canvas class="draw"></canvas><div class="no">gescannt</div>';
-  after.after(n);wire(n.querySelector('canvas'));$$('.page').forEach((p,i)=>{p.querySelector('.no').textContent=p.querySelector('.no').textContent==='gescannt'?'gescannt':i+1});
-  pos();n.scrollIntoView({behavior:'smooth',block:'center'});toast('2 Seiten eingefügt. Texterkennung läuft im Hintergrund.')};
-document.addEventListener('click',e=>{if(e.target.closest('[data-close]')||e.target.classList.contains('scrim')){$$('.scrim').forEach(s=>s.classList.remove('open'))}});
+/* page rail */
+function buildRail(){
+  const n=7,cur=3;$('#rail').innerHTML=Array.from({length:n},(_,i)=>`<div class="th ${i+1===cur?'on':''}"><div class="p ${i===6?'auto':''}"></div>${i+1}</div>`).join('')+'<div class="th add"><div class="p"><svg class="i"><use href="#i-plus"/></svg></div>Neu</div>';
+}
+/* drawing */
+(function(){
+  const c=$('#draw'),x=c.getContext('2d');let down=false,last=null,tool='pen',color='#27257a';
+  function fit(){const r=c.getBoundingClientRect();if(!r.width)return;c.width=r.width*devicePixelRatio;c.height=r.height*devicePixelRatio}
+  new ResizeObserver(fit).observe(c);
+  const pt=e=>{const r=c.getBoundingClientRect();return[(e.clientX-r.left)*devicePixelRatio,(e.clientY-r.top)*devicePixelRatio]};
+  c.onpointerdown=e=>{down=true;last=pt(e);c.setPointerCapture(e.pointerId)};
+  c.onpointermove=e=>{if(!down||tool==='lasso')return;const p=pt(e),pr=e.pressure||.5;
+    x.globalCompositeOperation=tool==='eraser'?'destination-out':'source-over';x.strokeStyle=tool==='marker'?'#ffe27a':color;x.globalAlpha=tool==='marker'?.5:1;
+    x.lineCap='round';x.lineJoin='round';x.lineWidth=(tool==='marker'?18:tool==='eraser'?28:1.6+pr*3)*devicePixelRatio;x.beginPath();x.moveTo(...last);x.lineTo(...p);x.stroke();last=p};
+  c.onpointerup=c.onpointercancel=()=>down=false;
+  $$('.tool[data-tool]').forEach(b=>b.onclick=()=>{$$('.tool[data-tool]').forEach(t=>t.classList.remove('on'));b.classList.add('on');tool=b.dataset.tool});
+  $$('.sw').forEach(b=>b.onclick=()=>{$$('.sw').forEach(t=>t.classList.remove('on'));b.classList.add('on');color=b.dataset.color});
+})();
 
 /* learn */
-$('#learnBtn').onclick=e=>{e.stopPropagation();$('#learnMenu').classList.toggle('open')};
-document.addEventListener('click',e=>{if(!e.target.closest('#learnMenu')&&!e.target.closest('#learnBtn'))$('#learnMenu').classList.remove('open')});
-const learn={
-  quiz:()=>`<h3>Abfragen</h3><p class="s">Frage 1 von 5 · aus Seite 1 und 2</p><div class="card"><div class="q">Was passiert mit dem Nenner, wenn du Brüche mit gleichem Nenner addierst?</div><div class="src">↗ Dein Heft, Seite 1, Zeile 2</div></div><p class="s">Schreib deine Antwort mit dem Stift oder sprich sie ein.</p><div class="actions"><button class="btn ghost" data-close>Später</button><button class="btn" data-toast="Antwort geprüft: richtig. Der Nenner bleibt.">Prüfen</button></div>`,
-  test:()=>`<h3>Probetest</h3><p class="s">Wird als neues Heft „Probetest Bruchrechnung“ angelegt, mit Lösungsheft zum Aufdecken.</p><div class="card"><b>8 Aufgaben · ca. 20 Minuten</b><br><span class="s">Leicht bis mittel, passend zu deinem Heft.</span></div><div class="actions"><button class="btn ghost" data-close>Abbrechen</button><button class="btn" data-toast="Probetest wird erstellt …">Erstellen</button></div>`,
-  cards:()=>`<h3>Karteikarten</h3><p class="s">12 Karten aus diesem Heft, wiederholt nach dem Vergessens-Rhythmus.</p><div class="card"><div class="q">Wie addiert man 1/2 + 1/3?</div><div class="src">↗ Seite 1</div></div><div class="actions"><button class="btn ghost" data-close>Später</button><button class="btn" data-toast="12 Karten angelegt, erste Wiederholung morgen">Anlegen</button></div>`,
-  check:()=>`<h3>Ergänzen &amp; Prüfen</h3><p class="s">Die KI markiert am Rand, was fehlt oder falsch ist. Du entscheidest, was übernommen wird.</p><div class="card"><div class="q">Vorschlag zu Seite 1</div>„Beim Kürzen immer durch den größten gemeinsamen Teiler teilen.“<div class="src">Fehlt in deinem Heft · ergänzen?</div></div><div class="actions"><button class="btn ghost" data-close>Verwerfen</button><button class="btn" data-toast="Als Randnotiz übernommen">Übernehmen</button></div>`,
-  copy:()=>`<h3>Abschreib-Modus</h3><p class="s">Seite 1 erscheint 30 Sekunden, dann wird sie ausgeblendet. Du schreibst daneben aus dem Gedächtnis, danach zeigt ein Vergleich, was fehlt.</p><div class="actions"><button class="btn ghost" data-close>Abbrechen</button><button class="btn" data-toast="Zwei Hefte nebeneinander, Timer läuft">Starten</button></div>`,
-};
-$$('[data-learn]').forEach(b=>b.onclick=()=>{$('#learnMenu').classList.remove('open');$('#learnSheet').innerHTML=learn[b.dataset.learn]();open('#learnScrim')});
-$('#learnSheet').addEventListener('click',e=>{const t=e.target.closest('[data-toast]');if(t){toast(t.dataset.toast);close('#learnScrim')}});
+const quiz=[['Was passiert mit dem Nenner, wenn du Brüche mit gleichem Nenner addierst?','Er bleibt gleich. Nur die Zähler werden addiert.'],['Wie addierst du 1/2 + 1/3?','Erst auf den Hauptnenner 6 erweitern: 3/6 + 2/6 = 5/6.'],['Was musst du nach dem Addieren prüfen?','Ob sich der Bruch kürzen lässt.']];
+const titles={quiz:'Abfragen',test:'Probetest',cards:'Karteikarten',check:'Ergänzen und Prüfen',copy:'Abschreib-Modus'};
+function startLearn(kind){
+  $('#learn-menu').classList.remove('on');const b=$('#learn-body');
+  if(kind==='quiz'){let i=0,rev=false;const r=()=>{ if(i>=quiz.length){b.innerHTML=`<h3>Geschafft</h3><p class="muted">2 von 3 wusstest du. Die anderen kommen als Karten wieder.</p><div class="actions"><button class="btn" data-close>Fertig</button></div>`;return}
+      b.innerHTML=`<div class="small muted">Frage ${i+1} von ${quiz.length} · aus Seite 3</div><h3 style="margin:6px 0 14px">${quiz[i][0]}</h3><textarea style="width:100%;min-height:80px;font:inherit;padding:12px;border-radius:12px;border:1px solid var(--line);background:var(--surface2);color:var(--text)" placeholder="Schreibe oder diktiere deine Antwort"></textarea>${rev?`<div class="answer">Richtig wäre: ${quiz[i][1]}</div><div class="rates" style="grid-template-columns:repeat(3,1fr)"><button class="rate r1" data-n>Nein</button><button class="rate r2" data-n>Fast</button><button class="rate r3" data-n>Ja</button></div>`:`<div class="actions"><button class="btn soft" data-r>Lösung zeigen</button><button class="btn" data-r>Von der KI prüfen lassen</button></div>`}`;
+      b.querySelectorAll('[data-r]').forEach(x=>x.onclick=()=>{rev=true;r()});b.querySelectorAll('[data-n]').forEach(x=>x.onclick=()=>{i++;rev=false;r()})};r()}
+  else if(kind==='cards'){b.innerHTML=`<h3>Karteikarten</h3><div class="muted small">Welche Karten willst du behalten?</div>${['Was ist ein Nenner? · der untere Teil','Wie erweitert man einen Bruch? · Zähler und Nenner mit derselben Zahl malnehmen','Was heißt kürzen? · Zähler und Nenner durch dieselbe Zahl teilen'].map(t=>`<button class="opt on"><span class="radio"></span><span>${t}</span></button>`).join('')}<div class="actions"><button class="btn plain" data-close>Abbrechen</button><button class="btn" data-close data-toast="3 Karten gespeichert, die erste Wiederholung ist morgen">3 Karten speichern</button></div>`;b.querySelectorAll('.opt').forEach(o=>o.onclick=()=>o.classList.toggle('on'))}
+  else if(kind==='check'){b.innerHTML=`<h3>Ergänzen und Prüfen</h3><div class="muted small" style="margin-bottom:8px">Du entscheidest, was auf deine Seite kommt.</div><div class="card" style="box-shadow:inset 0 0 0 1px var(--line);margin-top:8px"><span class="chip bad">Fehlt</span><p style="margin:8px 0">Beim Kürzen immer durch den größten gemeinsamen Teiler teilen.</p><div style="display:flex;gap:8px"><button class="btn sm" data-close data-toast="Übernommen: steht jetzt im Kasten unten auf der Seite">Übernehmen</button><button class="btn sm plain" data-close>Weg damit</button></div></div><div class="card" style="box-shadow:inset 0 0 0 1px var(--line);margin-top:10px"><span class="chip warn">Unklar</span><p style="margin:8px 0">„Hauptnenner“ ist nicht erklärt. Möchtest du eine kurze Erklärung ergänzen?</p><div style="display:flex;gap:8px"><button class="btn sm" data-close>Übernehmen</button><button class="btn sm plain" data-close>Weg damit</button></div></div>`}
+  else if(kind==='test'){b.innerHTML=`<h3>Probetest Brüche</h3><div class="muted">6 Aufgaben · 20 Punkte · etwa 30 Minuten</div><div class="muted small" style="margin:10px 0">Wird als eigenes Heft angelegt: Aufgaben gedruckt, Platz zum Schreiben, Lösungen zum Aufdecken.</div><div class="actions"><button class="btn plain" data-close>Abbrechen</button><button class="btn" data-close data-toast="Probetest als Heft angelegt">Als Heft anlegen</button></div>`}
+  else{b.innerHTML=`<h3>Abschreib-Modus</h3><p class="muted">Die Seite erscheint 45 Sekunden, dann wird sie ausgeblendet. Du schreibst sie aus dem Gedächtnis, danach siehst du, was fehlt.</p><div class="ring" style="--p:75;width:110px;height:110px;margin:12px auto"><span style="width:86px;height:86px;font-size:26px">45<small>Sekunden</small></span></div><div class="actions"><button class="btn plain" data-close>Abbrechen</button><button class="btn" data-close data-toast="Zwei Hefte nebeneinander, Timer läuft">Starten</button></div>`}
+  open('learn');
+}
+
+/* flashcards */
+const deck=[['Wie addiert man 1/2 + 1/3?','Auf den Hauptnenner 6 erweitern: 3/6 + 2/6 = 5/6'],['Was ist ein Hauptnenner?','Der kleinste gemeinsame Nenner der Brüche'],['Wie kürzt man 12/18?','Durch 6 teilen: 2/3'],['Was bedeutet der Nenner?','In wie viele gleiche Teile das Ganze geteilt ist'],['Wie addiert man Brüche mit gleichem Nenner?','Zähler addieren, Nenner bleibt']];
+let ci=0,cr=false;
+function flash(){const f=$('#flash');
+  if(ci>=deck.length){f.innerHTML=`<div class="fc"><svg class="i" style="width:44px;height:44px;color:var(--ok)"><use href="#i-check"/></svg><div class="q">Für heute fertig</div><div class="muted">5 Karten gelernt. Die nächsten kommen zur richtigen Zeit zurück.</div><button class="btn" id="again">Noch einmal ansehen</button></div>`;$('#again').onclick=()=>{ci=0;cr=false;flash()};return}
+  f.innerHTML=`<div class="small muted" style="margin-bottom:10px">Karte ${ci+1} von ${deck.length} · Mathe</div><div class="fc"><div class="q">${deck[ci][0]}</div>${cr?`<div class="a">${deck[ci][1]}</div>`:''}</div>`+(cr?`<div class="rates"><button class="rate r1" data-rate>Nochmal<small>morgen</small></button><button class="rate r2" data-rate>Schwer<small>in 2 Tagen</small></button><button class="rate r3" data-rate>Gut<small>in 4 Tagen</small></button><button class="rate r4" data-rate>Leicht<small>in 8 Tagen</small></button></div>`:`<div style="margin-top:16px"><button class="btn" style="padding-inline:34px" id="reveal">Antwort zeigen</button></div>`);
+  const r=$('#reveal');if(r)r.onclick=()=>{cr=true;flash()};f.querySelectorAll('[data-rate]').forEach(b=>b.onclick=()=>{ci++;cr=false;flash()})}
+flash();
+
+/* grades */
+const G={Mathe:{c:'var(--math)',g:[[2,2],[3,1],[2.3,1],[2.7,2],[2,1]]},Deutsch:{c:'var(--german)',g:[[2.7,2],[2,1],[3,1]]},Englisch:{c:'var(--english)',g:[[1.7,2],[2.3,1],[2,1]]},Biologie:{c:'var(--bio)',g:[[3,1],[2.7,2]]}};
+const avg=g=>g.reduce((s,[v,w])=>s+v*w,0)/g.reduce((s,[,w])=>s+w,0);const fmt=v=>v.toFixed(1).replace('.',',');
+let sel='Mathe';
+function grades(){
+  $('#grade-list').innerHTML=Object.entries(G).map(([n,o])=>`<button class="grade-row ${n===sel?'on':''}" data-gs="${n}"><span class="dot" style="background:${o.c};width:14px;height:14px"></span><span style="flex:1"><b>${n}</b><div class="small muted">${o.g.length} Noten</div></span><span class="avg">${fmt(avg(o.g))}</span></button>`).join('');
+  const o=G[sel];$('#grade-title').textContent=sel+' · Schnitt '+fmt(avg(o.g));
+  $('#grade-spark').innerHTML=o.g.map(([v])=>`<i style="height:${(7-v)/6*100}%"></i>`).join('');
+  $('#grade-items').innerHTML=o.g.map(([v,w],i)=>`<div class="kv"><span>${w===2?'Klassenarbeit':'Mündlich / Test'} ${i+1}</span><b>${fmt(v)}</b></div>`).join('');
+  goal();
+  $$('[data-gs]').forEach(b=>b.onclick=()=>{sel=b.dataset.gs;grades()});
+}
+function goal(){
+  const t=$('#goal').value/10,w=+$('#goal-w').value,g=G[sel].g;$('#goal-v').textContent=fmt(t);
+  const tot=g.reduce((s,[,x])=>s+x,0),sum=g.reduce((s,[v,x])=>s+v*x,0),need=(t*(tot+w)-sum)/w;
+  $('#goal-a').textContent=need<1?'Mit der nächsten Note allein ist das nicht mehr zu schaffen.':need>=6?'Du schaffst das Ziel sicher, egal wie die nächste Note wird.':'Du brauchst mindestens eine '+fmt(Math.floor(need*10)/10)+'.';
+}
+$('#goal').oninput=goal;$('#goal-w').onchange=goal;grades();
 
 /* search */
-const hits=[['Mathe · Bruchrechnung','Seite 1','Gleiche Nenner: nur die Zähler addieren …'],['Mathe · Arbeitsblätter','Scan 2','Berechne: 1/3 + 1/4 (Bruch …)'],['Biologie · Zelle','Seite 5','… Bruchteil der Zellen teilt sich …']];
-$('#searchBtn').onclick=()=>{open('#searchScrim');$('#q').focus();showHits()};
-function showHits(){const q=$('#q').value.trim().toLowerCase();$('#hits').innerHTML=q?hits.filter(h=>(h[0]+h[2]).toLowerCase().includes(q.slice(0,4))).map(h=>`<div class="hit"><div class="thumb"><i></i></div><div><b>${h[0]}</b><div class="s" style="color:var(--muted)">${h[1]} · ${h[2]}</div></div></div>`).join(''):''}
-$('#q').oninput=showHits;
-addEventListener('keydown',e=>{if(e.key==='Escape')$$('.scrim').forEach(s=>s.classList.remove('open'))});
+const HITS=[['Mathe · Bruchrechnung','Seite 3','Gleiche <mark>Nenner</mark>: nur die Zähler addieren …'],['Mathe · Arbeitsblätter','Scan 2','… auf den Haupt<mark>nenner</mark> erweitern, dann …'],['Biologie · Die Zelle','Seite 5','… der Zell<mark>kern</mark> steuert …']];
+function renderHits(){const q=$('#q').value.trim().toLowerCase();$('#hits').innerHTML=(q?HITS.filter(h=>(h[0]+h[2]).toLowerCase().includes(q.slice(0,4))):[]).map(h=>`<div class="hit" data-go="book"><div style="width:44px;aspect-ratio:.707;border-radius:5px;background:var(--paper);box-shadow:inset 0 0 0 1px var(--line);flex:none"></div><div><b>${h[0]}</b><div class="small muted">${h[1]} · ${h[2]}</div></div></div>`).join('')||'<p class="muted" style="padding:14px 4px">Nichts gefunden.</p>'}
+$('#q').oninput=renderHits;
 </script>
 </body>
 </html>
