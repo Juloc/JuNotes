@@ -29,7 +29,7 @@ h1{font-size:30px;letter-spacing:-.02em;line-height:1.15}
 h2{font-size:17px;letter-spacing:-.01em}
 .muted{color:var(--muted)} .small{font-size:13px}
 .app{display:grid;grid-template-columns:268px minmax(0,1fr);grid-template-rows:minmax(0,1fr) auto;height:100vh}
-.app.collapsed{grid-template-columns:0 minmax(0,1fr)}.app.collapsed .side{display:none}
+.app.collapsed{grid-template-columns:minmax(0,1fr)}.app.collapsed .side{display:none}
 
 /* sidebar */
 .side{background:var(--surface);border-right:1px solid var(--line);padding:18px 14px;overflow:auto;display:flex;flex-direction:column;gap:2px;grid-row:1}
@@ -183,7 +183,12 @@ input[type=range]{width:100%;accent-color:var(--accent);height:32px}
 .search-box{width:100%;font:inherit;font-size:18px;padding:14px 16px;border-radius:14px;border:0;background:var(--surface2);color:var(--text);outline:2px solid var(--accent)}
 .hit{display:flex;gap:12px;padding:12px 4px;border-bottom:1px solid var(--line);cursor:pointer}.hit mark{background:#ffe27acc;color:inherit;border-radius:3px;padding:0 2px}
 .toast{position:fixed;left:50%;bottom:64px;transform:translate(-50%,20px);background:#241d4be6;color:#fff;padding:11px 18px;border-radius:14px;opacity:0;transition:.25s;z-index:80;pointer-events:none}.toast.on{opacity:1;transform:translate(-50%,0)}
-@media (max-width:980px){.app{grid-template-columns:0 minmax(0,1fr)}.side{display:none}.grid>*{grid-column:span 12!important}.stats{grid-template-columns:repeat(2,1fr)}.study{grid-template-columns:1fr}.studio{grid-template-columns:76px minmax(0,1fr)}.insp{display:none}}
+/* Inside the device frame (ipad.html): room for the status bar on top and the home indicator at the bottom */
+html.device body{padding-top:28px;background:var(--bg)}
+html.device .app{height:calc(100vh - 28px)}
+html.device .status{padding-bottom:22px}
+html.device .palette{bottom:26px}
+@media (max-width:980px){.app{grid-template-columns:minmax(0,1fr)}.side{display:none}.grid>*{grid-column:span 12!important}.stats{grid-template-columns:repeat(2,1fr)}.study{grid-template-columns:1fr}.studio{grid-template-columns:76px minmax(0,1fr)}.insp{display:none}}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
 </head>
@@ -476,10 +481,18 @@ input[type=range]{width:100%;accent-color:var(--accent);height:32px}
 <script>
 const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
 const html=document.documentElement;
+// ?device=1 puts it inside the iPad frame; &portrait=1 starts with the sidebar and the inspector folded away, as on a narrow screen
+{const q=new URLSearchParams(location.search);if(q.has('device'))html.classList.add('device');
+ if(q.has('portrait')){$('#app').classList.add('collapsed');$('#studio').classList.add('noinsp')}
+ if(q.get('dark')==='1')html.classList.add('dark');
+ if(q.get('view'))setTimeout(()=>show(q.get('view')),0)}
 function toast(t){const e=$('#toast');e.textContent=t;e.classList.add('on');clearTimeout(toast.t);toast.t=setTimeout(()=>e.classList.remove('on'),2800)}
 function open(id){$('#'+id).classList.add('on')}
 function show(view){
   $$('.view').forEach(v=>v.classList.toggle('on',v.id==='view-'+view));
+  // The sidebar marks where she is; a click on one of the subjects then marks that subject instead.
+  const first=$$('.nav[data-go]').find(n=>n.dataset.go===(view==='book'?'subject':view));
+  $$('.nav').forEach(n=>n.classList.toggle('on',n===first));
   $('#learn-menu').classList.remove('on');
   if(view==='book')buildRail();
 }
