@@ -1,10 +1,12 @@
 using System.Reflection;
+using JuNotes.Backend.Ai;
 using JuNotes.Backend.Assets;
 using JuNotes.Backend.Backup;
 using JuNotes.Backend.Data.Sync;
 using JuNotes.Backend.Database;
 using JuNotes.Backend.School;
 using JuNotes.Backend.Service;
+using JuNotes.Integrations.Codex;
 using JuNotes.Workers;
 using Npgsql;
 
@@ -29,24 +31,37 @@ if (backups.Options.BeforeMigration && await DatabaseUpgrade.PendingAsync(data, 
 
 await DatabaseUpgrade.RunAsync(data, migrations, DatabaseUpgrade.ReadBaseline(backend), app.Lifetime.ApplicationStopping);
 
+await app.Services.GetRequiredService<AiProfileStore>().EnsureDefaultsAsync(app.Lifetime.ApplicationStopping);
+
 app.UseStaticFiles();
 app.MapRazorPages();
 app.MapGet("/health/live", () => Results.Ok());
 app.MapGet("/health/ready", async (HealthService health, CancellationToken ct) => await health.IsReadyAsync(ct) ? Results.Ok() : Results.StatusCode(503));
 app.MapGet("/api/v1/status", () => Results.Json(new { name = "JuNotes", version = Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "0.0.0", api = 1 }));
 
-// Everything below needs the instance token; /api/v1/status above is the only open endpoint.
-var secured = app.MapGroup("/api/v1");
-secured.AddEndpointFilter(async (context, next) =>
+// Everything under /api/v1 except /status needs the instance token. This runs before routing and body binding, so a caller without the token learns nothing else.
+app.Use(async (context, next) =>
 {
-    var access = context.HttpContext.RequestServices.GetRequiredService<SyncAccess>();
-    if (!access.IsConfigured)
+    var path = context.Request.Path;
+    if (path.StartsWithSegments("/api/v1") && !path.StartsWithSegments("/api/v1/status"))
     {
-        return Results.Problem("The API is not set up: set Sync:Token (environment variable Sync__Token).", statusCode: 503);
+        var access = context.RequestServices.GetRequiredService<SyncAccess>();
+        if (!access.IsConfigured)
+        {
+            await Results.Problem("The API is not set up: set Sync:Token (environment variable Sync__Token).", statusCode: 503).ExecuteAsync(context);
+            return;
+        }
+
+        if (!access.IsAuthorized(context.Request.Headers.Authorization))
+        {
+            await Results.Unauthorized().ExecuteAsync(context);
+            return;
+        }
     }
 
-    return access.IsAuthorized(context.HttpContext.Request.Headers.Authorization) ? await next(context) : Results.Unauthorized();
+    await next();
 });
+var secured = app.MapGroup("/api/v1");
 var sync = secured.MapGroup("/sync");
 sync.MapPost("/push", async (PushRequest request, SyncService service, CancellationToken ct) =>
 {
@@ -89,6 +104,32 @@ assetApi.MapPut("/{id:guid}", async (Guid id, HttpRequest request, AssetService 
 });
 assetApi.MapMethods("/{id:guid}", ["HEAD"], (Guid id, AssetService assets) => assets.Exists(id) ? Results.Ok() : Results.NotFound());
 assetApi.MapGet("/{id:guid}", (Guid id, AssetService assets) => assets.Open(id) is { } file ? Results.Stream(file.Stream, file.ContentType, enableRangeProcessing: true) : Results.NotFound());
+
+var aiApi = secured.MapGroup("/ai");
+aiApi.MapGet("/profiles", async (AiProfileStore store, CancellationToken ct) => Results.Ok((await store.ListAsync(ct)).Select(profile => new { profile.Key, profile.Name, profile.Enabled })));
+aiApi.MapPost("/{task}", async (string task, AiRequest request, LearningService learning, CancellationToken ct) =>
+{
+    try
+    {
+        return Results.Ok(await learning.RunAsync(task, request, ct));
+    }
+    catch (AiRequestException error)
+    {
+        return Results.Problem(error.Message, statusCode: 400);
+    }
+    catch (AiRefusedException error)
+    {
+        return Results.Problem(error.Message, statusCode: error.StatusCode);
+    }
+    catch (CodexUnavailableException)
+    {
+        return Results.Problem("Die KI ist auf dem Server noch nicht eingerichtet.", statusCode: 503);
+    }
+    catch (CodexFailedException error)
+    {
+        return Results.Problem(error.Message, statusCode: 502);
+    }
+});
 
 app.Run();
 

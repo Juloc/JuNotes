@@ -1,7 +1,9 @@
+using JuNotes.Backend.Ai;
 using JuNotes.Backend.Assets;
 using JuNotes.Backend.Backup;
 using JuNotes.Backend.Infrastructure.Sql;
 using JuNotes.Backend.School;
+using JuNotes.Integrations.Codex;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -28,6 +30,17 @@ namespace JuNotes.Backend.Service
             backup.AssetsDirectory ??= assets.Directory;
             services.AddSingleton(backup);
             services.AddSingleton(provider => new BackupService(connectionString, backup, provider.GetRequiredService<TimeProvider>(), provider.GetRequiredService<ILogger<BackupService>>()));
+            var codex = new CodexOptions();
+            configuration.GetSection("Codex").Bind(codex);
+            services.AddSingleton(codex);
+            services.AddSingleton<CodexAccount>();
+            services.AddSingleton<ICodexRunner, CodexRunner>();
+            var ai = new AiOptions();
+            configuration.GetSection("Ai").Bind(ai);
+            services.AddSingleton(ai);
+            services.AddSingleton<AiProfileStore>();
+            services.AddSingleton<AiUsageStore>();
+            services.AddSingleton<LearningService>();
             var school = new SchoolOptions();
             configuration.GetSection("School").Bind(school);
             services.AddSingleton(school);

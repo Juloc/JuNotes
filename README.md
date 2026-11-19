@@ -39,6 +39,10 @@ Schule (alles optional): `School__TimetableIcsUrl` ist der iCal-Link des Stunden
 `webcal://` geht auch), `School__NewsFeedUrl` ein RSS- oder Atom-Feed der Schul-Website. Der Server holt beides alle 30 Minuten
 und stellt es unter `/api/v1/school/calendar` und `/api/v1/school/news` bereit, ebenfalls mit dem Token.
 
+KI (Phase 3): Das Codex-CLI muss im Image oder auf dem Server stehen (`Codex__Executable`, Standard `codex`); die Anmeldung liegt unter
+`Codex__Home` (im Docker-Image `/data/codex`) und wird im Admin-Bereich per Geräteanmeldung gemacht. `Ai__DailyLimit` (Standard 60)
+begrenzt die Anfragen pro Tag. Die Profile (Prompts, Schwierigkeit, Ton) stellt der Admin ein; die App sieht nur ihre Namen.
+
 Server ohne Docker starten (legt die Datenbank bei Bedarf selbst an):
 
 ```bash
