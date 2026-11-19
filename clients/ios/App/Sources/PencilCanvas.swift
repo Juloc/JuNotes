@@ -155,7 +155,8 @@ struct PencilCanvas: UIViewRepresentable {
                 let drawing = canvas.drawing
                 var text = ""
                 if !drawing.strokes.isEmpty {
-                    let ink = drawing.image(from: CGRect(origin: .zero, size: size), scale: 1.5, userInterfaceStyle: .light)
+                    var ink = UIImage()
+                    UITraitCollection(userInterfaceStyle: .light).performAsCurrent { ink = drawing.image(from: CGRect(origin: .zero, size: size), scale: 1.5) }
                     // Text recognition wants dark ink on white, not on transparent.
                     let flat = UIGraphicsImageRenderer(size: ink.size).image { context in
                         UIColor.white.setFill()

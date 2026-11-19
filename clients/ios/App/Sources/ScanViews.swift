@@ -9,7 +9,7 @@ struct ScanDestinationSheet: View {
     @Environment(\.dismiss) private var dismiss
     @State private var options: [ScanDestination] = []
     @State private var selected: ScanDestination?
-    @State private var chosenSubject: Subject?
+    @State private var chosenSubjectID: UUID?
     @State private var chosenNotebooks: [Notebook] = []
     /// nil means a new worksheet.
     @State private var chosenNotebookID: UUID?
@@ -37,9 +37,9 @@ struct ScanDestinationSheet: View {
 
                 if selected == .choose {
                     Section("Fach und Heft") {
-                        Picker("Fach", selection: $chosenSubject) {
-                            Text("Ohne Fach").tag(Subject?.none)
-                            ForEach(model.subjects) { Text($0.name).tag(Subject?.some($0)) }
+                        Picker("Fach", selection: $chosenSubjectID) {
+                            Text("Ohne Fach").tag(UUID?.none)
+                            ForEach(model.subjects) { Text($0.name).tag(UUID?.some($0.id)) }
                         }
                         Picker("Heft", selection: $chosenNotebookID) {
                             Text("Neues Arbeitsblatt").tag(UUID?.none)
@@ -57,9 +57,13 @@ struct ScanDestinationSheet: View {
                 }
             }
             .task { await prepare() }
-            .onChange(of: chosenSubject) { _, subject in
+            .onChange(of: chosenSubjectID) { _, subjectID in
                 Task {
-                    chosenNotebooks = subject.map { subject in ((try? await model.store.notebooks(subjectID: subject.id)) ?? []).filter { $0.type == .pages } } ?? []
+                    if let subjectID {
+                        chosenNotebooks = ((try? await model.store.notebooks(subjectID: subjectID)) ?? []).filter { $0.type == .pages }
+                    } else {
+                        chosenNotebooks = []
+                    }
                     chosenNotebookID = nil
                 }
             }
@@ -104,7 +108,7 @@ struct ScanDestinationSheet: View {
             if let notebook = chosenNotebooks.first(where: { $0.id == chosenNotebookID }) {
                 await model.insertScan(images, into: notebook, worksheetIn: nil, afterPageID: nil)
             } else {
-                await model.insertScan(images, into: nil, worksheetIn: chosenSubject, afterPageID: nil)
+                await model.insertScan(images, into: nil, worksheetIn: model.subjects.first { $0.id == chosenSubjectID }, afterPageID: nil)
             }
         }
         dismiss()
