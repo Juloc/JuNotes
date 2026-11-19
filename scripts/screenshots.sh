@@ -47,6 +47,7 @@ shoot() { # name, screen, extra launch arguments...
 }
 
 shoot 1-heute today
+xcrun simctl spawn "$device_id" log show --last 2m --predicate 'eventMessage CONTAINS "JuNotes demo"' || true
 shoot 2-fach subject
 shoot 3-heft notebook
 shoot 4-karteikarten cards
