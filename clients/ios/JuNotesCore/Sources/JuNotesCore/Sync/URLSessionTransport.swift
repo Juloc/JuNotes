@@ -37,7 +37,26 @@ public struct URLSessionTransport: SyncTransport {
         return request
     }
 
+    func get<T>(path: String, parse: (Data) throws -> T) async throws -> T {
+        let request = makeRequest(path: path)
+        let data = try await body(of: request)
+        do {
+            return try parse(data)
+        } catch {
+            throw TransportError.serverUnreachable
+        }
+    }
+
     private func send<Response: Decodable>(_ request: URLRequest) async throws -> Response {
+        let data = try await body(of: request)
+        do {
+            return try JSONDecoder().decode(Response.self, from: data)
+        } catch {
+            throw TransportError.serverUnreachable
+        }
+    }
+
+    private func body(of request: URLRequest) async throws -> Data {
         let data: Data
         let response: URLResponse
         do {
@@ -51,11 +70,7 @@ public struct URLSessionTransport: SyncTransport {
         guard let http = response as? HTTPURLResponse else { throw TransportError.serverUnreachable }
         switch http.statusCode {
         case 200..<300:
-            do {
-                return try JSONDecoder().decode(Response.self, from: data)
-            } catch {
-                throw TransportError.serverUnreachable
-            }
+            return data
         case 401, 403:
             throw TransportError.unauthorized
         case 400..<500:

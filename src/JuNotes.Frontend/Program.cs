@@ -1,4 +1,5 @@
 using System.Reflection;
+using JuNotes.Backend.Backup;
 using JuNotes.Backend.Data.Sync;
 using JuNotes.Backend.Database;
 using JuNotes.Backend.Service;
@@ -15,7 +16,16 @@ var app = builder.Build();
 
 // The database is current before the first request is answered; a failed upgrade rolls back and stops the host.
 var backend = typeof(MigrationSet).Assembly;
-await DatabaseUpgrade.RunAsync(app.Services.GetRequiredService<NpgsqlDataSource>(), MigrationSet.FromAssembly(backend), DatabaseUpgrade.ReadBaseline(backend), app.Lifetime.ApplicationStopping);
+var data = app.Services.GetRequiredService<NpgsqlDataSource>();
+var migrations = MigrationSet.FromAssembly(backend);
+var backups = app.Services.GetRequiredService<BackupService>();
+if (backups.Options.BeforeMigration && await DatabaseUpgrade.PendingAsync(data, migrations, app.Lifetime.ApplicationStopping) > 0)
+{
+    // Anything that changes the schema is preceded by a backup; if that fails, nothing is changed and the host does not start.
+    await backups.RunAsync(BackupKind.BeforeMigration, app.Lifetime.ApplicationStopping);
+}
+
+await DatabaseUpgrade.RunAsync(data, migrations, DatabaseUpgrade.ReadBaseline(backend), app.Lifetime.ApplicationStopping);
 
 app.UseStaticFiles();
 app.MapRazorPages();
@@ -45,6 +55,7 @@ sync.MapPost("/push", async (PushRequest request, SyncService service, Cancellat
         return Results.Problem(error.Message, statusCode: 400);
     }
 });
+sync.MapGet("/info", (BackupService backup, TimeProvider time) => Results.Ok(new { serverTime = time.GetUtcNow(), lastBackupAt = backup.Latest()?.At }));
 sync.MapGet("/pull", async (long? since, int? limit, SyncService service, CancellationToken ct) => Results.Ok(await service.PullAsync(since ?? 0, limit ?? SyncService.MaxChanges, ct)));
 
 app.Run();

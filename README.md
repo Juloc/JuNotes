@@ -28,8 +28,14 @@ dotnet test tests/JuNotes.Backend.Tests
 ```
 
 Ohne `JUNOTES_TEST_DB` werden die Datenbanktests übersprungen. Tests laufen nie gegen eine echte Datenbank.
+Die Backup-Tests brauchen `pg_dump` und `pg_restore` in Version 18 (mindestens so neu wie der Server). Liegen ältere auf dem PATH,
+zeigen `JUNOTES_TEST_PGDUMP` und `JUNOTES_TEST_PGRESTORE` auf die Programme der Version 18.
 
-Server starten (legt die Datenbank bei Bedarf selbst an):
+Betrieb mit Docker (Server und Postgres): `.env.example` nach `.env` kopieren, `POSTGRES_PASSWORD` und `SYNC_TOKEN` setzen, dann
+`docker compose up -d`. Der Server hört auf `127.0.0.1:8098`; Backups liegen im Volume unter `/data/backups` (nachts um 3 Uhr,
+die neuesten 7 bleiben, dazu eines vor jeder Migration).
+
+Server ohne Docker starten (legt die Datenbank bei Bedarf selbst an):
 
 ```bash
 export ConnectionStrings__JuNotes='Host=…;Database=junotes;Username=…;Password=…'

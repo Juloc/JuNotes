@@ -96,3 +96,40 @@ struct URLSessionTransportTests {
         await #expect(throws: TransportError.serverUnreachable) { try await transport.pull(since: 0, limit: 10) }
     }
 }
+
+struct ServerInfoTests {
+    @Test func theServersSevenFractionalDigitsParse() throws {
+        let info = try ServerInfo.decode(Data(#"{"serverTime":"2026-11-19T20:00:00.1234567+00:00","lastBackupAt":"2026-11-19T02:00:03.5+00:00"}"#.utf8))
+
+        #expect(info.serverTime == Date(timeIntervalSince1970: 1_795_118_400.123))
+        #expect(info.lastBackupAt == Date(timeIntervalSince1970: 1_795_053_603.5))
+    }
+
+    @Test func noBackupYetIsNil() throws {
+        let info = try ServerInfo.decode(Data(#"{"serverTime":"2026-11-19T20:00:00Z","lastBackupAt":null}"#.utf8))
+        #expect(info.lastBackupAt == nil)
+    }
+
+    @Test func datesWithOffsetsAndWithoutFractionsParse() {
+        #expect(ServerDate.parse("2026-11-19T21:00:00+01:00") == ServerDate.parse("2026-11-19T20:00:00Z"))
+        #expect(ServerDate.parse("not a date") == nil)
+    }
+
+    @Test func nonsenseIsAnUnreachableServer() {
+        #expect(throws: TransportError.serverUnreachable) { try ServerInfo.decode(Data("[]".utf8)) }
+    }
+}
+
+extension URLSessionTransportTests {
+    @Test func infoReadsTheBackupTime() async throws {
+        StubProtocol.handler = { request in
+            #expect(request.url?.path == "/api/v1/sync/info")
+            #expect(request.value(forHTTPHeaderField: "Authorization") == "Bearer t0k")
+            return (200, Data(#"{"serverTime":"2026-11-19T20:00:00.0000000+00:00","lastBackupAt":"2026-11-19T02:00:00.0000000+00:00"}"#.utf8))
+        }
+
+        let info = try await transport.info()
+
+        #expect(info.lastBackupAt != nil)
+    }
+}

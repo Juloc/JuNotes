@@ -1,0 +1,36 @@
+# JuNotes: the server and its PostgreSQL. Copy .env.example to .env, fill it in, then `docker compose up -d`.
+services:
+  junotes:
+    image: ${JUNOTES_IMAGE:-junotes:local}
+    build: .
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      ConnectionStrings__JuNotes: Host=postgres;Database=junotes;Username=junotes;Password=${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      Sync__Token: ${SYNC_TOKEN:?set SYNC_TOKEN in .env}
+    ports:
+      - "127.0.0.1:8098:8080"
+    volumes:
+      - junotes-data:/data
+    stop_grace_period: 20s
+
+  postgres:
+    image: postgres:18
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: junotes
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: junotes
+    volumes:
+      - junotes-db:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U junotes -d junotes"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+volumes:
+  junotes-data:
+  junotes-db:

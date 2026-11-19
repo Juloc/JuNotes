@@ -31,7 +31,13 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           global-json-file: global.json
+      - name: PostgreSQL 18 client tools for the backup tests
+        run: |
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
+          sudo apt-get install -y postgresql-client-18
       - run: dotnet build JuNotes.slnx -c Release --nologo
       - run: dotnet test tests/JuNotes.Backend.Tests -c Release --no-build --nologo
         env:
           JUNOTES_TEST_DB: Host=localhost;Port=5432;Username=junotes_test;Password=isolated-test-password;Database=junotes_test_admin
+          JUNOTES_TEST_PGDUMP: /usr/lib/postgresql/18/bin/pg_dump
+          JUNOTES_TEST_PGRESTORE: /usr/lib/postgresql/18/bin/pg_restore

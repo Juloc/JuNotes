@@ -6,6 +6,20 @@ namespace JuNotes.Backend.Database
     // Brings an empty database to the baseline and every database to the newest migration, all pending migrations in one transaction.
     public static class DatabaseUpgrade
     {
+        // How many migrations the database still lacks; 0 for a database that is new (nothing worth saving yet) or current.
+        public static async Task<int> PendingAsync(NpgsqlDataSource dataSource, MigrationSet migrations, CancellationToken ct)
+        {
+            await using var connection = await dataSource.OpenConnectionAsync(ct);
+            await using var exists = new NpgsqlCommand("select to_regclass('schema_migrations') is not null", connection);
+            if (!(bool)(await exists.ExecuteScalarAsync(ct))!)
+            {
+                return 0;
+            }
+
+            await using var current = new NpgsqlCommand("select coalesce(max(number), 0) from schema_migrations", connection);
+            return Math.Max(0, migrations.Latest - Convert.ToInt32(await current.ExecuteScalarAsync(ct), System.Globalization.CultureInfo.InvariantCulture));
+        }
+
         public static async Task<int> RunAsync(NpgsqlDataSource dataSource, MigrationSet migrations, string baseline, CancellationToken ct)
         {
             await using var connection = await dataSource.OpenConnectionAsync(ct);
