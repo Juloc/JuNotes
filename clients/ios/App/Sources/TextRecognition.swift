@@ -19,3 +19,14 @@ enum TextRecognition {
         }.value
     }
 }
+
+extension UIImage {
+    /// Ink on a transparent background put on white: text recognition wants dark on light.
+    func onWhite() -> UIImage {
+        UIGraphicsImageRenderer(size: size).image { context in
+            UIColor.white.setFill()
+            context.fill(CGRect(origin: .zero, size: size))
+            draw(at: .zero)
+        }
+    }
+}

@@ -13,6 +13,7 @@ struct PageView: View {
     @Environment(AppModel.self) private var model
     @State private var strokes: [Stroke]?
     @State private var scanImage: UIImage?
+    @State private var showSolution = false
 
     var body: some View {
         let logical = PageGeometry.size(for: notebook.type)
@@ -27,6 +28,16 @@ struct PageView: View {
                 } else {
                     VStack(spacing: 8) { ProgressView(); Text(AssetFiles.exists(assetID) ? "Scan wird geöffnet" : "Scan wird vom Server geholt").font(.footnote).foregroundStyle(.secondary) }
                 }
+            }
+            if let printed = page.printedText {
+                // Printed by the app, such as the tasks of a mock test; she writes around it.
+                VStack {
+                    Text(printed).font(.system(size: 15 * displayWidth / PageGeometry.width)).foregroundStyle(.black)
+                        .padding(.horizontal, displayWidth * 0.12).padding(.top, displayWidth * 0.08)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    Spacer()
+                }
+                .allowsHitTesting(false)
             }
             if let heading = page.heading {
                 VStack {
@@ -54,6 +65,8 @@ struct PageView: View {
                 ProgressView()
             }
         }
+        .overlay(alignment: .bottom) { additionsBox }
+        .overlay(alignment: .topTrailing) { solutionButton }
         .frame(width: displayWidth, height: height)
         .clipShape(RoundedRectangle(cornerRadius: 4))
         .shadow(color: .black.opacity(0.18), radius: 3, y: 1)
@@ -62,6 +75,41 @@ struct PageView: View {
             if case .scan(let assetID) = page.content {
                 scanImage = await Task.detached { AssetFiles.image(for: assetID) }.value
             }
+        }
+    }
+
+    /// The suggestions she accepted, in a box of their own at the foot of the page.
+    @ViewBuilder private var additionsBox: some View {
+        if !page.additions.isEmpty {
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Ergänzungen").font(.caption.weight(.semibold)).foregroundStyle(Color(red: 0.1, green: 0.4, blue: 0.2))
+                ForEach(page.additions.indices, id: \.self) { index in
+                    HStack(alignment: .top) {
+                        Text(page.additions[index]).font(.footnote).foregroundStyle(.black)
+                        Spacer()
+                        Button { Task { await model.removeAddition(at: index, from: page.id) } } label: { Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary) }.buttonStyle(.plain)
+                    }
+                }
+            }
+            .padding(10)
+            .background(Color(red: 0.88, green: 0.96, blue: 0.9), in: RoundedRectangle(cornerRadius: 8))
+            .padding(12)
+        }
+    }
+
+    /// The solution stays hidden until she asks.
+    @ViewBuilder private var solutionButton: some View {
+        if let solution = page.solution {
+            VStack(alignment: .trailing, spacing: 8) {
+                Button(showSolution ? "Lösung verbergen" : "Lösung zeigen", systemImage: showSolution ? "eye.slash" : "eye") { showSolution.toggle() }
+                    .font(.footnote).buttonStyle(.bordered).tint(.gray)
+                if showSolution {
+                    Text(solution).font(.footnote).foregroundStyle(.black).padding(10)
+                        .background(Color(red: 1, green: 0.97, blue: 0.85), in: RoundedRectangle(cornerRadius: 8))
+                        .frame(maxWidth: displayWidth * 0.7, alignment: .leading)
+                }
+            }
+            .padding(10)
         }
     }
 }

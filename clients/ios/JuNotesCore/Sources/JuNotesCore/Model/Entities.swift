@@ -187,11 +187,17 @@ public struct Page: SyncEntity {
     public var autoCreated: Bool
     /// A line at the top of the page, such as "Do 19.11. · Mathe", which "Neue Seite für jetzt" writes.
     public var heading: String?
+    /// Text printed on the page by the app, such as the tasks of a mock test; she writes around it.
+    public var printedText: String?
+    /// The solution to what is printed, which she can uncover after trying.
+    public var solution: String?
+    /// Suggestions from "Ergänzen und Prüfen" that she accepted; shown in a box on the page and never mixed into her handwriting.
+    public var additions: [String]
     public var trashedAt: Date?
 
     public var parentID: UUID? { notebookID }
 
-    public init(id: UUID = UUID(), notebookID: UUID, sort: String, template: PageTemplate? = nil, content: PageContent = .drawing, autoCreated: Bool = false, heading: String? = nil, trashedAt: Date? = nil) {
+    public init(id: UUID = UUID(), notebookID: UUID, sort: String, template: PageTemplate? = nil, content: PageContent = .drawing, autoCreated: Bool = false, heading: String? = nil, printedText: String? = nil, solution: String? = nil, additions: [String] = [], trashedAt: Date? = nil) {
         self.id = id
         self.notebookID = notebookID
         self.sort = sort
@@ -199,10 +205,13 @@ public struct Page: SyncEntity {
         self.content = content
         self.autoCreated = autoCreated
         self.heading = heading
+        self.printedText = printedText
+        self.solution = solution
+        self.additions = additions
         self.trashedAt = trashedAt
     }
 
-    enum CodingKeys: String, CodingKey { case sort, template, content, autoCreated, heading, trashedAt }
+    enum CodingKeys: String, CodingKey { case sort, template, content, autoCreated, heading, printedText, solution, additions, trashedAt }
 
     public init(from decoder: any Decoder) throws {
         let values = try decoder.container(keyedBy: CodingKeys.self)
@@ -213,6 +222,9 @@ public struct Page: SyncEntity {
         content = try values.decodeIfPresent(PageContent.self, forKey: .content) ?? .drawing
         autoCreated = try values.decodeIfPresent(Bool.self, forKey: .autoCreated) ?? false
         heading = try values.decodeIfPresent(String.self, forKey: .heading)
+        printedText = try values.decodeIfPresent(String.self, forKey: .printedText)
+        solution = try values.decodeIfPresent(String.self, forKey: .solution)
+        additions = try values.decodeIfPresent([String].self, forKey: .additions) ?? []
         trashedAt = try values.decodeIfPresent(Date.self, forKey: .trashedAt)
     }
 

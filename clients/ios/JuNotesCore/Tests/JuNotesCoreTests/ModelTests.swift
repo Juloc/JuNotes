@@ -104,3 +104,32 @@ struct PageHeadingTests {
         #expect(try Page.decode(record).heading == nil)
     }
 }
+
+struct PageLearningFieldsTests {
+    @Test func printedTextSolutionAndAdditionsSurviveTheWire() throws {
+        let page = Page(id: uuid(3), notebookID: uuid(2), sort: "i", heading: "Probetest", printedText: "1) 1/2 + 1/3 = ?", solution: "5/6", additions: ["Beim Kürzen den ggT nutzen."])
+        let record = SyncRecord(kind: .page, id: uuid(3), parentID: uuid(2), payload: try page.change().payload, seq: 1)
+
+        let decoded = try Page.decode(record)
+
+        #expect(decoded == page)
+        #expect(decoded.additions == ["Beim Kürzen den ggT nutzen."])
+    }
+
+    @Test func anOlderPageWithoutThemStillDecodes() throws {
+        let record = SyncRecord(kind: .page, id: uuid(3), parentID: uuid(2), payload: .object(["sort": .string("i")]), seq: 1)
+        let page = try Page.decode(record)
+
+        #expect(page.printedText == nil)
+        #expect(page.solution == nil)
+        #expect(page.additions.isEmpty)
+    }
+
+    @Test func aStudyPlanCanBeKeptAndRead() throws {
+        let plan = StudyPlan(days: [StudyDay(date: Date(timeIntervalSince1970: 1_800_000_000), tasks: [StudyTask(kind: .learn, topic: "Brüche", minutes: 25)])], unscheduled: [StudyTask(kind: .mockTest, minutes: 40)])
+
+        let data = try JSONEncoder().encode(plan)
+
+        #expect(try JSONDecoder().decode(StudyPlan.self, from: data) == plan)
+    }
+}

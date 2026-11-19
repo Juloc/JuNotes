@@ -13,7 +13,7 @@ public enum StudyTaskKind: String, Sendable, Codable, Equatable {
     case lastLook
 }
 
-public struct StudyTopic: Sendable, Equatable {
+public struct StudyTopic: Sendable, Equatable, Codable {
     public var title: String
     /// Minutes she needs to work through it the first time.
     public var minutes: Int
@@ -24,7 +24,7 @@ public struct StudyTopic: Sendable, Equatable {
     }
 }
 
-public struct StudyTask: Sendable, Equatable {
+public struct StudyTask: Sendable, Equatable, Codable {
     public var kind: StudyTaskKind
     public var topic: String?
     public var minutes: Int
@@ -36,14 +36,14 @@ public struct StudyTask: Sendable, Equatable {
     }
 }
 
-public struct StudyDay: Sendable, Equatable {
+public struct StudyDay: Sendable, Equatable, Codable {
     public var date: Date
     public var tasks: [StudyTask]
 
     public var minutes: Int { tasks.reduce(0) { $0 + $1.minutes } }
 }
 
-public struct StudyPlan: Sendable, Equatable {
+public struct StudyPlan: Sendable, Equatable, Codable {
     public var days: [StudyDay]
     /// What did not fit in the time before the exam; shown so she knows rather than finding out too late.
     public var unscheduled: [StudyTask]

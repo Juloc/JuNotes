@@ -187,5 +187,27 @@ struct SQLiteStoreTests {
 
         #expect(Set(try await store.referencedAssetIDs()) == [uuid(7), uuid(9)])
     }
+
+    @Test func theRecognisedTextOfPagesCanBeReadBackInPageOrder() async throws {
+        let store = try store()
+        try await store.put(Page(id: uuid(10), notebookID: uuid(2), sort: "b"))
+        try await store.put(Page(id: uuid(11), notebookID: uuid(2), sort: "a"))
+        try await store.index(pageID: uuid(10), notebookID: uuid(2), text: "zweite Seite")
+        try await store.index(pageID: uuid(11), notebookID: uuid(2), text: "erste Seite")
+        try await store.index(pageID: uuid(12), notebookID: uuid(3), text: "anderes Heft")
+
+        #expect(try await store.indexedText(pageID: uuid(10)) == "zweite Seite")
+        #expect(try await store.indexedText(pageID: uuid(99)) == nil)
+        #expect(try await store.indexedTexts(notebookID: uuid(2)).map(\.text) == ["erste Seite", "zweite Seite"])
+    }
+
+    @Test func cardsComeBackPerSubject() async throws {
+        let store = try store()
+        try await store.put(Flashcard(id: uuid(1), subjectID: uuid(10), front: "a", back: "b"))
+        try await store.put(Flashcard(id: uuid(2), subjectID: uuid(11), front: "c", back: "d"))
+
+        #expect(try await store.cards(subjectID: uuid(10)).map(\.id) == [uuid(1)])
+        #expect(try await store.cards().count == 2)
+    }
 }
 #endif

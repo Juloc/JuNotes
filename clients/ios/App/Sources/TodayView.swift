@@ -4,6 +4,7 @@ import SwiftUI
 /// "Heute": what is on now and next, what is cancelled, which exams are coming and what the school writes.
 struct TodayView: View {
     @Environment(AppModel.self) private var model
+    @State private var planning: Exam?
 
     var body: some View {
         TimelineView(.periodic(from: .now, by: 60)) { context in
@@ -19,6 +20,7 @@ struct TodayView: View {
                     } else {
                         nowCard(cockpit)
                         lessons(cockpit)
+                        studyToday(cockpit.now)
                         exams(cockpit)
                     }
                     news
@@ -29,6 +31,8 @@ struct TodayView: View {
             }
             .navigationTitle(context.date.formatted(.dateTime.weekday(.wide).day().month(.wide)))
             .refreshable { await model.syncNow() }
+            .sheet(item: $planning) { StudyPlanSheet(exam: $0) }
+            .task { model.plans.dropFinished(now: Date()) }
             .toolbar { ToolbarItem(placement: .primaryAction) { Button("Scannen", systemImage: "doc.viewfinder") { model.scannerOrigin = ScanOrigin() } } }
         }
     }
@@ -95,6 +99,32 @@ struct TodayView: View {
         }
     }
 
+    // MARK: Study plan
+
+    @ViewBuilder private func studyToday(_ now: Date) -> some View {
+        let calendar = Calendar.current
+        let items: [(plan: StoredPlan, dayIndex: Int, day: StudyDay)] = model.plans.plans.compactMap { plan in
+            plan.plan.days.enumerated().first { calendar.isDate($0.element.date, inSameDayAs: now) && !$0.element.tasks.isEmpty }.map { (plan, $0.offset, $0.element) }
+        }
+        if !items.isEmpty {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Lernen für die Arbeit").font(.headline)
+                ForEach(items, id: \.plan.id) { item in
+                    Text(item.plan.examTitle).font(.footnote).foregroundStyle(.secondary)
+                    ForEach(item.day.tasks.indices, id: \.self) { index in
+                        let key = "\(item.dayIndex)-\(index)"
+                        let done = item.plan.done.contains(key)
+                        Button { model.plans.toggle(planID: item.plan.id, task: key) } label: {
+                            Label("\(item.day.tasks[index].title) · \(item.day.tasks[index].minutes) Min.", systemImage: done ? "checkmark.circle.fill" : "circle")
+                                .strikethrough(done).foregroundStyle(done ? .secondary : .primary)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+        }
+    }
+
     // MARK: Exams
 
     @ViewBuilder private func exams(_ cockpit: Cockpit) -> some View {
@@ -109,6 +139,8 @@ struct TodayView: View {
                             Text(exam.title)
                             Text(daysUntil(exam.date, now: cockpit.now)).font(.footnote).foregroundStyle(.secondary)
                         }
+                        Spacer()
+                        Button(model.plans.plans.contains { $0.id == exam.id } ? "Plan ändern" : "Lernplan", systemImage: "calendar.badge.clock") { planning = exam }.buttonStyle(.bordered).font(.footnote)
                     }
                 }
             }

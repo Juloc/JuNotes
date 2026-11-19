@@ -222,6 +222,21 @@ public actor SQLiteStore: SyncStore {
         }
     }
 
+    /// What text recognition found on a page, nil if it has not run yet.
+    public func indexedText(pageID: UUID) throws -> String? {
+        try database.query("select body from page_text where page_id = ?", [.text(pageID.uuidString)]) { $0.text(0) }.first.flatMap { $0 }
+    }
+
+    /// The recognised text of a notebook's pages in their order, for the material of a quiz or a test.
+    public func indexedTexts(notebookID: UUID) throws -> [(pageID: UUID, text: String)] {
+        let order = try pages(notebookID: notebookID).map(\.id)
+        let found = try database.query("select page_id, body from page_text where notebook_id = ?", [.text(notebookID.uuidString)]) { row in
+            row.text(0).flatMap(UUID.init(uuidString:)).flatMap { id in row.text(1).map { (id, $0) } }
+        }.compactMap { $0 }
+        let byID = Dictionary(found, uniquingKeysWith: { first, _ in first })
+        return order.compactMap { id in byID[id].map { (id, $0) } }
+    }
+
     public func search(_ query: String, limit: Int = 30) throws -> [SearchHit] {
         let terms = query.split(whereSeparator: { !$0.isLetter && !$0.isNumber }).map { "\"\($0)\"*" }
         guard !terms.isEmpty else { return [] }

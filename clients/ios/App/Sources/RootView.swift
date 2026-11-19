@@ -15,6 +15,10 @@ struct RootView: View {
                 Section {
                     Label("Heute", systemImage: "sun.max").tag(SidebarItem.today)
                 }
+                Section {
+                    Label("Karteikarten", systemImage: "rectangle.on.rectangle.angled").tag(SidebarItem.cards)
+                        .badge(StudyQueue.counts(model.cards, now: Date()).due)
+                }
                 Section("Fächer") {
                     ForEach(model.subjects) { subject in
                         Label { Text(subject.name) } icon: {
@@ -40,6 +44,7 @@ struct RootView: View {
         } detail: {
             switch model.sidebar {
             case .today: NavigationStack { TodayView() }
+            case .cards: NavigationStack { StudyHubView() }
             case .grades: NavigationStack { GradesView() }
             case .trash: NavigationStack { TrashView() }
             default: NotebookListView()
@@ -58,6 +63,7 @@ struct RootView: View {
         .sheet(isPresented: $showNewSubject) { NewSubjectSheet() }
         .sheet(isPresented: $showSettings) { SettingsView() }
         .sheet(isPresented: $showSearch) { SearchView() }
+        .sheet(item: $model.learnRequest) { LearnSheet(request: $0) }
         .sheet(item: $model.pendingScan) { ScanDestinationSheet(scan: $0) }
         .fullScreenCover(item: $model.scannerOrigin) { origin in
             DocumentScanner(

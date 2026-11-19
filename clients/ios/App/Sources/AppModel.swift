@@ -4,6 +4,7 @@ import Observation
 
 enum SidebarItem: Hashable {
     case today
+    case cards
     case subject(UUID)
     case grades
     case trash
@@ -21,12 +22,16 @@ final class AppModel {
     var notebooks: [Notebook] = []
     var trashed: [Notebook] = []
     var grades: [Grade] = []
+    var cards: [Flashcard] = []
+    /// Counts up when a page was changed by the app (an accepted suggestion, say), so open notebooks reload their pages.
+    var pageRevision = 0
     var events: [CalendarEvent] = []
     var news: [SchoolNews] = []
     /// Set when "Neue Seite für jetzt" made a page: the notebook list opens that notebook.
     var pendingNotebookID: UUID?
     var pendingPageID: UUID?
     var scannerOrigin: ScanOrigin?
+    var learnRequest: LearnRequest?
     var pendingScan: PendingScan?
     var hasLooseNotebooks = false
     /// Counts up when files arrived from the server, so pages that waited for their scan look again.
@@ -35,6 +40,7 @@ final class AppModel {
     var settings: ServerSettings
 
     private let schoolCache: URL
+    let plans: StudyPlanBook
     private var syncTask: Task<Void, Never>?
     private var syncing = false
 
@@ -53,6 +59,7 @@ final class AppModel {
         self.settings = settings
         snapshot = SyncSnapshot(isConfigured: settings.isComplete, localWriteFailed: failed)
         schoolCache = directory.appendingPathComponent("school.json")
+        plans = StudyPlanBook(directory: directory)
         sidebar = .today
         loadSchoolCache()
     }
@@ -66,6 +73,7 @@ final class AppModel {
     func reload() async {
         subjects = (try? await store.subjects()) ?? []
         grades = (try? await store.grades()) ?? []
+        cards = (try? await store.cards()) ?? []
         hasLooseNotebooks = !((try? await store.notebooks(subjectID: nil)) ?? []).isEmpty
         await reloadNotebooks()
         trashed = ((try? await store.trashedNotebooks()) ?? []).sorted { ($0.trashedAt ?? .distantPast) > ($1.trashedAt ?? .distantPast) }

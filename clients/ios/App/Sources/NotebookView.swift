@@ -19,11 +19,13 @@ struct NotebookView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .principal) { positionLabel }
+            ToolbarItem(placement: .primaryAction) { LearnMenu(notebook: notebook, pageID: currentPageID) }
             ToolbarItem(placement: .primaryAction) {
                 Button("Scannen", systemImage: "doc.viewfinder") { model.scannerOrigin = ScanOrigin(notebook: notebook, afterPageID: currentPageID) }
             }
         }
         .task { await load() }
+        .onChange(of: model.pageRevision) { Task { await reloadPages() } }
         .onDisappear { Task { await trimAutoPages() } }
     }
 
@@ -85,6 +87,12 @@ struct NotebookView: View {
         // A search result or a fresh scan asks for one page.
         if let wanted = model.pendingPageID, loaded.contains(where: { $0.id == wanted }) { currentPageID = wanted } else { currentPageID = loaded.first?.id }
         model.pendingPageID = nil
+    }
+
+    /// The app changed a page (an accepted suggestion): read the pages again without losing the place.
+    private func reloadPages() async {
+        let loaded = (try? await model.store.pages(notebookID: notebook.id)) ?? pages
+        if !loaded.isEmpty { pages = loaded }
     }
 
     private func addPage(auto: Bool) async {
