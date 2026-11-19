@@ -1,0 +1,11 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/JuNotes.Backend/JuNotes.Backend.csproj" />
+    <Project Path="src/JuNotes.Frontend/JuNotes.Frontend.csproj" />
+    <Project Path="src/JuNotes.Integrations/JuNotes.Integrations.csproj" />
+    <Project Path="src/JuNotes.Workers/JuNotes.Workers.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/JuNotes.Backend.Tests/JuNotes.Backend.Tests.csproj" />
+  </Folder>
+</Solution>

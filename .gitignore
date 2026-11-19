@@ -1,0 +1,11 @@
+docs/LOCAL.md
+.env
+*.ipa
+*.p12
+*.mobileprovision
+.DS_Store
+bin/
+obj/
+.build/
+node_modules/
+.claude/

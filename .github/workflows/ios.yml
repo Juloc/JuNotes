@@ -1,0 +1,37 @@
+name: iPad app
+
+on:
+  push:
+    branches: [main]
+    paths: ["clients/ios/**", "scripts/build-ipa.sh", ".github/workflows/ios.yml"]
+  pull_request:
+    paths: ["clients/ios/**", "scripts/build-ipa.sh", ".github/workflows/ios.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    # The newest macOS image that carries Xcode 27; adjust the label if GitHub renames it.
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Select the newest Xcode
+        run: |
+          latest="$(find /Applications -maxdepth 1 -name 'Xcode_27*.app' | sort -V | tail -1)"
+          if [ -n "$latest" ]; then sudo xcode-select -s "$latest"; fi
+          xcodebuild -version
+          swift --version
+      - name: Core tests
+        run: swift test
+        working-directory: clients/ios/JuNotesCore
+      - name: Install XcodeGen
+        run: brew install xcodegen
+      - name: Build unsigned IPA
+        run: scripts/build-ipa.sh "$RUNNER_TEMP/ipa"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: JuNotes-unsigned-ipa
+          path: ${{ runner.temp }}/ipa/JuNotes.ipa
+          retention-days: 14

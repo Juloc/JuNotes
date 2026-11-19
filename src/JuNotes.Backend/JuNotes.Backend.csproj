@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <InternalsVisibleTo Include="JuNotes.Backend.Tests" />
+    <ProjectReference Include="../JuNotes.Integrations/JuNotes.Integrations.csproj" />
+    <EmbeddedResource Include="../../database/Schema.sql" LogicalName="JuNotes.Database.Schema.sql" />
+    <EmbeddedResource Include="../../database/migrations/*.sql" LogicalName="JuNotes.Database.Migrations.%(Filename)%(Extension)" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Npgsql" Version="10.0.3" />
+  </ItemGroup>
+</Project>
