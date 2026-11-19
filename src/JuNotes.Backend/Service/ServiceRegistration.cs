@@ -5,6 +5,7 @@ using JuNotes.Backend.Library;
 using JuNotes.Backend.Infrastructure.Sql;
 using JuNotes.Backend.School;
 using JuNotes.Integrations.Codex;
+using JuNotes.Integrations.Paperless;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -52,6 +53,10 @@ namespace JuNotes.Backend.Service
             services.AddSingleton(codex);
             services.AddSingleton<CodexAccount>();
             services.AddSingleton<ICodexRunner, CodexRunner>();
+            var paperless = new PaperlessOptions();
+            configuration.GetSection("Paperless").Bind(paperless);
+            services.AddSingleton(paperless);
+            services.AddSingleton(_ => new PaperlessClient(new HttpClient { Timeout = PaperlessClient.UploadTimeout }, paperless));
             var ai = new AiOptions();
             configuration.GetSection("Ai").Bind(ai);
             services.AddSingleton(ai);

@@ -8,6 +8,7 @@ using JuNotes.Backend.Database;
 using JuNotes.Backend.School;
 using JuNotes.Backend.Service;
 using JuNotes.Integrations.Codex;
+using JuNotes.Integrations.Paperless;
 using JuNotes.Workers;
 using Npgsql;
 
@@ -160,6 +161,50 @@ aiApi.MapPost("/{task}", async (string task, AiRequest request, LearningService 
         return Results.Problem("Die KI ist auf dem Server noch nicht eingerichtet.", statusCode: 503);
     }
     catch (CodexFailedException error)
+    {
+        return Results.Problem(error.Message, statusCode: 502);
+    }
+});
+
+var exportApi = secured.MapGroup("/export");
+exportApi.MapGet("/status", (PaperlessOptions paperless) => Results.Ok(new { paperless = paperless.IsConfigured }));
+// The finished PDF of a notebook goes to Paperless as an archive copy: the body is the PDF, the title and tags come in the query.
+exportApi.MapPost("/paperless", async (HttpRequest request, string title, string? tags, PaperlessOptions options, PaperlessClient paperless, CancellationToken ct) =>
+{
+    if (!options.IsConfigured)
+    {
+        return Results.Problem("Paperless ist auf dem Server nicht eingerichtet.", statusCode: 503);
+    }
+
+    if (string.IsNullOrWhiteSpace(title) || title.Length > 200)
+    {
+        return Results.Problem("Der Titel fehlt oder ist zu lang.", statusCode: 400);
+    }
+
+    using var buffer = new MemoryStream();
+    var chunk = new byte[64 * 1024];
+    int read;
+    while ((read = await request.Body.ReadAsync(chunk, ct)) > 0)
+    {
+        buffer.Write(chunk, 0, read);
+        if (buffer.Length > AssetService.MaxBytes)
+        {
+            return Results.Problem("Die Datei ist größer als 20 MB.", statusCode: 413);
+        }
+    }
+
+    var pdf = buffer.ToArray();
+    if (AssetService.SniffContentType(pdf.AsSpan(0, Math.Min(pdf.Length, 16))) != "application/pdf")
+    {
+        return Results.Problem("Das ist keine PDF-Datei.", statusCode: 415);
+    }
+
+    try
+    {
+        var names = (tags ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Take(10).ToList();
+        return Results.Accepted(value: new { task = await paperless.UploadAsync(pdf, title.Trim(), DateTimeOffset.UtcNow, names, ct) });
+    }
+    catch (PaperlessException error)
     {
         return Results.Problem(error.Message, statusCode: 502);
     }

@@ -17,15 +17,17 @@ namespace JuNotes.Backend.Tests
         private readonly string? _password;
         private readonly string _codex;
         private readonly string? _webPassword;
+        private readonly (string Url, string Token)? _paperless;
 
         public string BackupDirectory { get; } = Path.Combine(Path.GetTempPath(), "junotes-admin-" + Guid.NewGuid().ToString("N"));
 
-        public AdminHost(TestDatabase database, string? password, string codex, string? webPassword = null)
+        public AdminHost(TestDatabase database, string? password, string codex, string? webPassword = null, (string Url, string Token)? paperless = null)
         {
             _database = database;
             _password = password;
             _codex = codex;
             _webPassword = webPassword;
+            _paperless = paperless;
         }
 
         protected override void ConfigureWebHost(Microsoft.AspNetCore.Hosting.IWebHostBuilder builder)
@@ -46,6 +48,12 @@ namespace JuNotes.Backend.Tests
             if (_webPassword is not null)
             {
                 builder.UseSetting("Web:Password", _webPassword);
+            }
+
+            if (_paperless is { } paperless)
+            {
+                builder.UseSetting("Paperless:BaseUrl", paperless.Url);
+                builder.UseSetting("Paperless:Token", paperless.Token);
             }
         }
 

@@ -52,6 +52,11 @@ Mit `Backup__Passphrase` wird jede Kopie verschlüsselt (AES-256-GCM), bevor sie
 Backup__Passphrase='…' dotnet JuNotes.Frontend.dll decrypt-backup junotes-….dump.enc junotes-….dump
 ```
 
+Paperless (optional): `Paperless__BaseUrl` und `Paperless__Token` (ein API-Token eines Paperless-Benutzers, der Dokumente und Tags anlegen darf).
+Die App schickt dann fertige Hefte als PDF dorthin, mit dem Fach als Tag. Das ist ein Archiv, kein Backup.
+
+Web-Ansicht zum Lesen im Browser: `Web__Password` setzen, dann die Adresse des Servers öffnen. Das Admin-Passwort öffnet sie auch.
+
 Das Passwort für den Admin-Bereich (`/Admin`) steht in `Admin__Password`; ohne es bleibt der Bereich geschlossen.
 
 Server ohne Docker starten (legt die Datenbank bei Bedarf selbst an):
