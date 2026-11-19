@@ -98,7 +98,7 @@ namespace JuNotes.Integrations.Codex
             start.ArgumentList.Add("-");
 
             using var limit = CancellationTokenSource.CreateLinkedTokenSource(ct);
-            limit.CancelAfter(TimeSpan.FromSeconds(Math.Max(10, options.TimeoutSeconds)));
+            limit.CancelAfter(TimeSpan.FromSeconds(Math.Max(1, options.TimeoutSeconds)));
             try
             {
                 using var process = StartProcess(start);
