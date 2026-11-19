@@ -87,7 +87,7 @@ struct TodayView: View {
                 }
                 ForEach(all) { event in
                     HStack {
-                        Text(event.start.formatted(.dateTime.hour().minute())).monospacedDigit().foregroundStyle(.secondary).frame(width: 56, alignment: .leading)
+                        Text(event.start.formatted(.dateTime.hour().minute())).monospacedDigit().foregroundStyle(.secondary).lineLimit(1).fixedSize().frame(minWidth: 64, alignment: .leading)
                         Text(event.summary).strikethrough(event.cancelled)
                         if event.cancelled { Text("entfällt").font(.footnote).foregroundStyle(.red) }
                         Spacer()

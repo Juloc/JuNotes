@@ -139,11 +139,11 @@ extension AppModel {
                 while px < wordEnd {
                     let phase = (px - x) / 5.2
                     let y = baseline - 7 - 6 * abs(sin(phase)) * (0.6 + 0.4 * cos(phase * 0.37))
-                    points.append(StrokePoint(x: px, y: y + Double.random(in: -0.7...0.7, using: &generator), pressure: 0.55, time: t))
+                    points.append(StrokePoint(x: px, y: y + Double.random(in: -0.7...0.7, using: &generator), pressure: 1, time: t))
                     px += 1.6
                     t += 0.004
                 }
-                if points.count > 2 { strokes.append(Stroke(tool: .pen, color: "#1d2a8f", width: 1.8, points: points)) }
+                if points.count > 2 { strokes.append(Stroke(tool: .pen, color: "#1d2a8f", width: 3.2, points: points)) }
                 x = wordEnd + Double.random(in: 7...13, using: &generator)
             }
         }

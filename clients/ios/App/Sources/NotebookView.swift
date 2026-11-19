@@ -33,8 +33,12 @@ struct NotebookView: View {
             }
         }
         .task { await load() }
+        .onAppear { model.writing = true }
         .onChange(of: model.pageRevision) { Task { await reloadPages() } }
-        .onDisappear { Task { await trimAutoPages() } }
+        .onDisappear {
+            model.writing = false
+            Task { await trimAutoPages() }
+        }
     }
 
     private var pageList: some View {
