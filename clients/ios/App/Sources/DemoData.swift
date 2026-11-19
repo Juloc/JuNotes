@@ -14,8 +14,6 @@ enum Demo {
         guard let index = arguments.firstIndex(of: "-JuNotesScreen"), arguments.indices.contains(index + 1) else { return "today" }
         return arguments[index + 1]
     }
-
-    static var wantsLandscape: Bool { !ProcessInfo.processInfo.arguments.contains("-JuNotesPortrait") }
 }
 
 extension AppModel {
