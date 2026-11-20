@@ -30,7 +30,8 @@ namespace JuNotes.Backend.Tests
         [InlineData(EntityKinds.Stroke)]
         [InlineData(EntityKinds.Grade)]
         [InlineData(EntityKinds.Card)]
-        public void Pages_strokes_grades_and_cards_need_a_parent(string kind) => Rejects(new SyncChange(kind, Guid.NewGuid(), null, Empty, false));
+        [InlineData(EntityKinds.Object)]
+        public void Pages_strokes_grades_cards_and_objects_need_a_parent(string kind) => Rejects(new SyncChange(kind, Guid.NewGuid(), null, Empty, false));
 
         [Fact]
         public void A_change_that_is_not_a_deletion_needs_a_payload() => Rejects(new SyncChange(EntityKinds.Subject, Guid.NewGuid(), null, null, false));

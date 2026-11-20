@@ -7,6 +7,8 @@ public enum EntityKind: String, Sendable, Codable, Equatable {
     case stroke
     case grade
     case card
+    /// A picture, text box, sticker, tape or recording on a page.
+    case object
 }
 
 /// One entity created, changed or deleted. The wire format of the server's `/api/v1/sync` endpoints.

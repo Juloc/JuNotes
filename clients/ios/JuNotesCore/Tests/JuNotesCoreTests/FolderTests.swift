@@ -176,3 +176,46 @@ import Testing
         #expect(try JSONDecoder().decode([PageTemplate].self, from: Data(##"["planner"]"##.utf8)) == [.planner])
     }
 }
+
+@Suite struct PageObjectTests {
+    @Test func anObjectSurvivesTheWireWithItsPageAsParent() throws {
+        let page = UUID()
+        let object = PageObject(pageID: page, type: .text, x: 40, y: 120, width: 200, height: 50, rotation: 12, text: "Merken!", color: "#ff375f", fontSize: 20, z: 3)
+        let change = try object.change()
+        #expect(change.kind == .object)
+        #expect(change.parentID == page)
+        let record = SyncRecord(kind: change.kind, id: change.id, parentID: change.parentID, payload: change.payload, deleted: false, seq: 1)
+        #expect(try PageObject.decode(record) == object)
+    }
+
+    @Test func missingFieldsGetTheSizeOfTheirKind() throws {
+        let payload = try JSONDecoder().decode(JSONValue.self, from: Data(##"{"type":"sticker","text":"⭐️"}"##.utf8))
+        let object = try PageObject.decode(SyncRecord(kind: .object, id: UUID(), parentID: UUID(), payload: payload, seq: 1))
+        #expect(object.width == 64 && object.height == 64)
+        #expect(object.fontSize == 16 && object.rotation == 0)
+    }
+
+    @Test func aPhotoKeepsItsProportionsAndIsNeverBlownUp() {
+        let wide = PageObject.imageSize(pixelWidth: 4000, pixelHeight: 3000)
+        #expect(wide.width == 300 && wide.height == 225)
+        let small = PageObject.imageSize(pixelWidth: 100, pixelHeight: 50)
+        #expect(small.width == 100 && small.height == 50)
+        #expect(PageObject.imageSize(pixelWidth: 0, pixelHeight: 0).width == 240)
+    }
+
+    @Test func anObjectCannotBeLostOffThePage() {
+        let far = PageObject(pageID: UUID(), type: .image, x: 5000, y: -5000, width: 240, height: 180)
+        let kept = far.clamped(toWidth: 595, height: 842)
+        #expect(kept.x == 571)
+        #expect(kept.y == 24 - 180)
+        let inside = PageObject(pageID: UUID(), type: .text, x: 100, y: 100)
+        #expect(inside.clamped(toWidth: 595, height: 842) == inside)
+    }
+
+    @Test func everyKindHasASize() {
+        for kind in PageObject.Kind.allCases {
+            let size = PageObject.defaultSize(for: kind)
+            #expect(size.width > 0 && size.height > 0)
+        }
+    }
+}
