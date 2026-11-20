@@ -31,25 +31,38 @@ namespace JuNotes.Backend.Library
             return svg.ToString();
         }
 
-        // The printed paper, drawn as in the app: ruled with a margin, grid, dots, or the Cornell layout.
+        private static readonly string[] Days = ["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag", "Sonntag"];
+
+        // The printed paper, drawn as in the app: ruled (three distances, with a margin), grids, dots, Cornell, a checklist or a week planner.
         internal static void Background(StringBuilder svg, string template, double width, double height)
         {
             const string line = "#c7ddf5";
             const string margin = "#f5a3a3";
+            var lineSpacing = template switch { "ruled" or "cornell" => 28.0, "ruledMedium" => 20.0, "ruledFine" => 14.0, _ => 0.0 };
+            var lineTop = template switch { "ruled" => 60.0, "cornell" => 90.0, "ruledMedium" or "ruledFine" => 50.0, _ => 0.0 };
+            var gridSpacing = template switch { "grid" => 20.0, "gridFine" => 14.0, "gridLarge" => 28.0, _ => 0.0 };
+
+            if (lineSpacing > 0)
+            {
+                Lines(svg, line, width, height, lineSpacing, lineTop);
+            }
+
+            if (template is "ruled" or "ruledMedium" or "ruledFine")
+            {
+                Line(svg, margin, 64, 0, 64, height, 1);
+            }
+
+            if (gridSpacing > 0)
+            {
+                Lines(svg, line, width, height, gridSpacing, 0);
+                for (var x = gridSpacing; x < width; x += gridSpacing)
+                {
+                    Line(svg, line, x, 0, x, height, 0.6);
+                }
+            }
+
             switch (template)
             {
-                case "ruled":
-                    Lines(svg, line, width, height, 28, 60);
-                    Line(svg, margin, 64, 0, 64, height, 1);
-                    break;
-                case "grid":
-                    Lines(svg, line, width, height, 20, 0);
-                    for (var x = 20.0; x < width; x += 20)
-                    {
-                        Line(svg, line, x, 0, x, height, 0.6);
-                    }
-
-                    break;
                 case "dotted":
                     for (var y = 20.0; y < height; y += 20)
                     {
@@ -61,9 +74,29 @@ namespace JuNotes.Backend.Library
 
                     break;
                 case "cornell":
-                    Lines(svg, line, width, height, 28, 90);
                     Line(svg, margin, 170, 70, 170, height - 150, 1);
                     Line(svg, margin, 0, height - 150, width, height - 150, 1);
+                    break;
+                case "checklist":
+                    for (var y = 70.0; y < height - 30; y += 38)
+                    {
+                        Line(svg, line, 70, y, width - 40, y, 0.8);
+                        svg.Append(CultureInfo.InvariantCulture, $"<rect x=\"40\" y=\"{Num(y - 22)}\" width=\"18\" height=\"18\" rx=\"3\" fill=\"none\" stroke=\"#999999\" stroke-width=\"1\"/>");
+                    }
+
+                    break;
+                case "planner":
+                    var top = 60.0;
+                    var bottom = height - 40;
+                    var block = (bottom - top) / 7;
+                    for (var index = 0; index < 7; index++)
+                    {
+                        var y = top + (block * index);
+                        Line(svg, margin, 30, y, width - 30, y, 1);
+                        svg.Append(CultureInfo.InvariantCulture, $"<text x=\"36\" y=\"{Num(y + 18)}\" font-size=\"12\" font-weight=\"600\" fill=\"#8c8c8c\" stroke=\"none\">{Days[index]}</text>");
+                    }
+
+                    Line(svg, margin, 30, bottom, width - 30, bottom, 1);
                     break;
             }
         }

@@ -64,10 +64,12 @@ public struct Subject: SyncEntity {
     public var cover: Cover?
     /// How a subject is graded: scale, shares of oral and written, main subject. Folders that are no subject ignore it.
     public var grading: GradingSettings
+    public var favorite: Bool
+    public var tags: [String]
 
     public var parentID: UUID? { folderID }
 
-    public init(id: UUID = UUID(), name: String, color: String = "#0a84ff", symbol: String = "book", sort: Int = 0, folderID: UUID? = nil, isSubject: Bool = true, cover: Cover? = nil, grading: GradingSettings = GradingSettings()) {
+    public init(id: UUID = UUID(), name: String, color: String = "#0a84ff", symbol: String = "book", sort: Int = 0, folderID: UUID? = nil, isSubject: Bool = true, cover: Cover? = nil, grading: GradingSettings = GradingSettings(), favorite: Bool = false, tags: [String] = []) {
         self.id = id
         self.name = name
         self.color = color
@@ -77,9 +79,11 @@ public struct Subject: SyncEntity {
         self.isSubject = isSubject
         self.cover = cover
         self.grading = grading
+        self.favorite = favorite
+        self.tags = tags
     }
 
-    enum CodingKeys: String, CodingKey { case name, color, symbol, sort, isSubject, cover, grading }
+    enum CodingKeys: String, CodingKey { case name, color, symbol, sort, isSubject, cover, grading, favorite, tags }
 
     public init(from decoder: any Decoder) throws {
         let values = try decoder.container(keyedBy: CodingKeys.self)
@@ -92,6 +96,8 @@ public struct Subject: SyncEntity {
         isSubject = try values.decodeIfPresent(Bool.self, forKey: .isSubject) ?? true
         cover = try? values.decodeIfPresent(Cover.self, forKey: .cover)
         grading = (try? values.decodeIfPresent(GradingSettings.self, forKey: .grading)) ?? GradingSettings()
+        favorite = try values.decodeIfPresent(Bool.self, forKey: .favorite) ?? false
+        tags = try values.decodeIfPresent([String].self, forKey: .tags) ?? []
     }
 
     public static func decode(_ record: SyncRecord) throws -> Subject {
@@ -114,6 +120,57 @@ public enum NotebookKind: String, Sendable, Codable, Equatable {
 
 public enum PageTemplate: String, Sendable, Codable, Equatable, CaseIterable {
     case blank, ruled, grid, dotted, cornell
+    /// Lines 5 and 7 mm apart, squares 5 and 10 mm, a list of boxes to tick and a week planner.
+    case ruledFine, ruledMedium, gridFine, gridLarge, checklist, planner
+
+    public var title: String {
+        switch self {
+        case .blank: "Leer"
+        case .ruled: "Liniert, 10 mm"
+        case .ruledMedium: "Liniert, 7 mm"
+        case .ruledFine: "Liniert, 5 mm"
+        case .grid: "Kariert, 7 mm"
+        case .gridFine: "Kariert, 5 mm"
+        case .gridLarge: "Kariert, 10 mm"
+        case .dotted: "Gepunktet"
+        case .cornell: "Cornell"
+        case .checklist: "Checkliste"
+        case .planner: "Wochenplan"
+        }
+    }
+
+    /// Distance of the printed lines in page points (the page is 595 by 842), nil when the paper has no ruling.
+    public var lineSpacing: Double? {
+        switch self {
+        case .ruled, .cornell: 28
+        case .ruledMedium: 20
+        case .ruledFine: 14
+        default: nil
+        }
+    }
+
+    /// Where the first line may stand.
+    public var lineTop: Double {
+        switch self {
+        case .ruled: 60
+        case .cornell: 90
+        case .ruledMedium, .ruledFine: 50
+        default: 0
+        }
+    }
+
+    public var hasMargin: Bool { self == .ruled || self == .ruledMedium || self == .ruledFine }
+
+    public var gridSpacing: Double? {
+        switch self {
+        case .grid: 20
+        case .gridFine: 14
+        case .gridLarge: 28
+        default: nil
+        }
+    }
+
+    public var dotSpacing: Double? { self == .dotted ? 20 : nil }
 }
 
 public struct Notebook: SyncEntity {
@@ -128,11 +185,15 @@ public struct Notebook: SyncEntity {
     /// Set when it went to the trash; it is deleted for good after `Trash.retention`.
     public var trashedAt: Date?
     public var cover: Cover?
+    public var favorite: Bool
+    /// Opening it asks for Face ID or the code of the iPad.
+    public var locked: Bool
+    public var tags: [String]
 
     /// The folder it lies in (the field is still called `subjectID`, as it was when folders were only subjects).
     public var parentID: UUID? { subjectID }
 
-    public init(id: UUID = UUID(), subjectID: UUID? = nil, title: String, type: NotebookKind = .pages, template: PageTemplate = .ruled, createdAt: Date = Date(), trashedAt: Date? = nil, cover: Cover? = nil) {
+    public init(id: UUID = UUID(), subjectID: UUID? = nil, title: String, type: NotebookKind = .pages, template: PageTemplate = .ruled, createdAt: Date = Date(), trashedAt: Date? = nil, cover: Cover? = nil, favorite: Bool = false, locked: Bool = false, tags: [String] = []) {
         self.id = id
         self.subjectID = subjectID
         self.title = title
@@ -141,9 +202,12 @@ public struct Notebook: SyncEntity {
         self.createdAt = createdAt
         self.trashedAt = trashedAt
         self.cover = cover
+        self.favorite = favorite
+        self.locked = locked
+        self.tags = tags
     }
 
-    enum CodingKeys: String, CodingKey { case title, type, template, createdAt, trashedAt, cover }
+    enum CodingKeys: String, CodingKey { case title, type, template, createdAt, trashedAt, cover, favorite, locked, tags }
 
     public init(from decoder: any Decoder) throws {
         let values = try decoder.container(keyedBy: CodingKeys.self)
@@ -155,6 +219,9 @@ public struct Notebook: SyncEntity {
         createdAt = try values.decode(Date.self, forKey: .createdAt)
         trashedAt = try values.decodeIfPresent(Date.self, forKey: .trashedAt)
         cover = try? values.decodeIfPresent(Cover.self, forKey: .cover)
+        favorite = try values.decodeIfPresent(Bool.self, forKey: .favorite) ?? false
+        locked = try values.decodeIfPresent(Bool.self, forKey: .locked) ?? false
+        tags = try values.decodeIfPresent([String].self, forKey: .tags) ?? []
     }
 
     /// The record's parent is the folder, which the payload does not repeat.
@@ -218,10 +285,12 @@ public struct Page: SyncEntity {
     /// Suggestions from "Ergänzen und Prüfen" that she accepted; shown in a box on the page and never mixed into her handwriting.
     public var additions: [String]
     public var trashedAt: Date?
+    /// A bookmark, listed in the outline of the notebook.
+    public var bookmarked: Bool
 
     public var parentID: UUID? { notebookID }
 
-    public init(id: UUID = UUID(), notebookID: UUID, sort: String, template: PageTemplate? = nil, content: PageContent = .drawing, autoCreated: Bool = false, heading: String? = nil, printedText: String? = nil, solution: String? = nil, additions: [String] = [], trashedAt: Date? = nil) {
+    public init(id: UUID = UUID(), notebookID: UUID, sort: String, template: PageTemplate? = nil, content: PageContent = .drawing, autoCreated: Bool = false, heading: String? = nil, printedText: String? = nil, solution: String? = nil, additions: [String] = [], trashedAt: Date? = nil, bookmarked: Bool = false) {
         self.id = id
         self.notebookID = notebookID
         self.sort = sort
@@ -233,9 +302,10 @@ public struct Page: SyncEntity {
         self.solution = solution
         self.additions = additions
         self.trashedAt = trashedAt
+        self.bookmarked = bookmarked
     }
 
-    enum CodingKeys: String, CodingKey { case sort, template, content, autoCreated, heading, printedText, solution, additions, trashedAt }
+    enum CodingKeys: String, CodingKey { case sort, template, content, autoCreated, heading, printedText, solution, additions, trashedAt, bookmarked }
 
     public init(from decoder: any Decoder) throws {
         let values = try decoder.container(keyedBy: CodingKeys.self)
@@ -250,6 +320,7 @@ public struct Page: SyncEntity {
         solution = try values.decodeIfPresent(String.self, forKey: .solution)
         additions = try values.decodeIfPresent([String].self, forKey: .additions) ?? []
         trashedAt = try values.decodeIfPresent(Date.self, forKey: .trashedAt)
+        bookmarked = try values.decodeIfPresent(Bool.self, forKey: .bookmarked) ?? false
     }
 
     public static func decode(_ record: SyncRecord) throws -> Page {

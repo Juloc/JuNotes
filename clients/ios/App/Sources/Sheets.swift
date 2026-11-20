@@ -23,11 +23,7 @@ struct NewNotebookSheet: View {
                 }
                 Section("Papier") {
                     Picker("Papier", selection: $template) {
-                        Text("Liniert").tag(PageTemplate.ruled)
-                        Text("Kariert").tag(PageTemplate.grid)
-                        Text("Gepunktet").tag(PageTemplate.dotted)
-                        Text("Cornell").tag(PageTemplate.cornell)
-                        Text("Leer").tag(PageTemplate.blank)
+                        ForEach(PageTemplate.allCases, id: \.self) { Text($0.title).tag($0) }
                     }
                     .pickerStyle(.inline)
                     .labelsHidden()

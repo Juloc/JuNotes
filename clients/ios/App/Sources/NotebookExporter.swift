@@ -85,28 +85,50 @@ enum NotebookExporter {
             }
         }
 
-        switch template {
-        case .blank:
-            break
-        case .ruled:
-            horizontal(spacing: 28, top: 60)
-            stroke(margin, CGPoint(x: 64, y: 0), CGPoint(x: 64, y: bounds.height), 1)
-        case .grid:
-            horizontal(spacing: 20, top: 0)
-            var x: CGFloat = 20
-            while x < bounds.width { stroke(line, CGPoint(x: x, y: 0), CGPoint(x: x, y: bounds.height)); x += 20 }
-        case .dotted:
+        if let spacing = template.lineSpacing { horizontal(spacing: CGFloat(spacing), top: CGFloat(template.lineTop)) }
+        if template.hasMargin { stroke(margin, CGPoint(x: 64, y: 0), CGPoint(x: 64, y: bounds.height), 1) }
+        if let step = template.gridSpacing {
+            let spacing = CGFloat(step)
+            horizontal(spacing: spacing, top: 0)
+            var x = spacing
+            while x < bounds.width { stroke(line, CGPoint(x: x, y: 0), CGPoint(x: x, y: bounds.height)); x += spacing }
+        }
+        if let step = template.dotSpacing {
+            let spacing = CGFloat(step)
             context.setFillColor(UIColor(white: 0.7, alpha: 1).cgColor)
-            var y: CGFloat = 20
+            var y = spacing
             while y < bounds.height {
-                var x: CGFloat = 20
-                while x < bounds.width { context.fillEllipse(in: CGRect(x: x - 0.9, y: y - 0.9, width: 1.8, height: 1.8)); x += 20 }
-                y += 20
+                var x = spacing
+                while x < bounds.width { context.fillEllipse(in: CGRect(x: x - 0.9, y: y - 0.9, width: 1.8, height: 1.8)); x += spacing }
+                y += spacing
             }
+        }
+        switch template {
         case .cornell:
-            horizontal(spacing: 28, top: 90)
             stroke(margin, CGPoint(x: 170, y: 70), CGPoint(x: 170, y: bounds.height - 150), 1)
             stroke(margin, CGPoint(x: 0, y: bounds.height - 150), CGPoint(x: bounds.width, y: bounds.height - 150), 1)
+        case .checklist:
+            var y: CGFloat = 70
+            while y < bounds.height - 30 {
+                stroke(line, CGPoint(x: 70, y: y), CGPoint(x: bounds.width - 40, y: y), 0.8)
+                context.setStrokeColor(UIColor(white: 0.6, alpha: 1).cgColor)
+                context.setLineWidth(1)
+                context.stroke(CGRect(x: 40, y: y - 22, width: 18, height: 18))
+                y += 38
+            }
+        case .planner:
+            let days = ["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag", "Sonntag"]
+            let top: CGFloat = 60, bottom = bounds.height - 40
+            let block = (bottom - top) / 7
+            let attributes: [NSAttributedString.Key: Any] = [.font: UIFont.systemFont(ofSize: 12, weight: .semibold), .foregroundColor: UIColor(white: 0.55, alpha: 1)]
+            for index in 0..<7 {
+                let y = top + block * CGFloat(index)
+                stroke(margin, CGPoint(x: 30, y: y), CGPoint(x: bounds.width - 30, y: y), 1)
+                (days[index] as NSString).draw(at: CGPoint(x: 36, y: y + 6), withAttributes: attributes)
+            }
+            stroke(margin, CGPoint(x: 30, y: bottom), CGPoint(x: bounds.width - 30, y: bottom), 1)
+        default:
+            break
         }
     }
 }

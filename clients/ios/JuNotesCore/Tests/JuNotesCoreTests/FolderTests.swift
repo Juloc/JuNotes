@@ -133,3 +133,46 @@ import Testing
         #expect(Set(Cover.presets.map(\.name)).count == 12)
     }
 }
+
+@Suite struct OrderingEntityTests {
+    @Test func favouritesTagsLockAndBookmarksSurviveTheWire() throws {
+        let notebook = Notebook(subjectID: UUID(), title: "Beobachtungen", favorite: true, locked: true, tags: ["Kindi", "Praxis"])
+        let nc = try notebook.change()
+        let nr = SyncRecord(kind: nc.kind, id: nc.id, parentID: nc.parentID, payload: nc.payload, deleted: false, seq: 1)
+        let back = try Notebook.decode(nr)
+        #expect(back.favorite && back.locked)
+        #expect(back.tags == ["Kindi", "Praxis"])
+
+        let folder = Subject(name: "Schule", isSubject: false, favorite: true, tags: ["wichtig"])
+        let fc = try folder.change()
+        let fr = SyncRecord(kind: fc.kind, id: fc.id, parentID: fc.parentID, payload: fc.payload, deleted: false, seq: 1)
+        #expect(try Subject.decode(fr) == folder)
+
+        let page = Page(notebookID: UUID(), sort: "m", bookmarked: true)
+        let pc = try page.change()
+        let pr = SyncRecord(kind: pc.kind, id: pc.id, parentID: pc.parentID, payload: pc.payload, deleted: false, seq: 1)
+        #expect(try Page.decode(pr).bookmarked)
+    }
+
+    @Test func olderEntitiesAreNeitherLockedNorFavourite() throws {
+        let payload = try JSONDecoder().decode(JSONValue.self, from: Data(##"{"title":"X","type":"pages","template":"ruled","createdAt":"2026-11-19T10:00:00Z"}"##.utf8))
+        let notebook = try Notebook.decode(SyncRecord(kind: .notebook, id: UUID(), payload: payload, seq: 1))
+        #expect(!notebook.favorite && !notebook.locked && notebook.tags.isEmpty)
+    }
+
+    @Test func everyPaperHasANameAndTheRulingAddsUp() {
+        for template in PageTemplate.allCases { #expect(!template.title.isEmpty) }
+        #expect(PageTemplate.ruledFine.lineSpacing == 14)
+        #expect(PageTemplate.ruledMedium.lineSpacing == 20)
+        #expect(PageTemplate.gridLarge.gridSpacing == 28)
+        #expect(PageTemplate.blank.lineSpacing == nil && PageTemplate.blank.gridSpacing == nil && PageTemplate.blank.dotSpacing == nil)
+        #expect(PageTemplate.ruled.hasMargin && !PageTemplate.cornell.hasMargin)
+    }
+
+    @Test func anUnknownPaperFromANewerAppDoesNotBreakTheOthers() throws {
+        let data = Data(##"["ruled","hologram"]"##.utf8)
+        // A decoding failure for one value is the caller's to handle; the known ones still decode on their own.
+        #expect((try? JSONDecoder().decode([PageTemplate].self, from: data)) == nil)
+        #expect(try JSONDecoder().decode([PageTemplate].self, from: Data(##"["planner"]"##.utf8)) == [.planner])
+    }
+}
