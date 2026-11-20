@@ -263,6 +263,7 @@ struct FolderEditorSheet: View {
     @State private var cover: Cover
     @State private var favorite: Bool
     @State private var tags: String
+    @State private var sensitive: Bool
 
     init(target: FolderEditorTarget) {
         self.target = target
@@ -274,6 +275,7 @@ struct FolderEditorSheet: View {
         _isSubject = State(initialValue: folder?.isSubject ?? target.isSubject)
         _customCover = State(initialValue: folder?.cover != nil)
         _favorite = State(initialValue: folder?.favorite ?? false)
+        _sensitive = State(initialValue: folder?.sensitive ?? false)
         _tags = State(initialValue: (folder?.tags ?? []).joined(separator: ", "))
         _cover = State(initialValue: folder?.cover ?? Cover(style: .gradient, colorA: Cover.presets[0].a, colorB: Cover.presets[0].b, symbol: folder?.symbol))
     }
@@ -289,9 +291,10 @@ struct FolderEditorSheet: View {
                 }
                 Section {
                     Toggle("Favorit", isOn: $favorite)
+                    Toggle("Enthält Daten von Kindern", isOn: $sensitive)
                     TextField("Stichwörter, durch Komma getrennt", text: $tags)
                 } footer: {
-                    Text("Favoriten stehen auf „Heute“. Stichwörter findet die Suche.")
+                    Text("Favoriten stehen auf „Heute“. Was Daten von Kindern enthält, geht nicht ohne dein Ja an die KI, nicht an Paperless und steht nicht in der Systemsuche. Das gilt für alles darin.")
                 }
                 Section("Farbe in der Seitenleiste") {
                     LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 8)) {
@@ -341,12 +344,14 @@ struct FolderEditorSheet: View {
             folder.isSubject = isSubject
             folder.cover = finalCover
             folder.favorite = favorite
+            folder.sensitive = sensitive
             folder.tags = Tags.parse(tags)
             await model.update(folder)
         } else {
             var created = await model.addFolder(name: trimmed, color: color, symbol: symbol, isSubject: isSubject, cover: finalCover, in: target.parent)
-            if favorite || !tags.isEmpty {
+            if favorite || sensitive || !tags.isEmpty {
                 created.favorite = favorite
+                created.sensitive = sensitive
                 created.tags = Tags.parse(tags)
                 await model.update(created)
             }
@@ -367,6 +372,7 @@ struct NotebookEditorSheet: View {
     @State private var cover: Cover
     @State private var favorite: Bool
     @State private var locked: Bool
+    @State private var sensitive: Bool
     @State private var tags: String
 
     init(notebook: Notebook) {
@@ -375,6 +381,7 @@ struct NotebookEditorSheet: View {
         _customCover = State(initialValue: notebook.cover != nil)
         _favorite = State(initialValue: notebook.favorite)
         _locked = State(initialValue: notebook.locked)
+        _sensitive = State(initialValue: notebook.sensitive)
         _tags = State(initialValue: notebook.tags.joined(separator: ", "))
         _cover = State(initialValue: notebook.cover ?? Cover(style: .gradient, colorA: Cover.presets[0].a, colorB: Cover.presets[0].b))
     }
@@ -386,6 +393,7 @@ struct NotebookEditorSheet: View {
                 Section {
                     Toggle("Favorit", isOn: $favorite)
                     Toggle("Mit Face ID sperren", isOn: $locked)
+                    Toggle("Enthält Daten von Kindern", isOn: $sensitive)
                     TextField("Stichwörter, durch Komma getrennt", text: $tags)
                 } footer: {
                     Text("Ein gesperrtes Heft zeigt keine Vorschau, steht nicht in der Suche und öffnet sich nur mit Face ID oder dem Code des iPads.")
@@ -409,6 +417,7 @@ struct NotebookEditorSheet: View {
                             changed.cover = customCover ? cover : nil
                             changed.favorite = favorite
                             changed.locked = locked
+                            changed.sensitive = sensitive
                             changed.tags = Tags.parse(tags)
                             await model.update(changed)
                             dismiss()

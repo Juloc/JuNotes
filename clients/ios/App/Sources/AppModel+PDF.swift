@@ -107,6 +107,10 @@ extension AppModel {
 
     /// Sends the notebook to Paperless through the server, with its subject as a tag.
     func sendToPaperless(_ notebook: Notebook) async {
+        guard !isSensitive(notebook) else {
+            notice = "„\(notebook.title)“ enthält Daten von Kindern und wird nicht an Paperless gesendet."
+            return
+        }
         guard let transport = makeTransport() else {
             notice = "Der Server ist noch nicht eingerichtet. Trage Adresse und Schlüssel in den Einstellungen ein."
             return

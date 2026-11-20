@@ -52,6 +52,12 @@ public struct FolderTree: Sendable {
         return result
     }
 
+    /// True when the folder or any folder above it holds data about children.
+    public func isSensitive(folderID: UUID?) -> Bool {
+        guard let folderID else { return false }
+        return path(to: folderID).contains { $0.sensitive }
+    }
+
     /// A folder may go anywhere except into itself or into something inside it.
     public func canMove(_ id: UUID, into target: UUID?) -> Bool {
         guard let target else { return true }

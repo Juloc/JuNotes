@@ -26,6 +26,9 @@ struct LibraryHit: Identifiable {
 }
 
 extension AppModel {
+    /// True when the notebook or a folder above it holds data about children.
+    func isSensitive(_ notebook: Notebook) -> Bool { notebook.sensitive || tree.isSensitive(folderID: notebook.subjectID) }
+
     /// True when the notebook may be shown: it is not locked, or she has opened it since the app was last in the background.
     func unlock(_ notebook: Notebook) async -> Bool {
         if !notebook.locked || unlocked.contains(notebook.id) { return true }

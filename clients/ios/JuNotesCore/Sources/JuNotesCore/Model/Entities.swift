@@ -66,10 +66,12 @@ public struct Subject: SyncEntity {
     public var grading: GradingSettings
     public var favorite: Bool
     public var tags: [String]
+    /// Holds data about children: nothing in it goes to the AI, to Paperless or into the system search without her saying yes.
+    public var sensitive: Bool
 
     public var parentID: UUID? { folderID }
 
-    public init(id: UUID = UUID(), name: String, color: String = "#0a84ff", symbol: String = "book", sort: Int = 0, folderID: UUID? = nil, isSubject: Bool = true, cover: Cover? = nil, grading: GradingSettings = GradingSettings(), favorite: Bool = false, tags: [String] = []) {
+    public init(id: UUID = UUID(), name: String, color: String = "#0a84ff", symbol: String = "book", sort: Int = 0, folderID: UUID? = nil, isSubject: Bool = true, cover: Cover? = nil, grading: GradingSettings = GradingSettings(), favorite: Bool = false, tags: [String] = [], sensitive: Bool = false) {
         self.id = id
         self.name = name
         self.color = color
@@ -81,9 +83,10 @@ public struct Subject: SyncEntity {
         self.grading = grading
         self.favorite = favorite
         self.tags = tags
+        self.sensitive = sensitive
     }
 
-    enum CodingKeys: String, CodingKey { case name, color, symbol, sort, isSubject, cover, grading, favorite, tags }
+    enum CodingKeys: String, CodingKey { case name, color, symbol, sort, isSubject, cover, grading, favorite, tags, sensitive }
 
     public init(from decoder: any Decoder) throws {
         let values = try decoder.container(keyedBy: CodingKeys.self)
@@ -98,6 +101,7 @@ public struct Subject: SyncEntity {
         grading = (try? values.decodeIfPresent(GradingSettings.self, forKey: .grading)) ?? GradingSettings()
         favorite = try values.decodeIfPresent(Bool.self, forKey: .favorite) ?? false
         tags = try values.decodeIfPresent([String].self, forKey: .tags) ?? []
+        sensitive = try values.decodeIfPresent(Bool.self, forKey: .sensitive) ?? false
     }
 
     public static func decode(_ record: SyncRecord) throws -> Subject {
@@ -189,11 +193,13 @@ public struct Notebook: SyncEntity {
     /// Opening it asks for Face ID or the code of the iPad.
     public var locked: Bool
     public var tags: [String]
+    /// Holds data about children, see `Subject.sensitive`.
+    public var sensitive: Bool
 
     /// The folder it lies in (the field is still called `subjectID`, as it was when folders were only subjects).
     public var parentID: UUID? { subjectID }
 
-    public init(id: UUID = UUID(), subjectID: UUID? = nil, title: String, type: NotebookKind = .pages, template: PageTemplate = .ruled, createdAt: Date = Date(), trashedAt: Date? = nil, cover: Cover? = nil, favorite: Bool = false, locked: Bool = false, tags: [String] = []) {
+    public init(id: UUID = UUID(), subjectID: UUID? = nil, title: String, type: NotebookKind = .pages, template: PageTemplate = .ruled, createdAt: Date = Date(), trashedAt: Date? = nil, cover: Cover? = nil, favorite: Bool = false, locked: Bool = false, tags: [String] = [], sensitive: Bool = false) {
         self.id = id
         self.subjectID = subjectID
         self.title = title
@@ -205,9 +211,10 @@ public struct Notebook: SyncEntity {
         self.favorite = favorite
         self.locked = locked
         self.tags = tags
+        self.sensitive = sensitive
     }
 
-    enum CodingKeys: String, CodingKey { case title, type, template, createdAt, trashedAt, cover, favorite, locked, tags }
+    enum CodingKeys: String, CodingKey { case title, type, template, createdAt, trashedAt, cover, favorite, locked, tags, sensitive }
 
     public init(from decoder: any Decoder) throws {
         let values = try decoder.container(keyedBy: CodingKeys.self)
@@ -222,6 +229,7 @@ public struct Notebook: SyncEntity {
         favorite = try values.decodeIfPresent(Bool.self, forKey: .favorite) ?? false
         locked = try values.decodeIfPresent(Bool.self, forKey: .locked) ?? false
         tags = try values.decodeIfPresent([String].self, forKey: .tags) ?? []
+        sensitive = try values.decodeIfPresent(Bool.self, forKey: .sensitive) ?? false
     }
 
     /// The record's parent is the folder, which the payload does not repeat.
