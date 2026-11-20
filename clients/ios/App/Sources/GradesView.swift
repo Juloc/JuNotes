@@ -92,6 +92,7 @@ struct GradesView: View {
                         Text(subject.grading.scale.display(grade.value, decimals: subject.grading.decimals)).font(.title3.weight(.semibold)).monospacedDigit().foregroundStyle(.primary)
                     }
                 }
+                .buttonStyle(.plain)
                 .swipeActions { Button("Löschen", systemImage: "trash", role: .destructive) { Task { await model.deleteGrade(grade) } } }
             }
             Button("Note eintragen", systemImage: "plus") { editing = GradeEditTarget(subject: subject, grade: nil) }
