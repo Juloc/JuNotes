@@ -23,6 +23,18 @@ struct SettingsView: View {
                 }
 
                 Section {
+                    Toggle("Unterricht entfällt", isOn: Binding(get: { model.reminderSettings.cancellations }, set: { model.reminderSettings.cancellations = $0; Task { await model.refreshReminders() } }))
+                    Toggle("Neuigkeiten der Schule", isOn: Binding(get: { model.reminderSettings.news }, set: { model.reminderSettings.news = $0 }))
+                    Toggle("Arbeit morgen", isOn: Binding(get: { model.reminderSettings.exams }, set: { model.reminderSettings.exams = $0; Task { await model.refreshReminders() } }))
+                    Toggle("Lernplan heute", isOn: Binding(get: { model.reminderSettings.studyPlan }, set: { model.reminderSettings.studyPlan = $0; Task { await model.refreshReminders() } }))
+                    Toggle("Karteikarten fällig", isOn: Binding(get: { model.reminderSettings.cards }, set: { model.reminderSettings.cards = $0; Task { await model.refreshReminders() } }))
+                } header: {
+                    Text("Benachrichtigungen")
+                } footer: {
+                    Text("Das iPad meldet sich selbst. Es schaut alle paar Stunden im Hintergrund nach, die Meldungen kommen also nicht auf die Sekunde genau. Erlaubnis dafür steht unter Einstellungen des iPads, JuNotes, Mitteilungen.")
+                }
+
+                Section {
                     Button { Task { await test() } } label: {
                         HStack { Text("Verbindung testen"); if testing { Spacer(); ProgressView() } }
                     }
@@ -40,7 +52,7 @@ struct SettingsView: View {
             }
             .onAppear { draft = model.settings }
         }
-        .presentationDetents([.medium])
+        .presentationDetents([.large])
     }
 
     private func test() async {

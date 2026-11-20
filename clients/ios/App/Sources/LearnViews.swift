@@ -49,14 +49,32 @@ struct LearnMenu: View {
     let notebook: Notebook
     let pageID: UUID?
     @Environment(AppModel.self) private var model
+    @State private var asking: LearnKind?
 
     var body: some View {
         Menu {
             ForEach([LearnKind.quiz, .test, .cards, .check, .copy]) { kind in
-                Button(kind.title, systemImage: kind.symbol) { model.learnRequest = LearnRequest(kind: kind, notebook: notebook, pageID: pageID) }
+                Button(kind.title, systemImage: kind.symbol) { start(kind) }
             }
         } label: {
             Label("Lernen", systemImage: "sparkles")
+        }
+        .confirmationDialog("Daten von Kindern", isPresented: Binding(get: { asking != nil }, set: { if !$0 { asking = nil } }), titleVisibility: .visible, presenting: asking) { kind in
+            Button("Ja, nur dieses Mal") {
+                model.aiAllowed.insert(notebook.id)
+                model.learnRequest = LearnRequest(kind: kind, notebook: notebook, pageID: pageID)
+            }
+            Button("Abbrechen", role: .cancel) {}
+        } message: { _ in
+            Text("Dieses Heft enthält Daten von Kindern. Der Text würde an deinen Server und von dort an Codex geschickt. Schick nur Text ohne Namen.")
+        }
+    }
+
+    private func start(_ kind: LearnKind) {
+        if model.isSensitive(notebook) && !model.aiAllowed.contains(notebook.id) {
+            asking = kind
+        } else {
+            model.learnRequest = LearnRequest(kind: kind, notebook: notebook, pageID: pageID)
         }
     }
 }

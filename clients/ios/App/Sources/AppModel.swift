@@ -46,6 +46,8 @@ final class AppModel {
     var writing = false
     /// Locked notebooks she opened since the app was last in the background.
     var unlocked: Set<UUID> = []
+    /// Notebooks with data about children that she allowed to go to the AI since the app was last in the background.
+    var aiAllowed: Set<UUID> = []
     /// Objects on pages (photos, text boxes, stickers) can be moved, turned and resized while this is on.
     var editingObjects = false
     var selectedObject: PageObject?
@@ -254,6 +256,7 @@ final class AppModel {
             await syncAssets(using: transport)
             await reload()
         }
+        await refreshReminders()
     }
 
     func apply(_ new: ServerSettings) async {

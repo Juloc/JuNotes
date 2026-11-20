@@ -219,3 +219,26 @@ import Testing
         }
     }
 }
+
+@Suite struct SensitiveTests {
+    @Test func aFolderMakesEverythingInsideItSensitive() {
+        let kindi = Subject(name: "Kindi", isSubject: false, sensitive: true)
+        let group = Subject(name: "Gruppe", folderID: kindi.id, isSubject: false)
+        let school = Subject(name: "Schule", isSubject: false)
+        let tree = FolderTree([kindi, group, school])
+        #expect(tree.isSensitive(folderID: group.id))
+        #expect(tree.isSensitive(folderID: kindi.id))
+        #expect(!tree.isSensitive(folderID: school.id))
+        #expect(!tree.isSensitive(folderID: nil))
+    }
+
+    @Test func theFlagSurvivesTheWireAndDefaultsToOff() throws {
+        let notebook = Notebook(title: "Beobachtungen", sensitive: true)
+        let change = try notebook.change()
+        #expect(try Notebook.decode(SyncRecord(kind: change.kind, id: change.id, payload: change.payload, seq: 1)).sensitive)
+        let folder = Subject(name: "Kindi", isSubject: false, sensitive: true)
+        let folderChange = try folder.change()
+        #expect(try Subject.decode(SyncRecord(kind: folderChange.kind, id: folderChange.id, payload: folderChange.payload, seq: 1)) == folder)
+        #expect(!Notebook(title: "X").sensitive)
+    }
+}

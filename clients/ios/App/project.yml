@@ -19,6 +19,11 @@ targets:
     dependencies:
       - package: JuNotesCore
       - package: ZIPFoundation
+    info:
+      path: Info.plist
+      properties:
+        BGTaskSchedulerPermittedIdentifiers: [app.junotes.refresh]
+        UIBackgroundModes: [fetch]
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: app.junotes.ios

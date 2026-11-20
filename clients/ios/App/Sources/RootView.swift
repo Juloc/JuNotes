@@ -71,7 +71,10 @@ struct RootView: View {
         }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active { Task { await model.consumePendingAction(); await model.syncNow() } }
-            if phase == .background { model.unlocked.removeAll() }
+            if phase == .background {
+                model.unlocked.removeAll()
+                model.aiAllowed.removeAll()
+            }
         }
         .sheet(item: $folderEditor) { FolderEditorSheet(target: $0) }
         .sheet(isPresented: $showSettings) { SettingsView() }
