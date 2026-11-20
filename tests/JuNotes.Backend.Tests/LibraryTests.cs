@@ -34,6 +34,25 @@ namespace JuNotes.Backend.Tests
         }
 
         [Fact]
+        public void Finer_ruling_has_more_lines_and_the_new_papers_draw_something()
+        {
+            var normal = Count(Parse(PageRenderer.Svg("pages", "ruled", [])), "line");
+            var medium = Count(Parse(PageRenderer.Svg("pages", "ruledMedium", [])), "line");
+            var fine = Count(Parse(PageRenderer.Svg("pages", "ruledFine", [])), "line");
+            Assert.True(normal < medium && medium < fine);
+
+            Assert.True(Count(Parse(PageRenderer.Svg("pages", "gridFine", [])), "line") > Count(Parse(PageRenderer.Svg("pages", "grid", [])), "line"));
+            Assert.True(Count(Parse(PageRenderer.Svg("pages", "gridLarge", [])), "line") < Count(Parse(PageRenderer.Svg("pages", "grid", [])), "line"));
+
+            var checklist = Parse(PageRenderer.Svg("pages", "checklist", []));
+            Assert.True(Count(checklist, "rect") > 15);
+
+            var planner = Parse(PageRenderer.Svg("pages", "planner", []));
+            Assert.Contains(planner.Descendants(), node => node.Name.LocalName == "text" && node.Value == "Donnerstag");
+            Assert.Equal(8, Count(planner, "line"));
+        }
+
+        [Fact]
         public void Grid_paper_has_lines_both_ways_dots_have_circles_and_cornell_its_two_guides()
         {
             var grid = Parse(PageRenderer.Svg("pages", "grid", []));
