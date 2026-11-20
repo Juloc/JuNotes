@@ -77,6 +77,17 @@ Berichte und Praxisaufgaben, Beobachtungen zu einzelnen Kindern, Fotos und Proje
 - Backups verschlüsselt (gibt es schon), Bilder nicht ungefragt in Suche und KI.
 - Möglichkeit, Namen zu kürzen.
 
+### 11. Benachrichtigungen aus der Schule
+
+Gewünscht: Meldungen der Schule und rund ums Lernen als Benachrichtigung auf dem iPad.
+- **Ohne Developer-Konto gibt es keine Push-Nachrichten** (APNs). Möglich sind **lokale Benachrichtigungen**: Die App holt Stundenplan und
+  Schul-News im Hintergrund und meldet dann selbst, wenn sich etwas ändert.
+- Geplant: Unterrichtsausfall und Raumänderung, neue Schul-News, „Morgen ist Klassenarbeit in …“, Lernplan-Aufgaben des Tages und fällige
+  Karteikarten, jeweils einzeln abschaltbar.
+- Grenze: iOS entscheidet, wann die Hintergrundabfrage läuft (alle paar Stunden), es ist also nicht sekundengenau. Mit dem
+  Developer-Konto ginge echter Push vom Server.
+- Die Schul-News brauchen einen Feed-Link (`School__NewsFeedUrl`). Ob die Schule einen hat, ist offen; die interne Seite braucht eine Anmeldung.
+
 ## Noch offen
 
 - Standardgewichtung neuer Fächer (50 zu 50 oder 30 zu 70).
