@@ -62,10 +62,12 @@ public struct Subject: SyncEntity {
     /// Only subjects take part in marks, cards and "which lesson is on now".
     public var isSubject: Bool
     public var cover: Cover?
+    /// How a subject is graded: scale, shares of oral and written, main subject. Folders that are no subject ignore it.
+    public var grading: GradingSettings
 
     public var parentID: UUID? { folderID }
 
-    public init(id: UUID = UUID(), name: String, color: String = "#0a84ff", symbol: String = "book", sort: Int = 0, folderID: UUID? = nil, isSubject: Bool = true, cover: Cover? = nil) {
+    public init(id: UUID = UUID(), name: String, color: String = "#0a84ff", symbol: String = "book", sort: Int = 0, folderID: UUID? = nil, isSubject: Bool = true, cover: Cover? = nil, grading: GradingSettings = GradingSettings()) {
         self.id = id
         self.name = name
         self.color = color
@@ -74,9 +76,10 @@ public struct Subject: SyncEntity {
         self.folderID = folderID
         self.isSubject = isSubject
         self.cover = cover
+        self.grading = grading
     }
 
-    enum CodingKeys: String, CodingKey { case name, color, symbol, sort, isSubject, cover }
+    enum CodingKeys: String, CodingKey { case name, color, symbol, sort, isSubject, cover, grading }
 
     public init(from decoder: any Decoder) throws {
         let values = try decoder.container(keyedBy: CodingKeys.self)
@@ -88,6 +91,7 @@ public struct Subject: SyncEntity {
         sort = try values.decodeIfPresent(Int.self, forKey: .sort) ?? 0
         isSubject = try values.decodeIfPresent(Bool.self, forKey: .isSubject) ?? true
         cover = try? values.decodeIfPresent(Cover.self, forKey: .cover)
+        grading = (try? values.decodeIfPresent(GradingSettings.self, forKey: .grading)) ?? GradingSettings()
     }
 
     public static func decode(_ record: SyncRecord) throws -> Subject {

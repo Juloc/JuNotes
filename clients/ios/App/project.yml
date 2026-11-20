@@ -7,6 +7,9 @@ options:
 packages:
   JuNotesCore:
     path: ../JuNotesCore
+  ZIPFoundation:
+    url: https://github.com/weichsel/ZIPFoundation
+    from: 0.9.19
 targets:
   JuNotes:
     type: application
@@ -15,6 +18,7 @@ targets:
       - Sources
     dependencies:
       - package: JuNotesCore
+      - package: ZIPFoundation
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: app.junotes.ios

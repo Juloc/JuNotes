@@ -117,7 +117,7 @@ struct FolderView: View {
         }
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
-                Button("PDF importieren", systemImage: "square.and.arrow.down") { showImporter = true }
+                Button("PDF oder ZIP importieren", systemImage: "square.and.arrow.down") { showImporter = true }
             }
             ToolbarItem(placement: .primaryAction) {
                 Button("Scannen", systemImage: "doc.viewfinder") { model.scannerOrigin = ScanOrigin() }
@@ -141,10 +141,14 @@ struct FolderView: View {
         } message: { folder in
             Text(folder.isSubject ? "Noten und Karteikarten dieses Fachs werden mit gelöscht. Nur ein leerer Ordner lässt sich löschen." : "Nur ein leerer Ordner lässt sich löschen.")
         }
-        .fileImporter(isPresented: $showImporter, allowedContentTypes: [.pdf], allowsMultipleSelection: true) { result in
+        .fileImporter(isPresented: $showImporter, allowedContentTypes: [.pdf, .zip], allowsMultipleSelection: true) { result in
             guard case .success(let urls) = result else { return }
             Task {
                 for url in urls {
+                    if url.pathExtension.lowercased() == "zip" {
+                        await model.importZIP(from: url)
+                        continue
+                    }
                     do { try await model.importPDF(from: url) } catch let error as PDFImportError { model.notice = "\(url.lastPathComponent): \(error.sentence)" } catch { model.notice = "\(url.lastPathComponent) konnte nicht importiert werden." }
                 }
             }
