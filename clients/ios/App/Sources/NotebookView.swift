@@ -43,28 +43,59 @@ struct NotebookView: View {
 
     private var pageList: some View {
         GeometryReader { geometry in
-            let width = min(geometry.size.width - 48, 820)
-            ScrollView {
-                LazyVStack(spacing: 24) {
-                    ForEach(pages) { page in
-                        PageView(page: page, notebook: notebook, displayWidth: width,
-                                 onStrokeCount: { strokeCounts[page.id] = $0 },
-                                 onNearBottom: { Task { await nearBottom(of: page) } })
-                            .id(page.id)
-                            .contextMenu {
-                                Button("Seite löschen", systemImage: "trash", role: .destructive) { Task { await trash(page) } }
-                            }
+            // On a wide iPad a rail of small pages stands left of the sheet, the way pages of a book are leafed through.
+            let showsRail = geometry.size.width > 760 && pages.count > 1
+            let railWidth: CGFloat = showsRail ? 112 : 0
+            let width = min(geometry.size.width - 48 - railWidth, 820)
+            HStack(spacing: 0) {
+                if showsRail { pageRail }
+                ScrollView {
+                    LazyVStack(spacing: 24) {
+                        ForEach(pages) { page in
+                            PageView(page: page, notebook: notebook, displayWidth: width,
+                                     onStrokeCount: { strokeCounts[page.id] = $0 },
+                                     onNearBottom: { Task { await nearBottom(of: page) } })
+                                .id(page.id)
+                                .contextMenu {
+                                    Button("Seite löschen", systemImage: "trash", role: .destructive) { Task { await trash(page) } }
+                                }
+                        }
+                        Button("Neue Seite", systemImage: "plus") { Task { await addPage(auto: false) } }
+                            .buttonStyle(.bordered)
+                            .padding(.bottom, 120)
                     }
-                    Button("Neue Seite", systemImage: "plus") { Task { await addPage(auto: false) } }
-                        .buttonStyle(.bordered)
-                        .padding(.bottom, 120)
+                    .scrollTargetLayout()
+                    .padding(.top, 24)
+                    .frame(maxWidth: .infinity)
                 }
-                .scrollTargetLayout()
-                .padding(.top, 24)
-                .frame(maxWidth: .infinity)
+                .scrollPosition(id: $currentPageID)
             }
-            .scrollPosition(id: $currentPageID)
         }
+    }
+
+    /// Small pages with their numbers; the one she is on is framed. A tap goes there.
+    private var pageRail: some View {
+        ScrollView {
+            LazyVStack(spacing: 14) {
+                ForEach(Array(pages.enumerated()), id: \.element.id) { index, page in
+                    let current = page.id == currentPageID
+                    VStack(spacing: 4) {
+                        PageThumbnail(page: page, template: page.template ?? notebook.template)
+                            .overlay(RoundedRectangle(cornerRadius: 4, style: .continuous).stroke(Brand.accent, lineWidth: current ? 2.5 : 0))
+                        Text("\(index + 1)").font(.caption2.weight(current ? .bold : .regular)).foregroundStyle(current ? Brand.accent : Color.secondary)
+                    }
+                    .contentShape(Rectangle())
+                    .onTapGesture { withAnimation { currentPageID = page.id } }
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel("Seite \(index + 1)")
+                    .accessibilityAddTraits(.isButton)
+                }
+            }
+            .padding(.vertical, 24)
+            .padding(.horizontal, 12)
+        }
+        .frame(width: 112)
+        .background(.bar)
     }
 
     private var whiteboard: some View {

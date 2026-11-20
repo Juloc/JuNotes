@@ -32,9 +32,9 @@ struct NotebookListView: View {
                     }
                 } else {
                     ScrollView {
-                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 170), spacing: 20)], spacing: 24) {
+                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 170), spacing: 24)], alignment: .leading, spacing: 28) {
                             ForEach(model.notebooks) { notebook in
-                                NavigationLink(value: notebook.id) { card(notebook, color: model.selectedSubject?.color ?? "#8e8e93") }
+                                NavigationLink(value: notebook.id) { NotebookCover(notebook: notebook, subject: model.selectedSubject) }
                                     .buttonStyle(.plain)
                                     .contextMenu {
                                         Button("In den Papierkorb", systemImage: "trash", role: .destructive) { Task { await model.moveToTrash(notebook) } }
@@ -43,6 +43,7 @@ struct NotebookListView: View {
                         }
                         .padding(24)
                     }
+                    .background(Color(.systemGroupedBackground))
                 }
             } else {
                 ContentUnavailableView("Kein Fach gewählt", systemImage: "books.vertical", description: Text("Lege links ein Fach an oder wähle eines aus."))
@@ -73,20 +74,6 @@ struct NotebookListView: View {
                     do { try await model.importPDF(from: url) } catch let error as PDFImportError { model.notice = "\(url.lastPathComponent): \(error.sentence)" } catch { model.notice = "\(url.lastPathComponent) konnte nicht importiert werden." }
                 }
             }
-        }
-    }
-
-    private func card(_ notebook: Notebook, color: String) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            RoundedRectangle(cornerRadius: 10)
-                .fill(Color(uiColor: StrokeConversion.color(hex: color)).gradient)
-                .aspectRatio(0.78, contentMode: .fit)
-                .overlay(alignment: .bottomLeading) {
-                    Image(systemName: notebook.type == .whiteboard ? "rectangle.dashed" : "text.book.closed")
-                        .font(.title2).foregroundStyle(.white.opacity(0.9)).padding(12)
-                }
-            Text(notebook.title).font(.headline).lineLimit(2)
-            Text(notebook.type == .whiteboard ? "Whiteboard" : "Heft").font(.footnote).foregroundStyle(.secondary)
         }
     }
 }
