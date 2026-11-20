@@ -132,6 +132,47 @@ namespace JuNotes.Backend.Tests
         }
 
         [RequiresDatabaseFact]
+        public async Task A_folder_inside_a_folder_keeps_its_parent_and_whether_it_is_a_subject()
+        {
+            await using var database = await TestDatabase.CreateCurrentAsync();
+            var school = Guid.NewGuid();
+            var algebra = Guid.NewGuid();
+            await new SyncService(database.Data).PushAsync(new PushRequest(
+            [
+                Entity("subject", school, null, """{"name":"Schule","color":"#5b7cfa","symbol":"folder","sort":0,"isSubject":false}"""),
+                Entity("subject", algebra, school, """{"name":"Algebra","color":"#5b7cfa","symbol":"function","sort":0}"""),
+            ]), CancellationToken.None);
+
+            var subjects = await new LibraryReader(database.Data).SubjectsAsync(CancellationToken.None);
+
+            var top = subjects.Single(subject => subject.Id == school);
+            var inner = subjects.Single(subject => subject.Id == algebra);
+            Assert.Null(top.ParentId);
+            Assert.False(top.IsSubject);
+            Assert.Equal(school, inner.ParentId);
+            Assert.True(inner.IsSubject);
+        }
+
+        [Fact]
+        public void A_folders_path_reads_from_the_top_and_survives_a_missing_parent_and_a_circle()
+        {
+            var school = new SubjectInfo(Guid.NewGuid(), "Schule", "#000000", "folder", 0);
+            var math = new SubjectInfo(Guid.NewGuid(), "Mathe", "#000000", "function", 0, school.Id);
+            var orphan = new SubjectInfo(Guid.NewGuid(), "Waise", "#000000", "folder", 0, Guid.NewGuid());
+            var map = new[] { school, math, orphan }.ToDictionary(folder => folder.Id);
+
+            Assert.Equal("Schule / Mathe", FolderPath.Of(math, map));
+            Assert.Equal("Schule", FolderPath.Of(school, map));
+            Assert.Equal("Waise", FolderPath.Of(orphan, map));
+
+            var a = new SubjectInfo(Guid.NewGuid(), "A", "#000000", "folder", 0);
+            var b = new SubjectInfo(Guid.NewGuid(), "B", "#000000", "folder", 0, a.Id);
+            a = a with { ParentId = b.Id };
+            var circle = new[] { a, b }.ToDictionary(folder => folder.Id);
+            Assert.Equal(2, FolderPath.Of(a, circle).Split(" / ").Length);
+        }
+
+        [RequiresDatabaseFact]
         public async Task Notebooks_in_the_trash_are_not_shown()
         {
             await using var database = await TestDatabase.CreateCurrentAsync();

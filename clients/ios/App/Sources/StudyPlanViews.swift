@@ -122,7 +122,10 @@ struct StudyPlanSheet: View {
             .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Schließen") { dismiss() } } }
             .task {
                 guard topics.isEmpty, let subject = exam.subject else { return }
-                let notebooks = (try? await model.store.notebooks(subjectID: subject.id)) ?? []
+                var notebooks: [Notebook] = []
+                for id in [subject.id] + Array(model.tree.descendantIDs(of: subject.id)) {
+                    notebooks += (try? await model.store.notebooks(subjectID: id)) ?? []
+                }
                 topics = notebooks.filter { $0.type == .pages }.map { ($0.title, 25, true) }
             }
         }

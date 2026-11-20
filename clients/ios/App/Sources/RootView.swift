@@ -5,7 +5,7 @@ import SwiftUI
 struct RootView: View {
     @Environment(AppModel.self) private var model
     @Environment(\.scenePhase) private var scenePhase
-    @State private var showNewSubject = false
+    @State private var folderEditor: FolderEditorTarget?
     @State private var showSettings = false
     @State private var showSearch = false
     @State private var columns = NavigationSplitViewVisibility.doubleColumn
@@ -21,16 +21,14 @@ struct RootView: View {
                     Label("Karteikarten", systemImage: "rectangle.on.rectangle.angled").tag(SidebarItem.cards)
                         .badge(StudyQueue.counts(model.cards, now: Date()).due)
                 }
-                Section("Fächer") {
-                    ForEach(model.subjects) { subject in
-                        Label { Text(subject.name) } icon: {
-                            Image(systemName: subject.symbol).foregroundStyle(Color(uiColor: StrokeConversion.color(hex: subject.color)))
+                Section("Bibliothek") {
+                    Label("Alle Hefte", systemImage: "books.vertical").tag(SidebarItem.root)
+                    OutlineGroup(model.tree.nodes(), children: \.children) { node in
+                        Label { Text(node.folder.name) } icon: {
+                            Image(systemName: node.folder.symbol).foregroundStyle(Color(hex: node.folder.color))
                         }
-                        .tag(SidebarItem.subject(subject.id))
+                        .tag(SidebarItem.folder(node.id))
                     }
-                }
-                if model.hasLooseNotebooks {
-                    Section { Label("Lose Blätter", systemImage: "doc.on.doc").tag(SidebarItem.loose) }
                 }
                 Section {
                     Label("Noten", systemImage: "list.number").tag(SidebarItem.grades)
@@ -39,7 +37,14 @@ struct RootView: View {
             }
             .navigationTitle("JuNotes")
             .toolbar {
-                ToolbarItem(placement: .primaryAction) { Button("Neues Fach", systemImage: "plus") { showNewSubject = true } }
+                ToolbarItem(placement: .primaryAction) {
+                    Menu {
+                        Button("Neues Fach", systemImage: "graduationcap") { folderEditor = FolderEditorTarget(folder: nil, parent: model.selectedFolder?.id, isSubject: true) }
+                        Button("Neuer Ordner", systemImage: "folder.badge.plus") { folderEditor = FolderEditorTarget(folder: nil, parent: model.selectedFolder?.id, isSubject: false) }
+                    } label: {
+                        Label("Neu", systemImage: "plus")
+                    }
+                }
                 ToolbarItem(placement: .secondaryAction) { Button("Suchen", systemImage: "magnifyingglass") { showSearch = true } }
                 ToolbarItem(placement: .bottomBar) { Button("Einstellungen", systemImage: "gearshape") { showSettings = true } }
             }
@@ -49,7 +54,7 @@ struct RootView: View {
             case .cards: NavigationStack { StudyHubView() }
             case .grades: NavigationStack { GradesView() }
             case .trash: NavigationStack { TrashView() }
-            default: NotebookListView()
+            default: FolderView()
             }
         }
         // The status line is always visible: what is saved, synced and backed up.
@@ -67,7 +72,7 @@ struct RootView: View {
         .onChange(of: scenePhase) { _, phase in
             if phase == .active { Task { await model.consumePendingAction(); await model.syncNow() } }
         }
-        .sheet(isPresented: $showNewSubject) { NewSubjectSheet() }
+        .sheet(item: $folderEditor) { FolderEditorSheet(target: $0) }
         .sheet(isPresented: $showSettings) { SettingsView() }
         .sheet(isPresented: $showSearch) { SearchView() }
         .sheet(item: $model.shareItem) { ShareSheet(url: $0.url) }

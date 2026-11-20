@@ -46,7 +46,7 @@ extension AppModel {
         }
 
         let count = min(document.pageCount, Self.maximumPDFPages)
-        let notebook = Notebook(subjectID: selectedSubject?.id, title: NotebookTitle.fromFileName(url.lastPathComponent), template: .blank)
+        let notebook = Notebook(subjectID: selectedFolder?.id, title: NotebookTitle.fromFileName(url.lastPathComponent), template: .blank)
         await write { try await self.store.put(notebook) }
         let keys = PageOrder.keys(appending: count, after: nil)
         var pages: [Page] = []
@@ -107,7 +107,7 @@ extension AppModel {
             notice = "Das PDF konnte nicht erstellt werden."
             return
         }
-        let subject = subjects.first { $0.id == notebook.subjectID }?.name
+        let subject = subject(of: notebook)?.name
         do {
             try await transport.sendToPaperless(pdf: data, title: notebook.title, tags: [subject, "JuNotes"].compactMap { $0 })
             notice = "„\(notebook.title)“ liegt jetzt in Paperless."

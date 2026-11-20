@@ -98,7 +98,7 @@ struct TodayView: View {
                             Label("Neue Seite für \(subject.name)", systemImage: "plus")
                         }
                         .buttonStyle(.borderedProminent)
-                        Button { Task { await model.select(.subject(subject.id)) } } label: {
+                        Button { Task { await model.select(.folder(subject.id)) } } label: {
                             Label("Fach öffnen", systemImage: "folder")
                         }
                         .buttonStyle(.bordered)
@@ -297,7 +297,7 @@ struct TodayView: View {
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 120), spacing: 16)], alignment: .leading, spacing: 16) {
                     ForEach(recent) { notebook in
                         Button { Task { await model.open(notebookID: notebook.id, pageID: nil) } } label: {
-                            NotebookCover(notebook: notebook, subject: model.subjects.first { $0.id == notebook.subjectID })
+                            NotebookCover(notebook: notebook, subject: model.subject(of: notebook))
                         }
                         .buttonStyle(.plain)
                     }

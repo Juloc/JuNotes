@@ -13,9 +13,11 @@ namespace JuNotes.Frontend.Pages.Notes
         {
             var subjects = await library.SubjectsAsync(ct);
             var notebooks = await library.NotebooksAsync(ct);
+            var byId = subjects.ToDictionary(subject => subject.Id);
             var groups = subjects
-                .Select(subject => new SubjectGroup(subject.Name, PageRenderer_SafeColor(subject.Color), notebooks.Where(notebook => notebook.SubjectId == subject.Id).ToList()))
+                .Select(subject => new SubjectGroup(FolderPath.Of(subject, byId), PageRenderer_SafeColor(subject.Color), notebooks.Where(notebook => notebook.SubjectId == subject.Id).ToList()))
                 .Where(group => group.Notebooks.Count > 0)
+                .OrderBy(group => group.Name, StringComparer.CurrentCultureIgnoreCase)
                 .ToList();
 
             // Notebooks that belong to no subject, such as a scan made when no lesson was running.

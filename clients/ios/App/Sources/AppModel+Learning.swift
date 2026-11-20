@@ -24,7 +24,7 @@ extension AppModel {
             text = ((try? await store.indexedTexts(notebookID: notebook.id)) ?? []).map(\.text).joined(separator: "\n\n")
         }
         var name: String?
-        if let subjectID = notebook.subjectID { name = subjects.first { $0.id == subjectID }?.name }
+        name = subject(of: notebook)?.name
         return LearningMaterial(text: String(text.prefix(28_000)), subjectName: name)
     }
 

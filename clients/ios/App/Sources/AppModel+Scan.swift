@@ -83,7 +83,7 @@ extension AppModel {
     /// Shows a notebook, and a page in it if given: from a search result or after a scan.
     func open(notebookID: UUID, pageID: UUID?) async {
         guard let notebook = try? await store.notebook(id: notebookID) else { return }
-        sidebar = notebook.subjectID.map { .subject($0) } ?? .loose
+        sidebar = notebook.subjectID.map { .folder($0) } ?? .root
         await reloadNotebooks()
         pendingPageID = pageID
         pendingNotebookID = notebook.id
@@ -122,7 +122,7 @@ extension AppModel {
         for hit in hits {
             guard let notebook = try? await store.notebook(id: hit.notebookID), notebook.trashedAt == nil else { continue }
             var name: String?
-            if let subjectID = notebook.subjectID { name = try? await store.subject(id: subjectID)?.name }
+            if notebook.subjectID != nil { name = tree.pathTitle(of: notebook.subjectID) }
             results.append(SearchResult(hit: hit, notebook: notebook, subjectName: name))
         }
         return results

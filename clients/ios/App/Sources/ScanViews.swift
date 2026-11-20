@@ -36,10 +36,10 @@ struct ScanDestinationSheet: View {
                 }
 
                 if selected == .choose {
-                    Section("Fach und Heft") {
-                        Picker("Fach", selection: $chosenSubjectID) {
-                            Text("Ohne Fach").tag(UUID?.none)
-                            ForEach(model.subjects) { Text($0.name).tag(UUID?.some($0.id)) }
+                    Section("Ordner und Heft") {
+                        Picker("Ordner", selection: $chosenSubjectID) {
+                            Text("Ohne Ordner").tag(UUID?.none)
+                            ForEach(model.tree.rows) { Text(String(repeating: "    ", count: $0.depth) + $0.folder.name).tag(UUID?.some($0.folder.id)) }
                         }
                         Picker("Heft", selection: $chosenNotebookID) {
                             Text("Neues Arbeitsblatt").tag(UUID?.none)

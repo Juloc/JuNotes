@@ -45,6 +45,8 @@ public enum EntityCoding {
     }
 }
 
+/// A folder. A folder that is also a subject ("Fach") carries marks and cards; one that is not just holds things.
+/// On the wire and in the database this is still kind `subject`, so nothing already stored changes.
 public struct Subject: SyncEntity {
     public static let kind = EntityKind.subject
 
@@ -55,35 +57,49 @@ public struct Subject: SyncEntity {
     /// An SF Symbol name.
     public var symbol: String
     public var sort: Int
+    /// The folder this one lies in; nil at the top level.
+    public var folderID: UUID?
+    /// Only subjects take part in marks, cards and "which lesson is on now".
+    public var isSubject: Bool
+    public var cover: Cover?
 
-    public var parentID: UUID? { nil }
+    public var parentID: UUID? { folderID }
 
-    public init(id: UUID = UUID(), name: String, color: String = "#0a84ff", symbol: String = "book", sort: Int = 0) {
+    public init(id: UUID = UUID(), name: String, color: String = "#0a84ff", symbol: String = "book", sort: Int = 0, folderID: UUID? = nil, isSubject: Bool = true, cover: Cover? = nil) {
         self.id = id
         self.name = name
         self.color = color
         self.symbol = symbol
         self.sort = sort
+        self.folderID = folderID
+        self.isSubject = isSubject
+        self.cover = cover
     }
 
-    enum CodingKeys: String, CodingKey { case name, color, symbol, sort }
+    enum CodingKeys: String, CodingKey { case name, color, symbol, sort, isSubject, cover }
 
     public init(from decoder: any Decoder) throws {
         let values = try decoder.container(keyedBy: CodingKeys.self)
         id = UUID()
+        folderID = nil
         name = try values.decode(String.self, forKey: .name)
         color = try values.decodeIfPresent(String.self, forKey: .color) ?? "#0a84ff"
         symbol = try values.decodeIfPresent(String.self, forKey: .symbol) ?? "book"
         sort = try values.decodeIfPresent(Int.self, forKey: .sort) ?? 0
+        isSubject = try values.decodeIfPresent(Bool.self, forKey: .isSubject) ?? true
+        cover = try? values.decodeIfPresent(Cover.self, forKey: .cover)
     }
 
     public static func decode(_ record: SyncRecord) throws -> Subject {
         guard record.kind == kind, !record.deleted, let payload = record.payload else { throw EntityCoding.Failure.notDecodable(record.kind) }
         var subject: Subject = try EntityCoding.decode(payload)
         subject.id = record.id
+        subject.folderID = record.parentID
         return subject
     }
 }
+
+public typealias Folder = Subject
 
 public enum NotebookKind: String, Sendable, Codable, Equatable {
     /// Pages one below the other, with pages added as she writes.
@@ -107,10 +123,12 @@ public struct Notebook: SyncEntity {
     public var createdAt: Date
     /// Set when it went to the trash; it is deleted for good after `Trash.retention`.
     public var trashedAt: Date?
+    public var cover: Cover?
 
+    /// The folder it lies in (the field is still called `subjectID`, as it was when folders were only subjects).
     public var parentID: UUID? { subjectID }
 
-    public init(id: UUID = UUID(), subjectID: UUID? = nil, title: String, type: NotebookKind = .pages, template: PageTemplate = .ruled, createdAt: Date = Date(), trashedAt: Date? = nil) {
+    public init(id: UUID = UUID(), subjectID: UUID? = nil, title: String, type: NotebookKind = .pages, template: PageTemplate = .ruled, createdAt: Date = Date(), trashedAt: Date? = nil, cover: Cover? = nil) {
         self.id = id
         self.subjectID = subjectID
         self.title = title
@@ -118,9 +136,10 @@ public struct Notebook: SyncEntity {
         self.template = template
         self.createdAt = createdAt
         self.trashedAt = trashedAt
+        self.cover = cover
     }
 
-    enum CodingKeys: String, CodingKey { case title, type, template, createdAt, trashedAt }
+    enum CodingKeys: String, CodingKey { case title, type, template, createdAt, trashedAt, cover }
 
     public init(from decoder: any Decoder) throws {
         let values = try decoder.container(keyedBy: CodingKeys.self)
@@ -131,9 +150,10 @@ public struct Notebook: SyncEntity {
         template = try values.decodeIfPresent(PageTemplate.self, forKey: .template) ?? .ruled
         createdAt = try values.decode(Date.self, forKey: .createdAt)
         trashedAt = try values.decodeIfPresent(Date.self, forKey: .trashedAt)
+        cover = try? values.decodeIfPresent(Cover.self, forKey: .cover)
     }
 
-    /// The record's parent is the subject, which the payload does not repeat.
+    /// The record's parent is the folder, which the payload does not repeat.
     public static func decode(_ record: SyncRecord) throws -> Notebook {
         guard record.kind == kind, !record.deleted, let payload = record.payload else { throw EntityCoding.Failure.notDecodable(record.kind) }
         var notebook: Notebook = try EntityCoding.decode(payload)

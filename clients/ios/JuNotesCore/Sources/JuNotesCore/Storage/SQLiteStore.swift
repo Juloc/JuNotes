@@ -207,12 +207,16 @@ public actor SQLiteStore: SyncStore {
 
     /// Every file the pages refer to, including those another device made: the app fetches the ones it does not have yet.
     public func referencedAssetIDs() throws -> [UUID] {
-        try decoded(kind: .page, parent: nil, filterParent: false).compactMap { try? Page.decode($0) }.compactMap { page in
+        let pageAssets: [UUID] = try decoded(kind: .page, parent: nil, filterParent: false).compactMap { try? Page.decode($0) }.compactMap { page in
             switch page.content {
             case .scan(let id), .pdf(let id, _): id
             case .drawing: nil
             }
         }
+        // Pictures on the covers of folders and notebooks.
+        let folderCovers: [UUID] = try decoded(kind: .subject, parent: nil, filterParent: false).compactMap { try? Subject.decode($0) }.compactMap { $0.cover?.assetID }
+        let notebookCovers: [UUID] = try decoded(kind: .notebook, parent: nil, filterParent: false).compactMap { try? Notebook.decode($0) }.compactMap { $0.cover?.assetID }
+        return pageAssets + folderCovers + notebookCovers
     }
 
     // MARK: Search

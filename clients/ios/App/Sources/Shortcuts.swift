@@ -46,11 +46,11 @@ struct JuNotesShortcuts: AppShortcutsProvider {
 
 /// Her notebooks in the system search of the iPad: typing a title in Spotlight opens that notebook.
 enum SpotlightIndex {
-    static func update(subjects: [Subject], notebooks: [Notebook]) {
+    static func update(tree: FolderTree, notebooks: [Notebook]) {
         let items = notebooks.map { notebook -> CSSearchableItem in
             let attributes = CSSearchableItemAttributeSet(contentType: .content)
             attributes.title = notebook.title
-            let subject = subjects.first { $0.id == notebook.subjectID }?.name
+            let subject = notebook.subjectID.map { tree.pathTitle(of: $0) }.flatMap { $0.isEmpty ? nil : $0 }
             attributes.contentDescription = subject.map { "Heft in \($0)" } ?? "Heft"
             attributes.keywords = [subject, notebook.title, "JuNotes"].compactMap { $0 }
             return CSSearchableItem(uniqueIdentifier: notebook.id.uuidString, domainIdentifier: "notebooks", attributeSet: attributes)
