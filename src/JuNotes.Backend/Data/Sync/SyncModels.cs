@@ -11,9 +11,9 @@ namespace JuNotes.Backend.Data.Sync
         public const string Grade = "grade";
         public const string Card = "card";
         // A picture, text box, sticker or recording on a page.
-        public const string Object = "object";
+        public const string PageObject = "object";
 
-        public static readonly IReadOnlySet<string> All = new HashSet<string> { Subject, Notebook, Page, Stroke, Grade, Card, Object };
+        public static readonly IReadOnlySet<string> All = new HashSet<string> { Subject, Notebook, Page, Stroke, Grade, Card, PageObject };
     }
 
     // What a device sends: one entity created, changed or deleted.
