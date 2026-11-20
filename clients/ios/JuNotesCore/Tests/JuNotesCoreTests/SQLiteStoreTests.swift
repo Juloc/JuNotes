@@ -159,6 +159,26 @@ struct SQLiteStoreTests {
         #expect(try await store.grades().count == 3)
     }
 
+    @Test func coverPicturesAreReferencedAssetsToo() async throws {
+        let store = try store()
+        let folderPicture = uuid(21)
+        let notebookPicture = uuid(22)
+        try await store.put(Subject(id: uuid(1), name: "Schule", isSubject: false, cover: Cover.plain(color: "#000000").withImage(folderPicture)))
+        try await store.put(Notebook(id: uuid(2), subjectID: uuid(1), title: "Heft", cover: Cover.plain(color: "#000000").withImage(notebookPicture)))
+
+        #expect(Set(try await store.referencedAssetIDs()) == [folderPicture, notebookPicture])
+    }
+
+    @Test func aFolderInsideAFolderIsReadBackWithItsParent() async throws {
+        let store = try store()
+        try await store.put(Subject(id: uuid(1), name: "Schule", isSubject: false))
+        try await store.put(Subject(id: uuid(2), name: "Mathe", folderID: uuid(1)))
+
+        let folders = try await store.subjects()
+        #expect(folders.first { $0.id == uuid(2) }?.folderID == uuid(1))
+        #expect(folders.first { $0.id == uuid(1) }?.isSubject == false)
+    }
+
     @Test func singleEntitiesCanBeLookedUp() async throws {
         let store = try store()
         try await store.put(Subject(id: uuid(1), name: "Mathe"))

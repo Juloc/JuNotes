@@ -22,11 +22,22 @@ extension AppModel {
         let now = Date()
         let today = calendar.startOfDay(for: now)
 
-        let math = Subject(name: "Mathe", color: "#5b7cfa", symbol: "function", sort: 0)
-        let german = Subject(name: "Deutsch", color: "#ff9f0a", symbol: "text.book.closed", sort: 1)
-        let english = Subject(name: "Englisch", color: "#30b0c7", symbol: "globe.europe.africa", sort: 2)
-        let biology = Subject(name: "Biologie", color: "#34c759", symbol: "leaf", sort: 3)
-        let subjects = [math, german, english, biology]
+        // Folders in folders: three areas, and the subjects inside "Schule".
+        let school = Subject(name: "Schule", color: "#5b7cfa", symbol: "graduationcap", sort: 0, isSubject: false,
+                             cover: Cover(style: .gradient, colorA: "#8f7cf5", colorB: "#5b4bd6", symbol: "graduationcap", pattern: .lines))
+        let kita = Subject(name: "Kindi", color: "#ff9f0a", symbol: "figure.2.and.child.holdinghands", sort: 1, isSubject: false,
+                           cover: Cover(style: .gradient, colorA: "#ffd15c", colorB: "#ff9f0a", symbol: "teddybear", pattern: .dots))
+        let other = Subject(name: "Sonstiges", color: "#8e8e93", symbol: "tray.full", sort: 2, isSubject: false)
+        let math = Subject(name: "Mathe", color: "#5b7cfa", symbol: "function", sort: 0, folderID: school.id,
+                           cover: Cover(style: .gradient, colorA: "#6fb1ff", colorB: "#3478f6", symbol: "function", pattern: .grid))
+        let german = Subject(name: "Deutsch", color: "#ff9f0a", symbol: "text.book.closed", sort: 1, folderID: school.id,
+                             cover: Cover(style: .gradient, colorA: "#ff9a7a", colorB: "#f2545b", emoji: "📖"))
+        let english = Subject(name: "Englisch", color: "#30b0c7", symbol: "globe.europe.africa", sort: 2, folderID: school.id,
+                              cover: Cover(style: .gradient, colorA: "#4fd1d9", colorB: "#1f7fb5", symbol: "globe.europe.africa"))
+        let biology = Subject(name: "Biologie", color: "#34c759", symbol: "leaf", sort: 3, folderID: school.id,
+                              cover: Cover(style: .gradient, colorA: "#8fd96b", colorB: "#3fa73e", symbol: "leaf", pattern: .dots))
+        let worksheets = Subject(name: "Arbeitsblätter", color: "#5b7cfa", symbol: "folder", sort: 0, folderID: math.id, isSubject: false)
+        let subjects = [school, kita, other, math, german, english, biology, worksheets]
         for subject in subjects { try? await store.put(subject) }
 
         // Notebooks, newest last; the first has handwriting on every page.
@@ -35,7 +46,14 @@ extension AppModel {
         let poems = Notebook(subjectID: german.id, title: "Gedichte", template: .ruled, createdAt: now.addingTimeInterval(-20 * 86400))
         let cell = Notebook(subjectID: biology.id, title: "Die Zelle", template: .dotted, createdAt: now.addingTimeInterval(-14 * 86400))
         let vocabulary = Notebook(subjectID: english.id, title: "Unit 4 Vocabulary", template: .ruled, createdAt: now.addingTimeInterval(-6 * 86400))
-        let notebooks = [fractions, geometry, poems, cell, vocabulary]
+        let sheet = Notebook(subjectID: worksheets.id, title: "Übungsblatt 3", template: .blank, createdAt: now.addingTimeInterval(-3 * 86400))
+        let report = Notebook(subjectID: kita.id, title: "Praxisbericht", template: .ruled, createdAt: now.addingTimeInterval(-12 * 86400),
+                              cover: Cover(style: .gradient, colorA: "#ffd15c", colorB: "#ff9f0a", emoji: "🧸", pattern: .dots))
+        let observations = Notebook(subjectID: kita.id, title: "Beobachtungen", template: .ruled, createdAt: now.addingTimeInterval(-5 * 86400),
+                                    cover: Cover(style: .gradient, colorA: "#c87cf0", colorB: "#7b3fc4", symbol: "eye", pattern: .lines))
+        let recipes = Notebook(subjectID: other.id, title: "Rezepte", template: .dotted, createdAt: now.addingTimeInterval(-40 * 86400),
+                               cover: Cover(style: .gradient, colorA: "#ff9fc4", colorB: "#d6478a", emoji: "🍰"))
+        let notebooks = [fractions, geometry, poems, cell, vocabulary, sheet, report, observations, recipes]
         for notebook in notebooks { try? await store.put(notebook) }
 
         var thirdPageID: UUID?
@@ -46,7 +64,7 @@ extension AppModel {
             if index == 2 { thirdPageID = page.id }
             if index < 4 { for stroke in Self.handwriting(seed: index, lines: index == 3 ? 4 : 11) { try? await store.put(stroke, on: page.id) } }
         }
-        for notebook in [geometry, poems, cell, vocabulary] {
+        for notebook in [geometry, poems, cell, vocabulary, sheet, report, observations, recipes] {
             for (index, key) in PageOrder.keys(appending: 3, after: nil).enumerated() {
                 let page = Page(notebookID: notebook.id, sort: key)
                 try? await store.put(page)
@@ -108,9 +126,12 @@ extension AppModel {
         await reload()
 
         switch Demo.screen {
-        case "subject": await select(.subject(math.id))
+        case "library": await select(.root)
+        case "folder": await select(.folder(school.id))
+        case "subject": await select(.folder(math.id))
+        case "kindi": await select(.folder(kita.id))
         case "notebook":
-            await select(.subject(math.id))
+            await select(.folder(math.id))
             pendingPageID = thirdPageID
             pendingNotebookID = fractions.id
         case "cards": await select(.cards)

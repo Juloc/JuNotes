@@ -5,11 +5,11 @@ import Observation
 enum SidebarItem: Hashable {
     case today
     case cards
-    case subject(UUID)
+    case folder(UUID)
     case grades
     case trash
-    /// Notebooks that belong to no subject, such as a worksheet scanned when no lesson was running.
-    case loose
+    /// The top level of the library: the folders and the notebooks that lie in no folder.
+    case root
 }
 
 /// What the whole app shares: the local database, the library the sidebar and lists show, and the sync with the server.
@@ -18,7 +18,10 @@ enum SidebarItem: Hashable {
 final class AppModel {
     let store: SQLiteStore
     var snapshot: SyncSnapshot
-    var subjects: [Subject] = []
+    /// Every folder, at any depth. A folder that is a subject ("Fach") also shows up in `subjects`.
+    var folders: [Subject] = []
+    /// How many notebooks lie directly in each folder, for the subtitle of its card.
+    var notebookCounts: [UUID: Int] = [:]
     var notebooks: [Notebook] = []
     var trashed: [Notebook] = []
     var grades: [Grade] = []
@@ -36,7 +39,6 @@ final class AppModel {
     var notice: String?
     var shareItem: ShareItem?
     var pendingScan: PendingScan?
-    var hasLooseNotebooks = false
     /// Counts up when files arrived from the server, so pages that waited for their scan look again.
     var assetRevision = 0
     var sidebar: SidebarItem?
@@ -70,24 +72,40 @@ final class AppModel {
         loadSchoolCache()
     }
 
-    var selectedSubject: Subject? {
-        if case .subject(let id) = sidebar { subjects.first { $0.id == id } } else { nil }
+    var subjects: [Subject] { folders.filter(\.isSubject) }
+    var tree: FolderTree { FolderTree(folders) }
+
+    var selectedFolder: Subject? {
+        if case .folder(let id) = sidebar { folders.first { $0.id == id } } else { nil }
     }
+
+    /// The folders directly inside the one that is open (the top level on the library's first page).
+    var subfolders: [Subject] { tree.children(of: selectedFolder?.id) }
+
+    /// The subject a notebook belongs to: its own folder if that is a subject, or the nearest one above.
+    func subject(of notebook: Notebook) -> Subject? { tree.nearestSubject(from: notebook.subjectID) }
 
     // MARK: Library
 
     func reload() async {
-        subjects = (try? await store.subjects()) ?? []
+        folders = (try? await store.subjects()) ?? []
         grades = (try? await store.grades()) ?? []
         cards = (try? await store.cards()) ?? []
-        SpotlightIndex.update(subjects: subjects, notebooks: (try? await store.allNotebooks()) ?? [])
-        hasLooseNotebooks = !((try? await store.notebooks(subjectID: nil)) ?? []).isEmpty
+        let everyNotebook = (try? await store.allNotebooks()) ?? []
+        SpotlightIndex.update(tree: tree, notebooks: everyNotebook)
+        notebookCounts = Dictionary(grouping: everyNotebook.compactMap(\.subjectID), by: { $0 }).mapValues(\.count)
         await reloadNotebooks()
         trashed = ((try? await store.trashedNotebooks()) ?? []).sorted { ($0.trashedAt ?? .distantPast) > ($1.trashedAt ?? .distantPast) }
     }
 
     func reloadNotebooks() async {
-        notebooks = (try? await store.notebooks(subjectID: selectedSubject?.id)) ?? []
+        if let id = selectedFolder?.id {
+            notebooks = (try? await store.notebooks(subjectID: id)) ?? []
+        } else {
+            // The top level also shows notebooks whose folder is gone, so none is ever lost from view.
+            let everyNotebook = ((try? await store.allNotebooks()) ?? []).sorted { $0.createdAt < $1.createdAt }
+            notebooks = everyNotebook.filter { notebook in notebook.subjectID.map { tree.folder($0) == nil } ?? true }
+        }
     }
 
     func select(_ item: SidebarItem?) async {
@@ -95,17 +113,73 @@ final class AppModel {
         await reloadNotebooks()
     }
 
-    func addSubject(name: String, color: String, symbol: String) async {
-        let subject = Subject(name: name, color: color, symbol: symbol, sort: subjects.count)
-        await write { try await self.store.put(subject) }
+    @discardableResult
+    func addFolder(name: String, color: String, symbol: String, isSubject: Bool, cover: Cover?, in parent: UUID?) async -> Subject {
+        let next = (tree.children(of: parent).map(\.sort).max() ?? -1) + 1
+        let folder = Subject(name: name, color: color, symbol: symbol, sort: next, folderID: parent, isSubject: isSubject, cover: cover)
+        await write { try await self.store.put(folder) }
         await reload()
-        sidebar = .subject(subject.id)
-        await reloadNotebooks()
+        return folder
+    }
+
+    func update(_ folder: Subject) async {
+        await write { try await self.store.put(folder) }
+        await reload()
+    }
+
+    func update(_ notebook: Notebook) async {
+        await write { try await self.store.put(notebook) }
+        await reload()
+    }
+
+    func move(_ folder: Subject, to parent: UUID?) async {
+        guard folder.folderID != parent, tree.canMove(folder.id, into: parent) else { return }
+        var moved = folder
+        moved.folderID = parent
+        moved.sort = (tree.children(of: parent).map(\.sort).max() ?? -1) + 1
+        await update(moved)
+    }
+
+    func move(_ notebook: Notebook, to parent: UUID?) async {
+        guard notebook.subjectID != parent else { return }
+        var moved = notebook
+        moved.subjectID = parent
+        await update(moved)
+    }
+
+    /// Only an empty folder can be deleted; marks and cards of a subject go with it. A message says what is in the way.
+    func deleteFolder(_ folder: Subject) async {
+        let inside = (try? await store.notebooks(subjectID: folder.id, includeTrashed: true)) ?? []
+        guard tree.children(of: folder.id).isEmpty, inside.isEmpty else {
+            notice = "„\(folder.name)“ ist nicht leer. Verschiebe oder lösche zuerst, was darin liegt."
+            return
+        }
+        for grade in grades where grade.subjectID == folder.id { await write { try await self.store.write(grade.deletion()) } }
+        for card in cards where card.subjectID == folder.id { await write { try await self.store.write(card.deletion()) } }
+        await write { try await self.store.write(folder.deletion()) }
+        if selectedFolder?.id == folder.id { sidebar = folder.folderID.map { .folder($0) } ?? .root }
+        await reload()
+    }
+
+    /// Something dragged onto a folder (or the top level): `n:<id>` is a notebook, `f:<id>` a folder.
+    func drop(_ items: [String], onto parent: UUID?) async -> Bool {
+        var moved = false
+        for item in items {
+            guard item.count > 2, let id = UUID(uuidString: String(item.dropFirst(2))) else { continue }
+            if item.hasPrefix("n:"), let notebook = try? await store.notebook(id: id) {
+                await move(notebook, to: parent)
+                moved = true
+            } else if item.hasPrefix("f:"), let folder = tree.folder(id) {
+                await move(folder, to: parent)
+                moved = true
+            }
+        }
+        return moved
     }
 
     @discardableResult
-    func addNotebook(title: String, type: NotebookKind, template: PageTemplate) async -> Notebook {
-        let notebook = Notebook(subjectID: selectedSubject?.id, title: title, type: type, template: template)
+    func addNotebook(title: String, type: NotebookKind, template: PageTemplate, cover: Cover? = nil) async -> Notebook {
+        let notebook = Notebook(subjectID: selectedFolder?.id, title: title, type: type, template: template, cover: cover)
         await write { try await self.store.put(notebook) }
         await reloadNotebooks()
         return notebook
@@ -226,7 +300,7 @@ final class AppModel {
         let page = Page(notebookID: notebook.id, sort: PageOrder.key(after: pages.last?.sort, before: nil), heading: heading)
         await write { try await self.store.put(page) }
 
-        sidebar = .subject(subject.id)
+        sidebar = .folder(subject.id)
         await reloadNotebooks()
         pendingNotebookID = notebook.id
     }

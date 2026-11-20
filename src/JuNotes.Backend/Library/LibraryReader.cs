@@ -4,7 +4,8 @@ using Npgsql;
 
 namespace JuNotes.Backend.Library
 {
-    public sealed record SubjectInfo(Guid Id, string Name, string Color, string Symbol, int Sort);
+    // A folder: kind "subject" on the wire. It lies in ParentId, and only a subject (IsSubject) takes marks and cards.
+    public sealed record SubjectInfo(Guid Id, string Name, string Color, string Symbol, int Sort, Guid? ParentId = null, bool IsSubject = true);
 
     public sealed record NotebookInfo(Guid Id, Guid? SubjectId, string Title, string Type, string Template, DateTimeOffset? CreatedAt);
 
@@ -30,9 +31,10 @@ namespace JuNotes.Backend.Library
         public async Task<IReadOnlyList<SubjectInfo>> SubjectsAsync(CancellationToken ct)
         {
             var result = new List<SubjectInfo>();
-            foreach (var (id, _, payload) in await ReadAsync("subject", null, ct))
+            foreach (var (id, parent, payload) in await ReadAsync("subject", null, ct))
             {
-                result.Add(new SubjectInfo(id, Text(payload, "name") ?? "Fach", Text(payload, "color") ?? "#8e8e93", Text(payload, "symbol") ?? "book", Number(payload, "sort")));
+                var isSubject = !payload.TryGetProperty("isSubject", out var flag) || flag.ValueKind != JsonValueKind.False;
+                result.Add(new SubjectInfo(id, Text(payload, "name") ?? "Fach", Text(payload, "color") ?? "#8e8e93", Text(payload, "symbol") ?? "book", Number(payload, "sort"), parent, isSubject));
             }
 
             return result.OrderBy(subject => subject.Sort).ThenBy(subject => subject.Name, StringComparer.CurrentCultureIgnoreCase).ToList();

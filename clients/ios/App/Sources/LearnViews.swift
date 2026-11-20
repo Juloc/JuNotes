@@ -240,8 +240,8 @@ struct CardPicker: View {
     @State private var chosen: Set<Int> = []
 
     var body: some View {
-        if notebook.subjectID == nil {
-            ContentUnavailableView("Dieses Heft gehört zu keinem Fach", systemImage: "rectangle.on.rectangle.angled", description: Text("Karteikarten gehören zu einem Fach. Verschiebe das Heft in ein Fach."))
+        if model.subject(of: notebook) == nil {
+            ContentUnavailableView("Dieses Heft liegt in keinem Fach", systemImage: "rectangle.on.rectangle.angled", description: Text("Karteikarten gehören zu einem Fach. Verschiebe das Heft in einen Ordner, der ein Fach ist."))
         } else {
             List {
                 Section("Welche Karten willst du behalten?") {
@@ -260,7 +260,7 @@ struct CardPicker: View {
                 Section {
                     Button("\(chosen.count) Karten speichern") {
                         Task {
-                            if let subjectID = notebook.subjectID { await model.saveCards(chosen.sorted().map { drafts[$0] }, subjectID: subjectID, sourcePageID: pageID) }
+                            if let subject = model.subject(of: notebook) { await model.saveCards(chosen.sorted().map { drafts[$0] }, subjectID: subject.id, sourcePageID: pageID) }
                             onDone()
                         }
                     }

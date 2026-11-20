@@ -6,6 +6,11 @@ enum Brand {
     static let accent = Color(red: 0.424, green: 0.361, blue: 0.906)
 }
 
+extension Color {
+    /// A colour from the hex text the library stores, such as "#6c5ce7".
+    init(hex: String) { self.init(uiColor: StrokeConversion.color(hex: hex)) }
+}
+
 extension View {
     /// A rounded card on the grouped background, the way Apple's own apps lay out an overview.
     func card() -> some View {
@@ -85,40 +90,5 @@ struct PageThumbnail: View {
         .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
         .shadow(color: .black.opacity(0.14), radius: 2, y: 1)
         .task(id: page.id) { strokes = (try? await model.store.strokes(pageID: page.id)) ?? [] }
-    }
-}
-
-/// A notebook as a small first page with the subject's colour as a tag, for the shelf and for "Zuletzt geöffnet".
-struct NotebookCover: View {
-    let notebook: Notebook
-    let subject: Subject?
-
-    @Environment(AppModel.self) private var model
-    @State private var firstPage: Page?
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            ZStack(alignment: .topLeading) {
-                if let firstPage {
-                    PageThumbnail(page: firstPage, template: firstPage.template ?? notebook.template)
-                } else {
-                    Color.white
-                        .aspectRatio(PageGeometry.width / PageGeometry.height, contentMode: .fit)
-                        .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
-                        .shadow(color: .black.opacity(0.14), radius: 2, y: 1)
-                }
-                if let subject {
-                    Text(subject.name)
-                        .font(.caption2.weight(.semibold))
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 7).padding(.vertical, 3)
-                        .background(Color(uiColor: StrokeConversion.color(hex: subject.color)), in: Capsule())
-                        .padding(8)
-                }
-            }
-            Text(notebook.title).font(.headline).lineLimit(2)
-            Text(notebook.type == .whiteboard ? "Whiteboard" : "Heft").font(.footnote).foregroundStyle(.secondary)
-        }
-        .task(id: notebook.id) { firstPage = (try? await model.store.pages(notebookID: notebook.id))?.first }
     }
 }

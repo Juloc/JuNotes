@@ -48,9 +48,13 @@ shoot() { # name, screen, extra launch arguments...
 }
 
 shoot 1-heute today
-shoot 2-fach subject
-shoot 3-heft notebook
-shoot 4-karteikarten cards
-shoot 5-noten grades
+shoot 2-bibliothek library
+shoot 3-ordner folder
+shoot 4-fach subject
+shoot 5-kindi kindi
+shoot 6-heft notebook
+shoot 7-cover-editor coverEditor
+shoot 8-karteikarten cards
+shoot 9-noten grades
 
 ls -l "$out"
