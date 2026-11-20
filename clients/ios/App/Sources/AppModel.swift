@@ -44,6 +44,8 @@ final class AppModel {
     var sidebar: SidebarItem?
     /// True while a notebook is open: the sidebar steps aside so the page gets the whole width.
     var writing = false
+    /// Locked notebooks she opened since the app was last in the background.
+    var unlocked: Set<UUID> = []
     var settings: ServerSettings
 
     private let schoolCache: URL

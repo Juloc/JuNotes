@@ -121,13 +121,32 @@ struct SearchView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var query = ""
     @State private var results: [SearchResult] = []
+    @State private var libraryHits: [LibraryHit] = []
     @FocusState private var focused: Bool
 
     var body: some View {
         NavigationStack {
             List {
-                if !query.isEmpty && results.isEmpty {
+                if !query.isEmpty && results.isEmpty && libraryHits.isEmpty {
                     ContentUnavailableView.search(text: query)
+                }
+                if !libraryHits.isEmpty {
+                    Section("Hefte und Ordner") {
+                        ForEach(libraryHits) { hit in
+                            Button {
+                                Task {
+                                    if let notebook = hit.notebook { await model.open(notebookID: notebook.id, pageID: nil) } else if let folder = hit.folder { await model.select(.folder(folder.id)) }
+                                    dismiss()
+                                }
+                            } label: {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(hit.title).font(.headline)
+                                    Text(hit.subtitle).font(.subheadline).foregroundStyle(.secondary)
+                                }
+                            }
+                            .foregroundStyle(.primary)
+                        }
+                    }
                 }
                 ForEach(results) { result in
                     Button {
@@ -149,7 +168,9 @@ struct SearchView: View {
                 // Waits a moment after the last keystroke.
                 try? await Task.sleep(for: .milliseconds(250))
                 guard !Task.isCancelled else { return }
-                results = query.trimmingCharacters(in: .whitespaces).isEmpty ? [] : await model.search(query)
+                let trimmed = query.trimmingCharacters(in: .whitespaces)
+                results = trimmed.isEmpty ? [] : await model.search(query)
+                libraryHits = trimmed.isEmpty ? [] : await model.searchLibrary(query)
             }
         }
         .presentationDetents([.large])

@@ -10,6 +10,7 @@ struct NotebookView: View {
     @State private var strokeCounts: [UUID: Int] = [:]
     @State private var currentPageID: UUID?
     @State private var showText = false
+    @State private var showGrid = false
 
     var body: some View {
         Group {
@@ -28,6 +29,7 @@ struct NotebookView: View {
                     Label("Teilen", systemImage: "square.and.arrow.up")
                 }
             }
+            ToolbarItem(placement: .primaryAction) { Button("Seiten", systemImage: "square.grid.2x2") { showGrid = true } }
             ToolbarItem(placement: .primaryAction) { Button("Erkannter Text", systemImage: "text.viewfinder") { showText = true } }
             ToolbarItem(placement: .primaryAction) { LearnMenu(notebook: notebook, pageID: currentPageID) }
             ToolbarItem(placement: .primaryAction) {
@@ -36,6 +38,7 @@ struct NotebookView: View {
         }
         .task { await load() }
         .sheet(isPresented: $showText) { PageTextSheet(notebook: notebook, pageID: currentPageID) }
+        .sheet(isPresented: $showGrid) { PageGridSheet(notebook: notebook) { id in currentPageID = id } }
         .onAppear { model.writing = true }
         .onChange(of: model.pageRevision) { Task { await reloadPages() } }
         .onDisappear {

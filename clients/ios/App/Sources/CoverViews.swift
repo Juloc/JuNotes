@@ -142,6 +142,11 @@ struct NotebookCover: View {
                 if let cover = notebook.cover {
                     CoverView(cover: cover)
                         .aspectRatio(PageGeometry.width / PageGeometry.height, contentMode: .fit)
+                } else if notebook.locked {
+                    Color(.secondarySystemFill)
+                        .aspectRatio(PageGeometry.width / PageGeometry.height, contentMode: .fit)
+                        .overlay { Image(systemName: "lock.fill").font(.largeTitle).foregroundStyle(.secondary) }
+                        .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
                 } else if let firstPage {
                     PageThumbnail(page: firstPage, template: firstPage.template ?? notebook.template)
                 } else {
@@ -159,7 +164,11 @@ struct NotebookCover: View {
                         .padding(8)
                 }
             }
-            Text(notebook.title).font(.headline).lineLimit(2)
+            HStack(spacing: 4) {
+                Text(notebook.title).font(.headline).lineLimit(2)
+                if notebook.favorite { Image(systemName: "star.fill").font(.caption).foregroundStyle(.yellow) }
+                if notebook.locked { Image(systemName: "lock.fill").font(.caption).foregroundStyle(.secondary) }
+            }
             Text(notebook.type == .whiteboard ? "Whiteboard" : "Heft").font(.footnote).foregroundStyle(.secondary)
         }
         .task(id: notebook.id) { firstPage = (try? await model.store.pages(notebookID: notebook.id))?.first }
