@@ -9,3 +9,4 @@ obj/
 .build/
 node_modules/
 .claude/
+clients/ios/App/Info.plist
