@@ -8,6 +8,7 @@ struct JuNotesApp: App {
         WindowGroup {
             RootView()
                 .environment(model)
+                .tint(Brand.accent)
         }
     }
 }
