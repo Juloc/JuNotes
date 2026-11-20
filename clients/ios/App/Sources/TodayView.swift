@@ -8,6 +8,7 @@ struct TodayView: View {
     @State private var planning: Exam?
     @State private var width: CGFloat = 1000
     @State private var recent: [Notebook] = []
+    @State private var favorites: [Notebook] = []
 
     var body: some View {
         TimelineView(.periodic(from: .now, by: 60)) { context in
@@ -21,6 +22,7 @@ struct TodayView: View {
                             Text("Der Server holt den Stundenplan, sobald der Link dafür eingetragen ist. Danach erscheint er hier, auch ohne Netz.")
                         }
                         cardsCard
+                        favoritesCard
                         recentCard
                     } else if width > 820 {
                         HStack(alignment: .top, spacing: 16) {
@@ -28,6 +30,7 @@ struct TodayView: View {
                                 hero(cockpit, now: context.date)
                                 lessonsCard(cockpit)
                                 studyTodayCard(cockpit.now)
+                                favoritesCard
                                 recentCard
                             }
                             VStack(spacing: 16) {
@@ -44,6 +47,7 @@ struct TodayView: View {
                         examsCard(cockpit)
                         studyTodayCard(cockpit.now)
                         cardsCard
+                        favoritesCard
                         recentCard
                     }
                     newsCard
@@ -58,12 +62,14 @@ struct TodayView: View {
             .toolbar { ToolbarItem(placement: .primaryAction) { Button("Scannen", systemImage: "doc.viewfinder") { model.scannerOrigin = ScanOrigin() } } }
         }
         .onGeometryChange(for: CGFloat.self, of: { $0.size.width }) { width = $0 }
-        .task(id: model.subjects.count) { await loadRecent() }
+        .task(id: model.folders.count + model.notebookCounts.values.reduce(0, +)) { await loadRecent() }
     }
 
     private func loadRecent() async {
         let all = (try? await model.store.allNotebooks()) ?? []
-        recent = Array(all.filter { $0.trashedAt == nil }.sorted { $0.createdAt > $1.createdAt }.prefix(4))
+        let live = all.filter { $0.trashedAt == nil }
+        recent = Array(live.sorted { $0.createdAt > $1.createdAt }.prefix(4))
+        favorites = live.filter(\.favorite).sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending }
     }
 
     // MARK: Now
@@ -286,6 +292,42 @@ struct TodayView: View {
             }
         }
         .card()
+    }
+
+    // MARK: Favourites and recent
+
+    @ViewBuilder private var favoritesCard: some View {
+        let folders = model.folders.filter(\.favorite)
+        if !favorites.isEmpty || !folders.isEmpty {
+            VStack(alignment: .leading, spacing: 14) {
+                CardTitle("Favoriten", symbol: "star")
+                if !folders.isEmpty {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack {
+                            ForEach(folders) { folder in
+                                Button { Task { await model.select(.folder(folder.id)) } } label: {
+                                    Label(folder.name, systemImage: folder.symbol).font(.subheadline.weight(.medium))
+                                        .padding(.horizontal, 12).padding(.vertical, 7)
+                                        .background(Color(hex: folder.color).opacity(0.18), in: Capsule())
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                    }
+                }
+                if !favorites.isEmpty {
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 120), spacing: 16)], alignment: .leading, spacing: 16) {
+                        ForEach(favorites) { notebook in
+                            Button { Task { await model.open(notebookID: notebook.id, pageID: nil) } } label: {
+                                NotebookCover(notebook: notebook, subject: model.subject(of: notebook))
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+            }
+            .card()
+        }
     }
 
     // MARK: Recent

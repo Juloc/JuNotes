@@ -206,7 +206,10 @@ struct FolderView: View {
                                 .background(.black.opacity(0.25), in: Circle()).padding(8)
                         }
                     }
-                Text(folder.name).font(.headline).lineLimit(2)
+                HStack(spacing: 4) {
+                    Text(folder.name).font(.headline).lineLimit(2)
+                    if folder.favorite { Image(systemName: "star.fill").font(.caption).foregroundStyle(.yellow) }
+                }
                 Text(parts.isEmpty ? "Leer" : parts.joined(separator: " · ")).font(.footnote).foregroundStyle(.secondary)
             }
         }
@@ -217,17 +220,27 @@ struct FolderView: View {
             return !items.isEmpty
         }
         .contextMenu {
+            Button(folder.favorite ? "Kein Favorit mehr" : "Als Favorit", systemImage: folder.favorite ? "star.slash" : "star") { Task { await model.toggleFavorite(folder) } }
             Button("Bearbeiten", systemImage: "paintbrush") { editor = FolderEditorTarget(folder: folder, parent: folder.folderID, isSubject: folder.isSubject) }
             Button("Verschieben", systemImage: "folder") { moving = MoveItem(subject: .folder(folder)) }
             Button("Löschen", systemImage: "trash", role: .destructive) { deleting = folder }
         }
     }
 
-    private func notebookCard(_ notebook: Notebook) -> some View {
-        NavigationLink(value: notebook.id) { NotebookCover(notebook: notebook, subject: model.subject(of: notebook)) }
-            .buttonStyle(.plain)
-            .draggable("n:\(notebook.id.uuidString)")
-            .contextMenu {
+    @ViewBuilder private func notebookCard(_ notebook: Notebook) -> some View {
+        let cover = NotebookCover(notebook: notebook, subject: model.subject(of: notebook))
+        Group {
+            if notebook.locked {
+                // A locked notebook asks for Face ID first.
+                Button { Task { if await model.unlock(notebook) { path.append(notebook.id) } } } label: { cover }
+            } else {
+                NavigationLink(value: notebook.id) { cover }
+            }
+        }
+        .buttonStyle(.plain)
+        .draggable("n:\(notebook.id.uuidString)")
+        .contextMenu {
+                Button(notebook.favorite ? "Kein Favorit mehr" : "Als Favorit", systemImage: notebook.favorite ? "star.slash" : "star") { Task { await model.toggleFavorite(notebook) } }
                 Button("Name und Cover", systemImage: "paintbrush") { editingNotebook = notebook }
                 Button("Verschieben", systemImage: "folder") { moving = MoveItem(subject: .notebook(notebook)) }
                 Button("In den Papierkorb", systemImage: "trash", role: .destructive) { Task { await model.moveToTrash(notebook) } }
@@ -248,6 +261,8 @@ struct FolderEditorSheet: View {
     @State private var isSubject: Bool
     @State private var customCover: Bool
     @State private var cover: Cover
+    @State private var favorite: Bool
+    @State private var tags: String
 
     init(target: FolderEditorTarget) {
         self.target = target
@@ -258,6 +273,8 @@ struct FolderEditorSheet: View {
         _symbol = State(initialValue: folder?.symbol ?? (target.isSubject ? "book" : "folder"))
         _isSubject = State(initialValue: folder?.isSubject ?? target.isSubject)
         _customCover = State(initialValue: folder?.cover != nil)
+        _favorite = State(initialValue: folder?.favorite ?? false)
+        _tags = State(initialValue: (folder?.tags ?? []).joined(separator: ", "))
         _cover = State(initialValue: folder?.cover ?? Cover(style: .gradient, colorA: Cover.presets[0].a, colorB: Cover.presets[0].b, symbol: folder?.symbol))
     }
 
@@ -269,6 +286,12 @@ struct FolderEditorSheet: View {
                     Toggle("Ist ein Fach", isOn: $isSubject)
                 } footer: {
                     Text("Ein Fach hat Noten und Karteikarten und passt zum Stundenplan. Ein Ordner hält nur Hefte und andere Ordner zusammen.")
+                }
+                Section {
+                    Toggle("Favorit", isOn: $favorite)
+                    TextField("Stichwörter, durch Komma getrennt", text: $tags)
+                } footer: {
+                    Text("Favoriten stehen auf „Heute“. Stichwörter findet die Suche.")
                 }
                 Section("Farbe in der Seitenleiste") {
                     LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 8)) {
@@ -317,9 +340,16 @@ struct FolderEditorSheet: View {
             folder.symbol = symbol
             folder.isSubject = isSubject
             folder.cover = finalCover
+            folder.favorite = favorite
+            folder.tags = Tags.parse(tags)
             await model.update(folder)
         } else {
-            await model.addFolder(name: trimmed, color: color, symbol: symbol, isSubject: isSubject, cover: finalCover, in: target.parent)
+            var created = await model.addFolder(name: trimmed, color: color, symbol: symbol, isSubject: isSubject, cover: finalCover, in: target.parent)
+            if favorite || !tags.isEmpty {
+                created.favorite = favorite
+                created.tags = Tags.parse(tags)
+                await model.update(created)
+            }
         }
         dismiss()
     }
@@ -335,11 +365,17 @@ struct NotebookEditorSheet: View {
     @State private var title: String
     @State private var customCover: Bool
     @State private var cover: Cover
+    @State private var favorite: Bool
+    @State private var locked: Bool
+    @State private var tags: String
 
     init(notebook: Notebook) {
         self.notebook = notebook
         _title = State(initialValue: notebook.title)
         _customCover = State(initialValue: notebook.cover != nil)
+        _favorite = State(initialValue: notebook.favorite)
+        _locked = State(initialValue: notebook.locked)
+        _tags = State(initialValue: notebook.tags.joined(separator: ", "))
         _cover = State(initialValue: notebook.cover ?? Cover(style: .gradient, colorA: Cover.presets[0].a, colorB: Cover.presets[0].b))
     }
 
@@ -347,6 +383,13 @@ struct NotebookEditorSheet: View {
         NavigationStack {
             Form {
                 Section("Name") { TextField("Name des Hefts", text: $title) }
+                Section {
+                    Toggle("Favorit", isOn: $favorite)
+                    Toggle("Mit Face ID sperren", isOn: $locked)
+                    TextField("Stichwörter, durch Komma getrennt", text: $tags)
+                } footer: {
+                    Text("Ein gesperrtes Heft zeigt keine Vorschau, steht nicht in der Suche und öffnet sich nur mit Face ID oder dem Code des iPads.")
+                }
                 Section {
                     Toggle("Eigenes Cover", isOn: $customCover)
                 } footer: {
@@ -364,6 +407,9 @@ struct NotebookEditorSheet: View {
                             var changed = notebook
                             changed.title = title.trimmingCharacters(in: .whitespaces)
                             changed.cover = customCover ? cover : nil
+                            changed.favorite = favorite
+                            changed.locked = locked
+                            changed.tags = Tags.parse(tags)
                             await model.update(changed)
                             dismiss()
                         }
@@ -438,5 +484,13 @@ struct MoveSheet: View {
             .padding(.leading, CGFloat(depth) * 20)
         }
         .disabled(!allowed)
+    }
+}
+
+enum Tags {
+    /// "Kindi, Praxis , " becomes ["Kindi", "Praxis"].
+    static func parse(_ text: String) -> [String] {
+        var seen: Set<String> = []
+        return text.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty && seen.insert($0.lowercased()).inserted }
     }
 }
