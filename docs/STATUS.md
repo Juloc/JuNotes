@@ -1,6 +1,6 @@
 # Stand der Entwicklung
 
-Stand: 19.11.2026. Der [Plan](PLAN.md) beschreibt, was JuNotes werden soll. Diese Datei sagt, was davon gebaut ist, **wie es geprüft wurde**
+Stand: 20.11.2026. Der [Plan](PLAN.md) beschreibt, was JuNotes werden soll. Diese Datei sagt, was davon gebaut ist, **wie es geprüft wurde**
 und was nicht.
 
 ## Wie geprüft wurde
@@ -44,6 +44,16 @@ unsignierte `.ipa`, Docker-Image und `compose.yaml`.
 - PDF-Import (so zieht ein Heft aus GoodNotes um), PDF-Export mit Teilen, Senden an Paperless
 - Kurzbefehle („Neue Seite für jetzt“, „Blatt scannen“), Notizbücher in Spotlight
 
+**Phase 5, Aufbau wie in GoodNotes** (Entscheidungen in [PHASE5.md](PHASE5.md)):
+- Ordner beliebig ineinander, ein Ordner kann zusätzlich Fach sein; Cover frei gestaltbar (Verlauf, Farbe, Foto, Symbol, Emoji, Muster); Verschieben und Ziehen
+- Noten pro Fach: Notensystem (1 bis 6 in Zehnteln oder Hundertsteln, mit Tendenz, Punkte), Anteil mündlich zu schriftlich, Gewicht pro Note, Hauptfächer mit eigenem Schnitt, Halbjahre
+- Import eines GoodNotes-Exports (ZIP mit PDFs), Ordnerstruktur bleibt; Ansicht des erkannten Textes
+- Seiten-Raster (umsortieren, duplizieren, Lesezeichen, in anderes Heft), Favoriten, Stichwörter, Sperre pro Heft mit Face ID, Suche nach Namen und Stichwort
+- Papier in weiteren Linienabständen, Checkliste, Wochenplan
+- Objekte auf Seiten: Fotos, Textfelder, Sticker, Washi-Tape, Sprachaufnahmen; Laserpointer; erkannte Schrift als Textfeld
+- „Enthält Daten von Kindern“: nichts davon geht ohne Ja an die KI, an Paperless oder in die Systemsuche
+- Lokale Benachrichtigungen: Unterricht entfällt, neue Schul-News, Arbeit morgen, Lernplan, fällige Karten
+
 ## Nicht geprüft
 
 - **Die App auf einem echten iPad.** Offen sind: wie sich das Schreiben anfühlt, ob PencilKit-Striche sauber wiedererkannt und synchronisiert
@@ -54,6 +64,11 @@ unsignierte `.ipa`, Docker-Image und `compose.yaml`.
   Schemas einhält, zeigt erst der erste echte Lauf. Die Antworten werden zur Sicherheit noch einmal geprüft.
 - **Google Drive und Paperless** gegen die echten Dienste.
 - Die **Anmeldung über die Geräteanmeldung** von Codex im Admin-Bereich mit dem echten Programm.
+
+- **Alles aus Phase 5 auf einem echten iPad.** Es wurde in der CI übersetzt und teils im Simulator gesehen (Ordner, Cover, Heute). Nie ausprobiert sind:
+  Fotoauswahl, Aufnahme, Face ID, Ziehen und Ablegen, Gesten auf Objekten, Laserpointer, der Import eines echten GoodNotes-ZIPs, Benachrichtigungen
+  und die Hintergrundabfrage.
+- **Codex-Bilder als Cover** sind nicht gebaut, weil die Bilderzeugung über Codex ungeprüft ist.
 
 ## Nicht gebaut
 
@@ -68,6 +83,10 @@ unsignierte `.ipa`, Docker-Image und `compose.yaml`.
 | Schreiben im Web | die Web-Ansicht ist nur zum Lesen |
 | Prototyp PaperKit gegen PencilKit | Es wird PencilKit benutzt. PaperKit wurde nicht ausprobiert. |
 | Whiteboard mit Minikarte und Zoom | Das Whiteboard ist eine große Fläche zum Scrollen. |
+| Vergrößerungsfenster, Handschrift in Text per Auswahl | Die Auswahl des Lassos ist für Apps nicht zugänglich. Stattdessen gibt es „erkannte Schrift als Textfeld“. Formen glätten kann PencilKit selbst (Linie halten), das ist nicht geprüft. |
+| Objekte, Cover-Fotos und Papier-Varianten in der Web-Ansicht | Die Web-Ansicht zeigt Striche und Papier, aber noch keine Fotos, Textfelder oder Sticker. |
+| KI-Cover | siehe oben |
+| Echte Push-Nachrichten | brauchen das kostenpflichtige Developer-Konto; es gibt nur lokale Benachrichtigungen |
 | Barrel Roll als eigene Funktion, eigene Hover-Vorschau | Es gilt, was der System-Werkzeugkasten kann. |
 | Mehrere Benutzer | Es gibt einen Schlüssel für den Server und ein Passwort pro Bereich. |
 | Lizenz | noch festzulegen. Ohne Lizenz gilt bei einem öffentlichen Repo „alle Rechte vorbehalten“. |
