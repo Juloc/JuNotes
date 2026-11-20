@@ -9,6 +9,7 @@ struct NotebookView: View {
     @State private var pages: [Page] = []
     @State private var strokeCounts: [UUID: Int] = [:]
     @State private var currentPageID: UUID?
+    @State private var showText = false
 
     var body: some View {
         Group {
@@ -27,12 +28,14 @@ struct NotebookView: View {
                     Label("Teilen", systemImage: "square.and.arrow.up")
                 }
             }
+            ToolbarItem(placement: .primaryAction) { Button("Erkannter Text", systemImage: "text.viewfinder") { showText = true } }
             ToolbarItem(placement: .primaryAction) { LearnMenu(notebook: notebook, pageID: currentPageID) }
             ToolbarItem(placement: .primaryAction) {
                 Button("Scannen", systemImage: "doc.viewfinder") { model.scannerOrigin = ScanOrigin(notebook: notebook, afterPageID: currentPageID) }
             }
         }
         .task { await load() }
+        .sheet(isPresented: $showText) { PageTextSheet(notebook: notebook, pageID: currentPageID) }
         .onAppear { model.writing = true }
         .onChange(of: model.pageRevision) { Task { await reloadPages() } }
         .onDisappear {

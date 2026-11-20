@@ -13,7 +13,7 @@ extension PDFImportError {
     var sentence: String {
         switch self {
         case .unreadable: "Diese Datei lässt sich nicht als PDF öffnen."
-        case .tooLarge: "Die Datei ist größer als 20 MB. Teile sie vorher in kleinere PDFs."
+        case .tooLarge: "Die Datei ist größer als 60 MB. Teile sie vorher in kleinere PDFs."
         case .empty: "Das PDF hat keine Seiten."
         case .storage: "Das PDF konnte nicht auf dem iPad gespeichert werden."
         }
@@ -21,13 +21,19 @@ extension PDFImportError {
 }
 
 extension AppModel {
-    static let maximumPDFBytes = 20 * 1024 * 1024
+    static let maximumPDFBytes = 60 * 1024 * 1024
     static let maximumPDFPages = 400
 
     /// A PDF becomes a notebook with one page per PDF page, in the subject that is open. She can write on every page. This is how a notebook leaves GoodNotes:
     /// export it there as PDF and import it here.
     @discardableResult
     func importPDF(from url: URL) async throws -> Notebook {
+        try await importPDF(from: url, into: selectedFolder?.id, opening: true)
+    }
+
+    /// The same, into a given folder and without opening the notebook, for importing a whole folder at once.
+    @discardableResult
+    func importPDF(from url: URL, into parent: UUID?, opening: Bool) async throws -> Notebook {
         let scoped = url.startAccessingSecurityScopedResource()
         defer { if scoped { url.stopAccessingSecurityScopedResource() } }
 
@@ -46,7 +52,7 @@ extension AppModel {
         }
 
         let count = min(document.pageCount, Self.maximumPDFPages)
-        let notebook = Notebook(subjectID: selectedFolder?.id, title: NotebookTitle.fromFileName(url.lastPathComponent), template: .blank)
+        let notebook = Notebook(subjectID: parent, title: NotebookTitle.fromFileName(url.lastPathComponent), template: .blank)
         await write { try await self.store.put(notebook) }
         let keys = PageOrder.keys(appending: count, after: nil)
         var pages: [Page] = []
@@ -56,9 +62,11 @@ extension AppModel {
             await write { try await self.store.put(page) }
         }
 
-        await reloadNotebooks()
         indexPDF(pages: pages, assetID: assetID, notebookID: notebook.id)
-        await open(notebookID: notebook.id, pageID: pages.first?.id)
+        if opening {
+            await reloadNotebooks()
+            await open(notebookID: notebook.id, pageID: pages.first?.id)
+        }
         return notebook
     }
 
