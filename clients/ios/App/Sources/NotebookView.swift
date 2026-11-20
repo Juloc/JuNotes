@@ -1,4 +1,5 @@
 import JuNotesCore
+import PhotosUI
 import SwiftUI
 
 /// A notebook. Pages run one below the other, and writing near the bottom of the last one adds the next.
@@ -11,6 +12,11 @@ struct NotebookView: View {
     @State private var currentPageID: UUID?
     @State private var showText = false
     @State private var showGrid = false
+    @State private var showPhotos = false
+    @State private var photoItem: PhotosPickerItem?
+    @State private var showStickers = false
+    @State private var showRecorder = false
+    @State private var laser = false
 
     var body: some View {
         Group {
@@ -29,6 +35,17 @@ struct NotebookView: View {
                     Label("Teilen", systemImage: "square.and.arrow.up")
                 }
             }
+            ToolbarItem(placement: .primaryAction) { insertMenu }
+            ToolbarItem(placement: .primaryAction) {
+                Button(model.editingObjects ? "Bearbeiten beenden" : "Objekte bearbeiten", systemImage: model.editingObjects ? "checkmark.circle.fill" : "hand.point.up.left") {
+                    model.editingObjects.toggle()
+                    if !model.editingObjects { model.selectedObject = nil }
+                }
+                .tint(model.editingObjects ? Brand.accent : nil)
+            }
+            ToolbarItem(placement: .primaryAction) {
+                Button(laser ? "Laserpointer aus" : "Laserpointer", systemImage: "dot.radiowaves.left.and.right") { laser.toggle() }.tint(laser ? .red : nil)
+            }
             ToolbarItem(placement: .primaryAction) { Button("Seiten", systemImage: "square.grid.2x2") { showGrid = true } }
             ToolbarItem(placement: .primaryAction) { Button("Erkannter Text", systemImage: "text.viewfinder") { showText = true } }
             ToolbarItem(placement: .primaryAction) { LearnMenu(notebook: notebook, pageID: currentPageID) }
@@ -39,12 +56,53 @@ struct NotebookView: View {
         .task { await load() }
         .sheet(isPresented: $showText) { PageTextSheet(notebook: notebook, pageID: currentPageID) }
         .sheet(isPresented: $showGrid) { PageGridSheet(notebook: notebook) { id in currentPageID = id } }
+        .sheet(isPresented: $showStickers) {
+            StickerSheet { kind, text, color in
+                guard let pageID = currentPageID else { return }
+                Task { await model.addObject(kind, on: pageID, text: text, color: color) }
+            }
+        }
+        .sheet(isPresented: $showRecorder) { if let pageID = currentPageID { AudioRecorderSheet(pageID: pageID) } }
+        .photosPicker(isPresented: $showPhotos, selection: $photoItem, matching: .images)
+        .onChange(of: photoItem) { _, item in
+            guard let item, let pageID = currentPageID else { return }
+            Task {
+                if let data = try? await item.loadTransferable(type: Data.self) { await model.addPhoto(data, on: pageID) }
+                photoItem = nil
+            }
+        }
+        .overlay { if laser { LaserOverlay() } }
+        .safeAreaInset(edge: .bottom, spacing: 0) { if model.editingObjects { ObjectInspector() } }
+        .onDisappear {
+            model.editingObjects = false
+            model.selectedObject = nil
+        }
         .onAppear { model.writing = true }
         .onChange(of: model.pageRevision) { Task { await reloadPages() } }
         .onDisappear {
             model.writing = false
             Task { await trimAutoPages() }
         }
+    }
+
+    private var insertMenu: some View {
+        Menu {
+            Button("Foto", systemImage: "photo") { showPhotos = true }
+            Button("Textfeld", systemImage: "textformat") {
+                guard let pageID = currentPageID else { return }
+                Task { await model.addObject(.text, on: pageID, text: "Text", color: "#1d1d1f") }
+            }
+            Button("Sticker und Washi-Tape", systemImage: "face.smiling") { showStickers = true }
+            Button("Sprachaufnahme", systemImage: "mic") { showRecorder = true }
+            Divider()
+            Button("Erkannte Schrift als Text", systemImage: "text.viewfinder") {
+                guard let pageID = currentPageID else { return }
+                Task { await model.addRecognisedText(on: pageID) }
+            }
+        } label: {
+            Label("Einfügen", systemImage: "plus.square.on.square")
+        }
+        .disabled(currentPageID == nil)
     }
 
     private var pageList: some View {

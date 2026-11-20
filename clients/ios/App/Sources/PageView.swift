@@ -15,6 +15,7 @@ struct PageView: View {
     @State private var scanImage: UIImage?
     @State private var pdfImage: UIImage?
     @State private var showSolution = false
+    @State private var objects: [PageObject] = []
 
     var body: some View {
         let logical = PageGeometry.size(for: notebook.type)
@@ -55,6 +56,9 @@ struct PageView: View {
                 }
                 .allowsHitTesting(false)
             }
+            // Photos, text boxes and stickers lie under her handwriting; while they are being edited they come to the front.
+            ObjectLayer(objects: model.editingObjects ? [] : objects.filter { $0.type != .audio }, displayWidth: displayWidth, logicalSize: CGSize(width: logical.width, height: logical.height), editable: false)
+                .allowsHitTesting(false)
             if let strokes {
                 PencilCanvas(
                     pageID: page.id,
@@ -72,6 +76,7 @@ struct PageView: View {
             } else {
                 ProgressView()
             }
+            ObjectLayer(objects: model.editingObjects ? objects : objects.filter { $0.type == .audio }, displayWidth: displayWidth, logicalSize: CGSize(width: logical.width, height: logical.height), editable: model.editingObjects)
         }
         .overlay(alignment: .bottom) { additionsBox }
         .overlay(alignment: .topTrailing) { solutionButton }
@@ -79,6 +84,7 @@ struct PageView: View {
         .clipShape(RoundedRectangle(cornerRadius: 4))
         .shadow(color: .black.opacity(0.18), radius: 3, y: 1)
         .task(id: page.id) { strokes = (try? await model.store.strokes(pageID: page.id)) ?? [] }
+        .task(id: ObjectsKey(pageID: page.id, revision: model.objectRevision)) { objects = (try? await model.store.objects(pageID: page.id)) ?? [] }
         .task(id: model.assetRevision) {
             if case .scan(let assetID) = page.content {
                 scanImage = await Task.detached { AssetFiles.image(for: assetID) }.value
@@ -123,4 +129,9 @@ struct PageView: View {
             .padding(10)
         }
     }
+}
+
+private struct ObjectsKey: Hashable {
+    var pageID: UUID
+    var revision: Int
 }

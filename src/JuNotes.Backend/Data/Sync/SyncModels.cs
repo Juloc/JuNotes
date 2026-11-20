@@ -10,8 +10,10 @@ namespace JuNotes.Backend.Data.Sync
         public const string Stroke = "stroke";
         public const string Grade = "grade";
         public const string Card = "card";
+        // A picture, text box, sticker or recording on a page.
+        public const string Object = "object";
 
-        public static readonly IReadOnlySet<string> All = new HashSet<string> { Subject, Notebook, Page, Stroke, Grade, Card };
+        public static readonly IReadOnlySet<string> All = new HashSet<string> { Subject, Notebook, Page, Stroke, Grade, Card, Object };
     }
 
     // What a device sends: one entity created, changed or deleted.

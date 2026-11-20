@@ -172,6 +172,11 @@ public actor SQLiteStore: SyncStore {
         try decoded(kind: .card, parent: subjectID, filterParent: subjectID != nil).compactMap { try? Flashcard.decode($0) }
     }
 
+    /// What she put on a page besides handwriting, back to front.
+    public func objects(pageID: UUID) throws -> [PageObject] {
+        try decoded(kind: .object, parent: pageID, filterParent: true).compactMap { try? PageObject.decode($0) }.sorted { ($0.z, $0.id.uuidString) < ($1.z, $1.id.uuidString) }
+    }
+
     public func strokes(pageID: UUID) throws -> [Stroke] {
         try decoded(kind: .stroke, parent: pageID, filterParent: true).compactMap { try? Stroke.decode($0).stroke }
     }
@@ -216,7 +221,8 @@ public actor SQLiteStore: SyncStore {
         // Pictures on the covers of folders and notebooks.
         let folderCovers: [UUID] = try decoded(kind: .subject, parent: nil, filterParent: false).compactMap { try? Subject.decode($0) }.compactMap { $0.cover?.assetID }
         let notebookCovers: [UUID] = try decoded(kind: .notebook, parent: nil, filterParent: false).compactMap { try? Notebook.decode($0) }.compactMap { $0.cover?.assetID }
-        return pageAssets + folderCovers + notebookCovers
+        let objectAssets: [UUID] = try decoded(kind: .object, parent: nil, filterParent: false).compactMap { try? PageObject.decode($0) }.compactMap(\.assetID)
+        return pageAssets + folderCovers + notebookCovers + objectAssets
     }
 
     // MARK: Search

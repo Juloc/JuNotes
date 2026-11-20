@@ -46,6 +46,11 @@ final class AppModel {
     var writing = false
     /// Locked notebooks she opened since the app was last in the background.
     var unlocked: Set<UUID> = []
+    /// Objects on pages (photos, text boxes, stickers) can be moved, turned and resized while this is on.
+    var editingObjects = false
+    var selectedObject: PageObject?
+    /// Counts up when an object changed, so the pages read their objects again.
+    var objectRevision = 0
     var settings: ServerSettings
 
     private let schoolCache: URL
