@@ -43,7 +43,7 @@ shoot() { # name, screen, extra launch arguments...
   shift 2
   xcrun simctl terminate "$device_id" app.junotes.ios 2>/dev/null || true
   xcrun simctl launch "$device_id" app.junotes.ios -AppleLanguages "(de)" -AppleLocale de_DE -JuNotesDemo -JuNotesScreen "$screen" "$@"
-  sleep 6
+  sleep 10
   xcrun simctl io "$device_id" screenshot "$out/$name.png"
 }
 

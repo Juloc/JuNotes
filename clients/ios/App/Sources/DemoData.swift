@@ -127,6 +127,7 @@ extension AppModel {
 
         switch Demo.screen {
         case "library": await select(.root)
+        case "coverEditor": await select(.folder(school.id))
         case "folder": await select(.folder(school.id))
         case "subject": await select(.folder(math.id))
         case "kindi": await select(.folder(kita.id))
