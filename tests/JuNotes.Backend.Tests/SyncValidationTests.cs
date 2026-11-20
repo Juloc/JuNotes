@@ -30,7 +30,7 @@ namespace JuNotes.Backend.Tests
         [InlineData(EntityKinds.Stroke)]
         [InlineData(EntityKinds.Grade)]
         [InlineData(EntityKinds.Card)]
-        [InlineData(EntityKinds.Object)]
+        [InlineData(EntityKinds.PageObject)]
         public void Pages_strokes_grades_cards_and_objects_need_a_parent(string kind) => Rejects(new SyncChange(kind, Guid.NewGuid(), null, Empty, false));
 
         [Fact]
