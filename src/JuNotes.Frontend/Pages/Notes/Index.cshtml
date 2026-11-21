@@ -19,7 +19,7 @@ else
                 @foreach (var notebook in group.Notebooks)
                 {
                     <a class="book" href="/Notes/@notebook.Id" data-title="@notebook.Title.ToLowerInvariant()">
-                        <div class="cover" style="background:@group.Color">@(notebook.Type == "whiteboard" ? "Whiteboard" : "Heft")</div>
+                        <div class="cover" style="@CoverStyle.Css(notebook, group.Color)">@(notebook.Cover?.Emoji ?? (notebook.Type == "whiteboard" ? "Whiteboard" : "Heft"))</div>
                         <strong>@notebook.Title</strong>
                     </a>
                 }
