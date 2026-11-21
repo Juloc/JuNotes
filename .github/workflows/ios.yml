@@ -21,7 +21,7 @@ jobs:
     # The runner image that carries Xcode 27 (Swift 6.4); macos-latest still has Xcode 26.
     runs-on: xcode-27
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Select the newest Xcode
         run: |
           latest="$(find /Applications -maxdepth 1 -name 'Xcode_27*.app' | sort -V | tail -1)"
@@ -45,7 +45,7 @@ jobs:
     # The real app in the iPad simulator, with made-up data, as pictures to look at.
     runs-on: xcode-27
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Select the newest Xcode
         run: |
           latest="$(find /Applications -maxdepth 1 -name 'Xcode_27*.app' | sort -V | tail -1)"
@@ -70,7 +70,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/download-artifact@v4
         with:
           name: JuNotes-unsigned-ipa
