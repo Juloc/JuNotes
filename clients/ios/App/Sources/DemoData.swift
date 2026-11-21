@@ -28,16 +28,19 @@ extension AppModel {
         let kita = Subject(name: "Kindi", color: "#ff9f0a", symbol: "figure.2.and.child.holdinghands", sort: 1, isSubject: false,
                            cover: Cover(style: .gradient, colorA: "#ffd15c", colorB: "#ff9f0a", symbol: "teddybear", pattern: .dots))
         let other = Subject(name: "Sonstiges", color: "#8e8e93", symbol: "tray.full", sort: 2, isSubject: false)
-        let math = Subject(name: "Mathe", color: "#5b7cfa", symbol: "function", sort: 0, folderID: school.id,
+        let year26 = Subject(name: "Schuljahr 2026/27", color: "#5b7cfa", symbol: "calendar", sort: 0, folderID: school.id, isSubject: false, schoolYear: 2026)
+        let year25 = Subject(name: "Schuljahr 2025/26", color: "#8e8e93", symbol: "archivebox", sort: 1, folderID: school.id, isSubject: false, schoolYear: 2025, closed: true)
+        let oldMath = Subject(name: "Mathe", color: "#5b7cfa", symbol: "function", sort: 0, folderID: year25.id)
+        let math = Subject(name: "Mathe", color: "#5b7cfa", symbol: "function", sort: 0, folderID: year26.id,
                            cover: Cover(style: .gradient, colorA: "#6fb1ff", colorB: "#3478f6", symbol: "function", pattern: .grid))
-        let german = Subject(name: "Deutsch", color: "#ff9f0a", symbol: "text.book.closed", sort: 1, folderID: school.id,
+        let german = Subject(name: "Deutsch", color: "#ff9f0a", symbol: "text.book.closed", sort: 1, folderID: year26.id,
                              cover: Cover(style: .gradient, colorA: "#ff9a7a", colorB: "#f2545b", emoji: "📖"))
-        let english = Subject(name: "Englisch", color: "#30b0c7", symbol: "globe.europe.africa", sort: 2, folderID: school.id,
+        let english = Subject(name: "Englisch", color: "#30b0c7", symbol: "globe.europe.africa", sort: 2, folderID: year26.id,
                               cover: Cover(style: .gradient, colorA: "#4fd1d9", colorB: "#1f7fb5", symbol: "globe.europe.africa"))
-        let biology = Subject(name: "Biologie", color: "#34c759", symbol: "leaf", sort: 3, folderID: school.id,
+        let biology = Subject(name: "Biologie", color: "#34c759", symbol: "leaf", sort: 3, folderID: year26.id,
                               cover: Cover(style: .gradient, colorA: "#8fd96b", colorB: "#3fa73e", symbol: "leaf", pattern: .dots))
         let worksheets = Subject(name: "Arbeitsblätter", color: "#5b7cfa", symbol: "folder", sort: 0, folderID: math.id, isSubject: false)
-        let subjects = [school, kita, other, math, german, english, biology, worksheets]
+        let subjects = [school, kita, other, year26, year25, oldMath, math, german, english, biology, worksheets]
         for subject in subjects { try? await store.put(subject) }
 
         // Notebooks, newest last; the first has handwriting on every page.
@@ -99,6 +102,7 @@ extension AppModel {
             (english, 1.0, .written, "Klassenarbeit 1", -50), (english, 2.0, .test, "Vokabeltest", -9),
             (biology, 2.0, .test, "Test Zellbiologie", -25),
         ]
+        try? await store.put(Grade(subjectID: oldMath.id, value: 2.3, category: .written, date: now.addingTimeInterval(-300 * 86400), title: "Abschlussarbeit"))
         for (subject, value, category, title, daysAgo) in grades {
             try? await store.put(Grade(subjectID: subject.id, value: value, category: category, date: now.addingTimeInterval(Double(daysAgo) * 86400), title: title))
         }
@@ -127,8 +131,9 @@ extension AppModel {
 
         switch Demo.screen {
         case "library": await select(.root)
-        case "coverEditor": await select(.folder(school.id))
+        case "coverEditor": await select(.folder(year26.id))
         case "folder": await select(.folder(school.id))
+        case "year": await select(.folder(year26.id))
         case "subject": await select(.folder(math.id))
         case "kindi": await select(.folder(kita.id))
         case "notebook":

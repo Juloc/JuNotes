@@ -19,14 +19,15 @@ struct RootView: View {
                 }
                 Section {
                     Label("Karteikarten", systemImage: "rectangle.on.rectangle.angled").tag(SidebarItem.cards)
-                        .badge(StudyQueue.counts(model.cards, now: Date()).due)
+                        .badge(StudyQueue.counts(model.activeCards, now: Date()).due)
                 }
                 Section("Bibliothek") {
                     Label("Alle Hefte", systemImage: "books.vertical").tag(SidebarItem.root)
                     OutlineGroup(model.tree.nodes(), children: \.children) { node in
                         Label { Text(node.folder.name) } icon: {
-                            Image(systemName: node.folder.symbol).foregroundStyle(Color(hex: node.folder.color))
+                            Image(systemName: node.folder.closed ? "archivebox" : node.folder.symbol).foregroundStyle(Color(hex: node.folder.color))
                         }
+                        .opacity(node.folder.closed ? 0.55 : 1)
                         .tag(SidebarItem.folder(node.id))
                     }
                 }
@@ -41,6 +42,7 @@ struct RootView: View {
                     Menu {
                         Button("Neues Fach", systemImage: "graduationcap") { folderEditor = FolderEditorTarget(folder: nil, parent: model.selectedFolder?.id, isSubject: true) }
                         Button("Neuer Ordner", systemImage: "folder.badge.plus") { folderEditor = FolderEditorTarget(folder: nil, parent: model.selectedFolder?.id, isSubject: false) }
+                        Button("Neues Schuljahr", systemImage: "calendar.badge.plus") { folderEditor = FolderEditorTarget(folder: nil, parent: model.selectedFolder?.id, isSubject: false, isSchoolYear: true) }
                     } label: {
                         Label("Neu", systemImage: "plus")
                     }

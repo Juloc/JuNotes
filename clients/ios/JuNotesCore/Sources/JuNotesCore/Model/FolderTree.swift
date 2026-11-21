@@ -58,6 +58,48 @@ public struct FolderTree: Sendable {
         return path(to: folderID).contains { $0.sensitive }
     }
 
+    /// The school year folder a folder lies in: itself or the nearest one above that is marked as a school year.
+    public func schoolYearFolder(of id: UUID?) -> Subject? {
+        guard let id else { return nil }
+        return path(to: id).last { $0.schoolYear != nil }
+    }
+
+    /// The subjects that count now: not in a finished school year and, when there is a folder for the current school year,
+    /// only those in it (plus subjects that lie in no school year at all).
+    public func activeSubjects(now: Date, calendar: Calendar = .current) -> [Subject] {
+        let current = SchoolYear.startYear(containing: now, calendar: calendar)
+        let hasCurrent = folders.contains { $0.schoolYear == current && !$0.closed }
+        return folders.filter { folder in
+            guard folder.isSubject else { return false }
+            guard let year = schoolYearFolder(of: folder.id) else { return true }
+            if year.closed { return false }
+            return hasCurrent ? year.schoolYear == current : true
+        }
+    }
+
+    /// The subjects inside one school year folder, at any depth.
+    public func subjects(inSchoolYear year: UUID) -> [Subject] {
+        folders.filter { $0.isSubject && schoolYearFolder(of: $0.id)?.id == year }
+    }
+
+    /// New folders shaped like the ones inside `source`, for the next school year: same names, colours, symbols, covers and grading settings,
+    /// nothing else (no notebooks, no marks). The copies lie in `parent`.
+    public func copiesOfContents(of source: UUID, into parent: UUID) -> [Subject] {
+        var result: [Subject] = []
+        func walk(_ from: UUID, _ to: UUID, _ visited: Set<UUID>) {
+            for child in children(of: from) where !visited.contains(child.id) {
+                var copy = child
+                copy.id = UUID()
+                copy.folderID = to
+                copy.favorite = false
+                result.append(copy)
+                walk(child.id, copy.id, visited.union([child.id]))
+            }
+        }
+        walk(source, parent, [source])
+        return result
+    }
+
     /// A folder may go anywhere except into itself or into something inside it.
     public func canMove(_ id: UUID, into target: UUID?) -> Bool {
         guard let target else { return true }

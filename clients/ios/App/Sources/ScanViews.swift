@@ -108,7 +108,7 @@ struct ScanDestinationSheet: View {
             if let notebook = chosenNotebooks.first(where: { $0.id == chosenNotebookID }) {
                 await model.insertScan(images, into: notebook, worksheetIn: nil, afterPageID: nil)
             } else {
-                await model.insertScan(images, into: nil, worksheetIn: model.subjects.first { $0.id == chosenSubjectID }, afterPageID: nil)
+                await model.insertScan(images, into: nil, worksheetIn: model.folders.first { $0.id == chosenSubjectID }, afterPageID: nil)
             }
         }
         dismiss()

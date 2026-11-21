@@ -282,3 +282,29 @@ public enum SchoolTerm {
         calendar.component(.month, from: interval.start) == 8 ? 1 : 2
     }
 }
+
+/// A school year runs from August to July and is named by the year it begins in: 2026 is "2026/27".
+public enum SchoolYear {
+    public static func startYear(containing date: Date, calendar: Calendar = .current) -> Int {
+        let components = calendar.dateComponents([.year, .month], from: date)
+        let year = components.year ?? 2000
+        return (components.month ?? 1) >= 8 ? year : year - 1
+    }
+
+    public static func label(_ startYear: Int) -> String {
+        String(format: "%d/%02d", startYear, (startYear + 1) % 100)
+    }
+
+    public static func interval(startYear: Int, calendar: Calendar = .current) -> DateInterval {
+        let start = calendar.date(from: DateComponents(year: startYear, month: 8, day: 1)) ?? Date()
+        let end = calendar.date(from: DateComponents(year: startYear + 1, month: 8, day: 1)) ?? start
+        return DateInterval(start: start, end: end)
+    }
+
+    /// The two halves: August to January, and February to July.
+    public static func halves(startYear: Int, calendar: Calendar = .current) -> (first: DateInterval, second: DateInterval) {
+        let year = interval(startYear: startYear, calendar: calendar)
+        let middle = calendar.date(from: DateComponents(year: startYear + 1, month: 2, day: 1)) ?? year.start
+        return (DateInterval(start: year.start, end: middle), DateInterval(start: middle, end: year.end))
+    }
+}

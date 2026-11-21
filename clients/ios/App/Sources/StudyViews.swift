@@ -11,13 +11,13 @@ struct StudyHubView: View {
 
     var body: some View {
         List {
-            if model.cards.isEmpty {
+            if model.activeCards.isEmpty {
                 ContentUnavailableView("Noch keine Karteikarten", systemImage: "rectangle.on.rectangle.angled", description: Text("Öffne ein Heft und wähle „Lernen“, „Karteikarten“. Die KI macht Karten aus deinen Notizen."))
             } else {
-                let all = StudyQueue.counts(model.cards, now: Date())
+                let all = StudyQueue.counts(model.activeCards, now: Date())
                 NavigationLink(value: StudyTarget(subjectID: nil)) { row("Alle Fächer", due: all.due, new: all.new, total: all.total) }
-                ForEach(model.subjects) { subject in
-                    let cards = model.cards.filter { $0.subjectID == subject.id }
+                ForEach(model.activeSubjects) { subject in
+                    let cards = model.activeCards.filter { $0.subjectID == subject.id }
                     if !cards.isEmpty {
                         let counts = StudyQueue.counts(cards, now: Date())
                         NavigationLink(value: StudyTarget(subjectID: subject.id)) { row(subject.name, due: counts.due, new: counts.new, total: counts.total) }
@@ -82,7 +82,7 @@ struct StudySessionView: View {
         .navigationTitle("Lernen")
         .navigationBarTitleDisplayMode(.inline)
         .task {
-            let cards = target.subjectID.map { id in model.cards.filter { $0.subjectID == id } } ?? model.cards
+            let cards = target.subjectID.map { id in model.cards.filter { $0.subjectID == id } } ?? model.activeCards
             queue = StudyQueue.today(cards, now: Date())
             started = true
         }

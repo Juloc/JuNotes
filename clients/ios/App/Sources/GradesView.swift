@@ -4,7 +4,13 @@ import SwiftUI
 /// Her grades by subject, with the average of each, of the main subjects and of all.
 struct GradesView: View {
     enum Period: Hashable {
-        case all, current, previous
+        case all, first, second
+    }
+
+    /// Which school year the list shows; without school year folders everything is shown.
+    enum YearChoice: Hashable {
+        case year(UUID)
+        case none
     }
 
     @Environment(AppModel.self) private var model
@@ -12,17 +18,43 @@ struct GradesView: View {
     @State private var settingsFor: Subject?
     @State private var calculating: Subject?
     @State private var period = Period.all
+    @State private var choice: YearChoice?
 
-    private var currentTerm: DateInterval { SchoolTerm.interval(containing: Date()) }
+    private var yearFolders: [Subject] {
+        model.folders.filter { $0.schoolYear != nil }.sorted { ($0.schoolYear ?? 0) > ($1.schoolYear ?? 0) }
+    }
+
+    private var hasLooseSubjects: Bool { model.subjects.contains { model.tree.schoolYearFolder(of: $0.id) == nil } }
+
+    /// What she picked, or the current school year, or the latest one that is still open.
+    private var effectiveChoice: YearChoice? {
+        guard !yearFolders.isEmpty else { return nil }
+        if let choice { return choice }
+        let current = SchoolYear.startYear(containing: Date())
+        if let folder = yearFolders.first(where: { $0.schoolYear == current && !$0.closed }) ?? yearFolders.first(where: { !$0.closed }) ?? yearFolders.first { return .year(folder.id) }
+        return YearChoice.none
+    }
+
+    private var shownSubjects: [Subject] {
+        switch effectiveChoice {
+        case nil: return model.subjects
+        case .year(let id)?: return model.tree.subjects(inSchoolYear: id)
+        case .none?: return model.subjects.filter { model.tree.schoolYearFolder(of: $0.id) == nil }
+        }
+    }
+
+    private var startYear: Int {
+        if case .year(let id)? = effectiveChoice, let year = model.tree.folder(id)?.schoolYear { return year }
+        return SchoolYear.startYear(containing: Date())
+    }
 
     private func grades(of subject: Subject) -> [Grade] {
         let all = model.grades(of: subject)
+        let halves = SchoolYear.halves(startYear: startYear)
         switch period {
         case .all: return all
-        case .current: return all.filter { currentTerm.contains($0.date) }
-        case .previous:
-            let previous = SchoolTerm.previous(of: currentTerm)
-            return all.filter { previous.contains($0.date) }
+        case .first: return all.filter { halves.first.contains($0.date) }
+        case .second: return all.filter { halves.second.contains($0.date) }
         }
     }
 
@@ -36,15 +68,23 @@ struct GradesView: View {
                 ContentUnavailableView("Noch kein Fach", systemImage: "list.number", description: Text("Noten gehören zu einem Fach. Lege zuerst ein Fach an: in der Bibliothek über „Neu“, „Neues Fach“."))
             } else {
                 Section {
+                    if !yearFolders.isEmpty {
+                        Picker("Schuljahr", selection: Binding(get: { effectiveChoice ?? YearChoice.none }, set: { choice = $0 })) {
+                            ForEach(yearFolders) { year in
+                                Text(year.name + (year.closed ? " (abgeschlossen)" : "")).tag(YearChoice.year(year.id))
+                            }
+                            if hasLooseSubjects { Text("Ohne Schuljahr").tag(YearChoice.none) }
+                        }
+                    }
                     Picker("Zeitraum", selection: $period) {
                         Text("Alles").tag(Period.all)
-                        Text("Dieses Halbjahr").tag(Period.current)
-                        Text("Letztes Halbjahr").tag(Period.previous)
+                        Text("1. Halbjahr").tag(Period.first)
+                        Text("2. Halbjahr").tag(Period.second)
                     }
                     .pickerStyle(.segmented)
                 }
                 summary
-                ForEach(model.subjects) { subject in
+                ForEach(shownSubjects) { subject in
                     subjectSection(subject)
                 }
             }
@@ -56,8 +96,8 @@ struct GradesView: View {
     }
 
     private var summary: some View {
-        let items = model.subjects.map { (grades: grades(of: $0), settings: $0.grading) }
-        let hasMajor = model.subjects.contains { $0.grading.isMajor }
+        let items = shownSubjects.map { (grades: grades(of: $0), settings: $0.grading) }
+        let hasMajor = shownSubjects.contains { $0.grading.isMajor }
         return Section {
             row("Gesamtschnitt", GradeCalculator.overall(items), prominent: true)
             if hasMajor {

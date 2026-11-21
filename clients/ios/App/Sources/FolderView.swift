@@ -32,6 +32,7 @@ struct FolderEditorTarget: Identifiable {
     var folder: Subject?
     var parent: UUID?
     var isSubject: Bool
+    var isSchoolYear = false
 }
 
 enum MoveSubject {
@@ -127,6 +128,7 @@ struct FolderView: View {
                     Button("Neues Heft", systemImage: "book") { showNewNotebook = true }
                     Button("Neuer Ordner", systemImage: "folder.badge.plus") { newFolder(isSubject: false) }
                     Button("Neues Fach", systemImage: "graduationcap") { newFolder(isSubject: true) }
+                    Button("Neues Schuljahr", systemImage: "calendar.badge.plus") { editor = FolderEditorTarget(folder: nil, parent: model.selectedFolder?.id, isSubject: false, isSchoolYear: true) }
                 } label: {
                     Label("Neu", systemImage: "plus")
                 }
@@ -196,12 +198,16 @@ struct FolderView: View {
         var parts: [String] = []
         if notebooks > 0 { parts.append(notebooks == 1 ? "1 Heft" : "\(notebooks) Hefte") }
         if inside > 0 { parts.append(inside == 1 ? "1 Ordner" : "\(inside) Ordner") }
+        if folder.closed { parts.append("abgeschlossen") }
         return Button { Task { await model.select(.folder(folder.id)) } } label: {
             VStack(alignment: .leading, spacing: 8) {
                 CoverView(cover: cover)
                     .aspectRatio(1.35, contentMode: .fit)
                     .overlay(alignment: .topTrailing) {
-                        if folder.isSubject {
+                        if folder.schoolYear != nil {
+                            Image(systemName: folder.closed ? "archivebox.fill" : "calendar").font(.caption).foregroundStyle(.white).padding(6)
+                                .background(.black.opacity(0.25), in: Circle()).padding(8)
+                        } else if folder.isSubject {
                             Image(systemName: "graduationcap.fill").font(.caption).foregroundStyle(.white).padding(6)
                                 .background(.black.opacity(0.25), in: Circle()).padding(8)
                         }
@@ -222,6 +228,10 @@ struct FolderView: View {
         .contextMenu {
             Button(folder.favorite ? "Kein Favorit mehr" : "Als Favorit", systemImage: folder.favorite ? "star.slash" : "star") { Task { await model.toggleFavorite(folder) } }
             Button("Bearbeiten", systemImage: "paintbrush") { editor = FolderEditorTarget(folder: folder, parent: folder.folderID, isSubject: folder.isSubject) }
+            if folder.schoolYear != nil {
+                Button(folder.closed ? "Schuljahr wieder öffnen" : "Schuljahr abschließen", systemImage: folder.closed ? "arrow.uturn.backward" : "archivebox") { Task { await model.setClosed(folder, !folder.closed) } }
+                Button("Nächstes Schuljahr anlegen", systemImage: "calendar.badge.plus") { Task { await model.startNextSchoolYear(from: folder) } }
+            }
             Button("Verschieben", systemImage: "folder") { moving = MoveItem(subject: .folder(folder)) }
             Button("Löschen", systemImage: "trash", role: .destructive) { deleting = folder }
         }
@@ -264,15 +274,22 @@ struct FolderEditorSheet: View {
     @State private var favorite: Bool
     @State private var tags: String
     @State private var sensitive: Bool
+    @State private var isYear: Bool
+    @State private var yearStart: Int
+    @State private var yearClosed: Bool
 
     init(target: FolderEditorTarget) {
         self.target = target
         let folder = target.folder
         let firstColor = folder?.color ?? Choices.colors[0]
-        _name = State(initialValue: folder?.name ?? "")
+        let current = SchoolYear.startYear(containing: Date())
+        _isYear = State(initialValue: folder?.schoolYear != nil || target.isSchoolYear)
+        _yearStart = State(initialValue: folder?.schoolYear ?? current)
+        _yearClosed = State(initialValue: folder?.closed ?? false)
+        _name = State(initialValue: folder?.name ?? (target.isSchoolYear ? "Schuljahr \(SchoolYear.label(current))" : ""))
         _color = State(initialValue: firstColor)
         _symbol = State(initialValue: folder?.symbol ?? (target.isSubject ? "book" : "folder"))
-        _isSubject = State(initialValue: folder?.isSubject ?? target.isSubject)
+        _isSubject = State(initialValue: (folder?.isSubject ?? target.isSubject) && !target.isSchoolYear)
         _customCover = State(initialValue: folder?.cover != nil)
         _favorite = State(initialValue: folder?.favorite ?? false)
         _sensitive = State(initialValue: folder?.sensitive ?? false)
@@ -285,9 +302,15 @@ struct FolderEditorSheet: View {
             Form {
                 Section("Name") { TextField(isSubject ? "Zum Beispiel Mathe" : "Zum Beispiel Schule", text: $name) }
                 Section {
-                    Toggle("Ist ein Fach", isOn: $isSubject)
+                    Toggle("Ist ein Schuljahr", isOn: $isYear)
+                    if isYear {
+                        Stepper("Beginnt im August \(yearStart), also \(SchoolYear.label(yearStart))", value: $yearStart, in: 2000...2100)
+                        Toggle("Abgeschlossen", isOn: $yearClosed)
+                    } else {
+                        Toggle("Ist ein Fach", isOn: $isSubject)
+                    }
                 } footer: {
-                    Text("Ein Fach hat Noten und Karteikarten und passt zum Stundenplan. Ein Ordner hält nur Hefte und andere Ordner zusammen.")
+                    Text(isYear ? "Fächer in diesem Ordner gehören zum Schuljahr. Ist es abgeschlossen, zählen sie nicht mehr für Stundenplan, „Heute“ und Karteikarten. Noten und Hefte bleiben." : "Ein Fach hat Noten und Karteikarten und passt zum Stundenplan. Ein Ordner hält nur Hefte und andere Ordner zusammen.")
                 }
                 Section {
                     Toggle("Favorit", isOn: $favorite)
@@ -341,14 +364,16 @@ struct FolderEditorSheet: View {
             folder.name = trimmed
             folder.color = color
             folder.symbol = symbol
-            folder.isSubject = isSubject
+            folder.isSubject = isSubject && !isYear
+            folder.schoolYear = isYear ? yearStart : nil
+            folder.closed = isYear && yearClosed
             folder.cover = finalCover
             folder.favorite = favorite
             folder.sensitive = sensitive
             folder.tags = Tags.parse(tags)
             await model.update(folder)
         } else {
-            var created = await model.addFolder(name: trimmed, color: color, symbol: symbol, isSubject: isSubject, cover: finalCover, in: target.parent)
+            var created = await model.addFolder(name: trimmed, color: color, symbol: symbol, isSubject: isSubject && !isYear, cover: finalCover, in: target.parent, schoolYear: isYear ? yearStart : nil, closed: isYear && yearClosed)
             if favorite || sensitive || !tags.isEmpty {
                 created.favorite = favorite
                 created.sensitive = sensitive

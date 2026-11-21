@@ -272,10 +272,10 @@ struct TodayView: View {
     // MARK: Cards
 
     @ViewBuilder private var cardsCard: some View {
-        let counts = StudyQueue.counts(model.cards, now: Date())
+        let counts = StudyQueue.counts(model.activeCards, now: Date())
         VStack(alignment: .leading, spacing: 12) {
             CardTitle("Karteikarten", symbol: "rectangle.on.rectangle.angled")
-            if model.cards.isEmpty {
+            if model.activeCards.isEmpty {
                 Text("Noch keine Karten. Öffne ein Heft und wähle „Lernen“, „Karteikarten“.").font(.footnote).foregroundStyle(.secondary)
             } else {
                 HStack(alignment: .firstTextBaseline, spacing: 8) {

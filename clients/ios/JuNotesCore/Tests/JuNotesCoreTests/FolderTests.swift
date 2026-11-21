@@ -242,3 +242,99 @@ import Testing
         #expect(!Notebook(title: "X").sensitive)
     }
 }
+
+@Suite struct SchoolYearTests {
+    private var calendar: Calendar {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "Europe/Berlin")!
+        return calendar
+    }
+
+    private func date(_ year: Int, _ month: Int, _ day: Int = 15) -> Date {
+        calendar.date(from: DateComponents(year: year, month: month, day: day, hour: 12))!
+    }
+
+    @Test func theSchoolYearBeginsInAugust() {
+        #expect(SchoolYear.startYear(containing: date(2026, 11), calendar: calendar) == 2026)
+        #expect(SchoolYear.startYear(containing: date(2027, 1), calendar: calendar) == 2026)
+        #expect(SchoolYear.startYear(containing: date(2027, 7, 31), calendar: calendar) == 2026)
+        #expect(SchoolYear.startYear(containing: date(2027, 8, 1), calendar: calendar) == 2027)
+    }
+
+    @Test func aSchoolYearIsNamedByBothYears() {
+        #expect(SchoolYear.label(2026) == "2026/27")
+        #expect(SchoolYear.label(2099) == "2099/00")
+    }
+
+    @Test func theHalvesCutAtTheStartOfFebruary() {
+        let halves = SchoolYear.halves(startYear: 2026, calendar: calendar)
+        #expect(halves.first.contains(date(2026, 10)) && halves.first.contains(date(2027, 1, 31)))
+        #expect(halves.second.contains(date(2027, 2, 2)) && halves.second.contains(date(2027, 7, 20)))
+        #expect(!halves.second.contains(date(2026, 10)))
+        #expect(SchoolYear.interval(startYear: 2026, calendar: calendar).contains(date(2027, 7, 31)))
+    }
+
+    private func world() -> (tree: FolderTree, y26: Subject, y25: Subject, math26: Subject, math25: Subject, loose: Subject) {
+        let y25 = Subject(name: "2025/26", isSubject: false, schoolYear: 2025, closed: true)
+        let y26 = Subject(name: "2026/27", isSubject: false, schoolYear: 2026)
+        let math25 = Subject(name: "Mathe", folderID: y25.id)
+        let math26 = Subject(name: "Mathe", folderID: y26.id)
+        let loose = Subject(name: "Zeichnen")
+        return (FolderTree([y25, y26, math25, math26, loose]), y26, y25, math26, math25, loose)
+    }
+
+    @Test func aFinishedYearsSubjectsDoNotCount() {
+        let w = world()
+        let active = w.tree.activeSubjects(now: date(2026, 11), calendar: calendar)
+        #expect(Set(active.map(\.id)) == [w.math26.id, w.loose.id])
+    }
+
+    @Test func withAFolderForTheCurrentYearOnlyItsSubjectsCount() {
+        var older = Subject(name: "2025/26", isSubject: false, schoolYear: 2025)
+        older.closed = false
+        let math25 = Subject(name: "Mathe", folderID: older.id)
+        let y26 = Subject(name: "2026/27", isSubject: false, schoolYear: 2026)
+        let math26 = Subject(name: "Mathe", folderID: y26.id)
+        let tree = FolderTree([older, math25, y26, math26])
+        #expect(tree.activeSubjects(now: date(2026, 11), calendar: calendar).map(\.id) == [math26.id])
+        // Before the new folder exists, the not yet finished older year still counts.
+        let onlyOld = FolderTree([older, math25])
+        #expect(onlyOld.activeSubjects(now: date(2026, 11), calendar: calendar).map(\.id) == [math25.id])
+    }
+
+    @Test func theSchoolYearFolderOfASubjectAndItsSubjects() {
+        let w = world()
+        #expect(w.tree.schoolYearFolder(of: w.math26.id)?.id == w.y26.id)
+        #expect(w.tree.schoolYearFolder(of: w.loose.id) == nil)
+        #expect(w.tree.schoolYearFolder(of: nil) == nil)
+        #expect(w.tree.subjects(inSchoolYear: w.y26.id).map(\.id) == [w.math26.id])
+    }
+
+    @Test func theNextYearGetsCopiesOfTheFoldersAndTheirSettingsButNothingElse() {
+        let w = world()
+        var maths = w.math26
+        maths.grading = GradingSettings(scale: .tendency, oralPercent: 30, isMajor: true)
+        maths.favorite = true
+        let sub = Subject(name: "Brüche", folderID: maths.id, isSubject: false)
+        let tree = FolderTree([w.y26, maths, sub])
+        let newYear = UUID()
+        let copies = tree.copiesOfContents(of: w.y26.id, into: newYear)
+
+        #expect(copies.count == 2)
+        let copiedMath = copies.first { $0.name == "Mathe" }!
+        #expect(copiedMath.folderID == newYear && copiedMath.id != maths.id)
+        #expect(copiedMath.grading == maths.grading && !copiedMath.favorite)
+        let copiedSub = copies.first { $0.name == "Brüche" }!
+        #expect(copiedSub.folderID == copiedMath.id)
+        #expect(Set(copies.map(\.id)).isDisjoint(with: [maths.id, sub.id]))
+    }
+
+    @Test func theSchoolYearSurvivesTheWire() throws {
+        let folder = Subject(name: "2026/27", isSubject: false, schoolYear: 2026, closed: true)
+        let change = try folder.change()
+        #expect(try Subject.decode(SyncRecord(kind: change.kind, id: change.id, payload: change.payload, seq: 1)) == folder)
+        let old = try JSONDecoder().decode(JSONValue.self, from: Data(##"{"name":"Alt","color":"#000000","symbol":"book","sort":0}"##.utf8))
+        let decoded = try Subject.decode(SyncRecord(kind: .subject, id: UUID(), payload: old, seq: 1))
+        #expect(decoded.schoolYear == nil && !decoded.closed)
+    }
+}
