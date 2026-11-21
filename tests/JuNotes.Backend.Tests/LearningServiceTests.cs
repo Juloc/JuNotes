@@ -183,7 +183,7 @@ namespace JuNotes.Backend.Tests
             await fixture.Profiles.EnsureDefaultsAsync(CancellationToken.None);
 
             Assert.Equal("Mein Prompt", (await fixture.Profiles.GetAsync("quiz", CancellationToken.None))!.SystemPrompt);
-            Assert.Equal(5, (await fixture.Profiles.ListAsync(CancellationToken.None)).Count);
+            Assert.Equal(AiDefaults.Profiles.Count, (await fixture.Profiles.ListAsync(CancellationToken.None)).Count);
         }
 
         [RequiresDatabaseFact]

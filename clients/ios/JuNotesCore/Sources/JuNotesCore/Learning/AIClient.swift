@@ -4,7 +4,7 @@ import FoundationNetworking
 #endif
 
 public enum AITask: String, Sendable {
-    case quiz, test, cards, check, grade
+    case quiz, test, cards, check, grade, cover
 }
 
 /// What the app tells the server's learning helper. Only the fields a task needs are sent.
@@ -76,6 +76,20 @@ public struct GradedAnswer: Sendable, Decodable, Equatable {
     /// 0 to 1.
     public var score: Double
     public var feedback: String
+}
+
+/// A cover the helper designed from a description: what the app can draw itself.
+public struct CoverDesign: Sendable, Decodable, Equatable {
+    public var colorA: String
+    public var colorB: String
+    public var emoji: String?
+    public var symbol: String?
+    public var pattern: String
+
+    /// The same as a cover, made from `base` so a picture or other choice of hers stays out of it: this is always a gradient.
+    public var cover: Cover {
+        Cover(style: .gradient, colorA: colorA, colorB: colorB, symbol: emoji == nil ? symbol : nil, emoji: emoji, pattern: Cover.Pattern(rawValue: pattern) ?? .none)
+    }
 }
 
 /// Why the learning helper did not answer, in terms the app can say in a sentence.

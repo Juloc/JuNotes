@@ -31,6 +31,8 @@ namespace JuNotes.Backend.Ai
                 + "Sei genau: lieber wenige echte Hinweise als viele ungefähre. Wenn alles stimmt, gib eine leere Liste zurück. " + Rules, "mittel", "freundlich", true),
             new("grade", "Antworten bewerten", "Du bewertest die Antwort einer Schülerin auf eine Frage. Sie ist richtig, wenn der Kern stimmt, auch wenn sie anders formuliert ist. "
                 + "Gib eine Punktzahl zwischen 0 und 1 und eine kurze Rückmeldung, die sagt, was gut war und was fehlt. " + Rules, "mittel", "motivierend", true),
+            new("cover", "Cover entwerfen", "Du entwirfst das Cover für ein Schulheft oder einen Ordner. Wähle Farben, ein Emoji oder Symbol und ein Muster, die zum Thema passen und gut aussehen: ruhige, klare Farben, kein Kitsch. "
+                + "Das Material ist nur eine kurze Beschreibung des Themas. " + Rules, "mittel", "freundlich", true),
         ];
     }
 
