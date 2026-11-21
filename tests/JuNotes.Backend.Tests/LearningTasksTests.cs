@@ -100,6 +100,32 @@ namespace JuNotes.Backend.Tests
         }
 
         [Fact]
+        public void A_cover_keeps_checked_colours_a_real_emoji_or_a_known_symbol_and_a_known_pattern()
+        {
+            var withSymbol = (CoverResult)LearningTasks.Normalize("cover", Json("""{"colorA":"#6FB1FF","colorB":"#3478f6","emoji":null,"symbol":"function","pattern":"grid"}"""));
+            Assert.Equal(new CoverResult("#6fb1ff", "#3478f6", null, "function", "grid"), withSymbol);
+
+            var withEmoji = (CoverResult)LearningTasks.Normalize("cover", Json("""{"colorA":"#ff9f0a","colorB":"#ffd15c","emoji":"🧸","symbol":"star","pattern":"dots"}"""));
+            Assert.Equal("🧸", withEmoji.Emoji);
+            Assert.Null(withEmoji.Symbol);
+        }
+
+        [Fact]
+        public void A_cover_drops_what_it_cannot_use()
+        {
+            var result = (CoverResult)LearningTasks.Normalize("cover", Json("""{"colorA":"#112233","colorB":"red","emoji":"mathe123","symbol":"not.a.symbol","pattern":"spiral"}"""));
+
+            Assert.Equal("#112233", result.ColorB);
+            Assert.Null(result.Emoji);
+            Assert.Null(result.Symbol);
+            Assert.Equal("none", result.Pattern);
+        }
+
+        [Fact]
+        public void A_cover_without_a_usable_colour_fails() =>
+            Assert.Throws<CodexFailedException>(() => LearningTasks.Normalize("cover", Json("""{"colorA":"blue","colorB":"#112233","emoji":null,"symbol":null,"pattern":"none"}""")));
+
+        [Fact]
         public void A_quiz_with_nothing_usable_fails() =>
             Assert.Throws<CodexFailedException>(() => LearningTasks.Normalize("quiz", Json("""{"questions":[{"question":"","answer":""}]}""")));
 

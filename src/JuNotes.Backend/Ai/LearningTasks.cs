@@ -22,6 +22,9 @@ namespace JuNotes.Backend.Ai
 
     public sealed record GradeResult(bool Correct, double Score, string Feedback);
 
+    // A cover the model designed from a description, in the parts the app can draw itself: two colours, an emoji or one of the app's symbols, and a pattern.
+    public sealed record CoverResult(string ColorA, string ColorB, string? Emoji, string? Symbol, string Pattern);
+
     // The request itself is not usable (no material, a number out of range), as opposed to the model failing.
     public sealed class AiRequestException(string message) : Exception(message);
 
@@ -31,7 +34,15 @@ namespace JuNotes.Backend.Ai
     {
         public const int MaxTextLength = 30_000;
 
-        public static readonly IReadOnlyList<string> Keys = ["quiz", "test", "cards", "check", "grade"];
+        public static readonly IReadOnlyList<string> Keys = ["quiz", "test", "cards", "check", "grade", "cover"];
+
+        // The symbols of the iPad app a cover may use; anything else the model names is dropped.
+        public static readonly IReadOnlyList<string> CoverSymbols =
+        [
+            "function", "text.book.closed", "character.bubble", "leaf", "atom", "globe.europe.africa", "paintpalette", "music.note", "figure.run", "laptopcomputer",
+            "book", "pencil", "graduationcap", "heart", "star", "sparkles", "house", "figure.2.and.child.holdinghands", "teddybear", "puzzlepiece",
+            "camera", "folder", "tray.full", "calendar", "flag", "lightbulb", "cross.case", "theatermasks", "hands.clap", "brain.head.profile",
+        ];
 
         private const string StringSchema = """{"type":"string"}""";
         private const string NullableStringSchema = """{"type":["string","null"]}""";
@@ -43,6 +54,7 @@ namespace JuNotes.Backend.Ai
             "cards" => Object("cards", Array(ObjectOf(("front", StringSchema), ("back", StringSchema)))),
             "check" => Object("notes", Array(ObjectOf(("kind", """{"type":"string","enum":["missing","error","unclear"]}"""), ("quote", NullableStringSchema), ("text", StringSchema), ("suggestion", NullableStringSchema)))),
             "grade" => ObjectOf(("correct", """{"type":"boolean"}"""), ("score", """{"type":"number"}"""), ("feedback", StringSchema)),
+            "cover" => ObjectOf(("colorA", StringSchema), ("colorB", StringSchema), ("emoji", NullableStringSchema), ("symbol", NullableStringSchema), ("pattern", """{"type":"string","enum":["none","lines","grid","dots"]}""")),
             _ => throw new ArgumentOutOfRangeException(nameof(task)),
         };
 
@@ -54,6 +66,8 @@ namespace JuNotes.Backend.Ai
             "cards" => $"Mache höchstens {Count(request, 12, 1, 30)} Karteikarten aus diesem Material.",
             "check" => "Prüfe dieses Material auf Lücken, Fehler und Unklares.",
             "grade" => "Bewerte die Antwort.",
+            "cover" => "Entwirf ein Cover für ein Heft oder einen Ordner nach der Beschreibung: zwei Farben als Hex-Code (#rrggbb) für einen Farbverlauf, passend zum Thema und gut lesbar, "
+                + "entweder ein Emoji oder eines dieser Symbole (nie beides, das andere ist null): " + string.Join(", ", CoverSymbols) + ", und ein Muster (none, lines, grid, dots).",
             _ => throw new ArgumentOutOfRangeException(nameof(task)),
         };
 
@@ -112,6 +126,7 @@ namespace JuNotes.Backend.Ai
                     "check" => new CheckResult(Items(answer, "notes", item => item.TryGetProperty("kind", out var kind) && kind.GetString() is "missing" or "error" or "unclear" && Text(item, "text") is { } text
                         ? new CheckNote(kind.GetString()!, Text(item, "quote"), text, Text(item, "suggestion")) : null)),
                     "grade" => new GradeResult(answer.GetProperty("correct").GetBoolean(), Math.Clamp(answer.GetProperty("score").GetDouble(), 0, 1), Text(answer, "feedback") ?? ""),
+                    "cover" => NormalizeCover(answer),
                     _ => throw new ArgumentOutOfRangeException(nameof(task)),
                 };
             }
@@ -120,6 +135,30 @@ namespace JuNotes.Backend.Ai
                 throw new Integrations.Codex.CodexFailedException("The answer did not have the expected shape.");
             }
         }
+
+        private static CoverResult NormalizeCover(JsonElement answer)
+        {
+            var a = HexColor(Text(answer, "colorA")) ?? throw new Integrations.Codex.CodexFailedException("The cover had no usable colour.");
+            var b = HexColor(Text(answer, "colorB")) ?? a;
+            var emoji = Text(answer, "emoji");
+            // An emoji is a few characters without letters or digits; anything longer or with words in it is not an emoji.
+            if (emoji is not null && (emoji.Length > 8 || emoji.Any(char.IsAsciiLetterOrDigit)))
+            {
+                emoji = null;
+            }
+
+            var symbol = Text(answer, "symbol") is { } name && CoverSymbols.Contains(name) ? name : null;
+            if (emoji is not null)
+            {
+                symbol = null;
+            }
+
+            var pattern = Text(answer, "pattern") is "lines" or "grid" or "dots" ? Text(answer, "pattern")! : "none";
+            return new CoverResult(a, b, emoji, symbol, pattern);
+        }
+
+        private static string? HexColor(string? value)
+            => value is { Length: 7 } && value[0] == '#' && value.Skip(1).All(char.IsAsciiHexDigit) ? value.ToLowerInvariant() : null;
 
         private static TestResult NormalizeTest(JsonElement answer)
         {

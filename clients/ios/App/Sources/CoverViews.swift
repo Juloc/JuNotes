@@ -183,6 +183,9 @@ struct CoverEditor: View {
     @Environment(AppModel.self) private var model
     @State private var photo: PhotosPickerItem?
     @State private var loadingPhoto = false
+    @State private var describing = false
+    @State private var wish = ""
+    @State private var designing = false
 
     var body: some View {
         Section {
@@ -194,6 +197,22 @@ struct CoverEditor: View {
                 Spacer()
             }
             .listRowBackground(Color.clear)
+        }
+
+        Section {
+            Button {
+                describing = true
+            } label: {
+                Label(designing ? "Die KI entwirft …" : "Cover von der KI entwerfen", systemImage: "sparkles")
+            }
+            .disabled(designing)
+        } footer: {
+            Text("Beschreibe das Thema, zum Beispiel „Bruchrechnung, ruhig und blau“. Die KI wählt Farben, Emoji oder Symbol und Muster. Das braucht den Server.")
+        }
+        .alert("Cover entwerfen", isPresented: $describing) {
+            TextField("Worum geht es?", text: $wish)
+            Button("Abbrechen", role: .cancel) {}
+            Button("Entwerfen") { Task { await design() } }
         }
 
         Section("Verlauf") {
@@ -290,6 +309,23 @@ struct CoverEditor: View {
                 if keyPath == \.colorA, cover.style == .color { cover.colorB = cover.colorA }
             }
         )
+    }
+
+    private func design() async {
+        let description = wish.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !description.isEmpty else { return }
+        guard let transport = model.makeTransport() else {
+            model.notice = "Der Server ist noch nicht eingerichtet. Trage Adresse und Schlüssel in den Einstellungen ein."
+            return
+        }
+        designing = true
+        defer { designing = false }
+        do {
+            let design = try await transport.ask(.cover, AIRequest(text: description), as: CoverDesign.self)
+            cover = design.cover
+        } catch {
+            model.notice = message(for: error)
+        }
     }
 
     private func load(_ item: PhotosPickerItem) async {

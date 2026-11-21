@@ -53,6 +53,10 @@ unsignierte `.ipa`, Docker-Image und `compose.yaml`.
 - Objekte auf Seiten: Fotos, Textfelder, Sticker, Washi-Tape, Sprachaufnahmen; Laserpointer; erkannte Schrift als Textfeld
 - „Enthält Daten von Kindern“: nichts davon geht ohne Ja an die KI, an Paperless oder in die Systemsuche
 - Lokale Benachrichtigungen: Unterricht entfällt, neue Schul-News, Arbeit morgen, Lernplan, fällige Karten
+- Schuljahre: Schuljahr-Ordner, abgeschlossene Jahre zählen nicht mehr, Noten nach Schuljahr und Halbjahr, nächstes Schuljahr aus dem letzten
+- Noten mit Rad in Schritten von 0,1, 0,05 oder 0,01 und einem Feld für eine genaue Zahl
+- Web-Ansicht zeigt Fotos, Textfelder, Sticker, Tape und Aufnahmen als Chip, Cover der Hefte und die neuen Papiere
+- Cover von der KI entwerfen: Farben, Emoji oder Symbol und Muster nach einer Beschreibung (mit Codex, wie die anderen Lernhilfen)
 
 ## Nicht geprüft
 
@@ -68,7 +72,8 @@ unsignierte `.ipa`, Docker-Image und `compose.yaml`.
 - **Alles aus Phase 5 auf einem echten iPad.** Es wurde in der CI übersetzt und teils im Simulator gesehen (Ordner, Cover, Heute). Nie ausprobiert sind:
   Fotoauswahl, Aufnahme, Face ID, Ziehen und Ablegen, Gesten auf Objekten, Laserpointer, der Import eines echten GoodNotes-ZIPs, Benachrichtigungen
   und die Hintergrundabfrage.
-- **Codex-Bilder als Cover** sind nicht gebaut, weil die Bilderzeugung über Codex ungeprüft ist.
+- **Codex-Bilder als Cover** (echte erzeugte Bilder wie in der Codex-Desktop-App) sind nicht gebaut, weil die Bilderzeugung über Codex ungeprüft ist.
+  Gebaut ist stattdessen, dass die KI ein Cover aus Farben, Emoji oder Symbol und Muster entwirft. Auch das lief nur gegen ein Fake-Programm, nicht mit echtem Codex.
 
 ## Nicht gebaut
 
@@ -84,8 +89,7 @@ unsignierte `.ipa`, Docker-Image und `compose.yaml`.
 | Prototyp PaperKit gegen PencilKit | Es wird PencilKit benutzt. PaperKit wurde nicht ausprobiert. |
 | Whiteboard mit Minikarte und Zoom | Das Whiteboard ist eine große Fläche zum Scrollen. |
 | Vergrößerungsfenster, Handschrift in Text per Auswahl | Die Auswahl des Lassos ist für Apps nicht zugänglich. Stattdessen gibt es „erkannte Schrift als Textfeld“. Formen glätten kann PencilKit selbst (Linie halten), das ist nicht geprüft. |
-| Objekte, Cover-Fotos und Papier-Varianten in der Web-Ansicht | Die Web-Ansicht zeigt Striche und Papier, aber noch keine Fotos, Textfelder oder Sticker. |
-| KI-Cover | siehe oben |
+| Sprachaufnahmen abspielen und Cover-Symbole in der Web-Ansicht | Aufnahmen erscheinen dort nur als Beschriftung, Symbole des iPads als Stern. |
 | Echte Push-Nachrichten | brauchen das kostenpflichtige Developer-Konto; es gibt nur lokale Benachrichtigungen |
 | Barrel Roll als eigene Funktion, eigene Hover-Vorschau | Es gilt, was der System-Werkzeugkasten kann. |
 | Mehrere Benutzer | Es gibt einen Schlüssel für den Server und ein Passwort pro Bereich. |
