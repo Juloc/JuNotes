@@ -82,6 +82,12 @@ final class AppModel {
     }
 
     var subjects: [Subject] { folders.filter(\.isSubject) }
+    /// The subjects that count now: not of a finished school year, and of the current one when there is a folder for it.
+    var activeSubjects: [Subject] { tree.activeSubjects(now: Date()) }
+    var activeCards: [Flashcard] {
+        let ids = Set(activeSubjects.map(\.id))
+        return cards.filter { ids.contains($0.subjectID) }
+    }
     var tree: FolderTree { FolderTree(folders) }
 
     var selectedFolder: Subject? {
@@ -123,9 +129,9 @@ final class AppModel {
     }
 
     @discardableResult
-    func addFolder(name: String, color: String, symbol: String, isSubject: Bool, cover: Cover?, in parent: UUID?) async -> Subject {
+    func addFolder(name: String, color: String, symbol: String, isSubject: Bool, cover: Cover?, in parent: UUID?, schoolYear: Int? = nil, closed: Bool = false) async -> Subject {
         let next = (tree.children(of: parent).map(\.sort).max() ?? -1) + 1
-        let folder = Subject(name: name, color: color, symbol: symbol, sort: next, folderID: parent, isSubject: isSubject, cover: cover)
+        let folder = Subject(name: name, color: color, symbol: symbol, sort: next, folderID: parent, isSubject: isSubject && schoolYear == nil, cover: cover, schoolYear: schoolYear, closed: closed && schoolYear != nil)
         await write { try await self.store.put(folder) }
         await reload()
         return folder
@@ -288,7 +294,7 @@ final class AppModel {
     }
 
     func cockpit(now: Date = Date()) -> Cockpit {
-        Cockpit(now: now, timetable: Timetable(events: events), subjects: subjects)
+        Cockpit(now: now, timetable: Timetable(events: events), subjects: activeSubjects)
     }
 
     /// "Neue Seite für jetzt": the notebook of the lesson that runs, with a fresh page headed by the day and the subject.

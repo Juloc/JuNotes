@@ -68,10 +68,14 @@ public struct Subject: SyncEntity {
     public var tags: [String]
     /// Holds data about children: nothing in it goes to the AI, to Paperless or into the system search without her saying yes.
     public var sensitive: Bool
+    /// Marks the folder as a school year: the year it begins in, so 2026 is 2026/27. Subjects inside belong to that year.
+    public var schoolYear: Int?
+    /// A finished school year: its subjects no longer count for the timetable, "Heute" and the cards, and the marks stay readable.
+    public var closed: Bool
 
     public var parentID: UUID? { folderID }
 
-    public init(id: UUID = UUID(), name: String, color: String = "#0a84ff", symbol: String = "book", sort: Int = 0, folderID: UUID? = nil, isSubject: Bool = true, cover: Cover? = nil, grading: GradingSettings = GradingSettings(), favorite: Bool = false, tags: [String] = [], sensitive: Bool = false) {
+    public init(id: UUID = UUID(), name: String, color: String = "#0a84ff", symbol: String = "book", sort: Int = 0, folderID: UUID? = nil, isSubject: Bool = true, cover: Cover? = nil, grading: GradingSettings = GradingSettings(), favorite: Bool = false, tags: [String] = [], sensitive: Bool = false, schoolYear: Int? = nil, closed: Bool = false) {
         self.id = id
         self.name = name
         self.color = color
@@ -84,9 +88,11 @@ public struct Subject: SyncEntity {
         self.favorite = favorite
         self.tags = tags
         self.sensitive = sensitive
+        self.schoolYear = schoolYear
+        self.closed = closed
     }
 
-    enum CodingKeys: String, CodingKey { case name, color, symbol, sort, isSubject, cover, grading, favorite, tags, sensitive }
+    enum CodingKeys: String, CodingKey { case name, color, symbol, sort, isSubject, cover, grading, favorite, tags, sensitive, schoolYear, closed }
 
     public init(from decoder: any Decoder) throws {
         let values = try decoder.container(keyedBy: CodingKeys.self)
@@ -102,6 +108,8 @@ public struct Subject: SyncEntity {
         favorite = try values.decodeIfPresent(Bool.self, forKey: .favorite) ?? false
         tags = try values.decodeIfPresent([String].self, forKey: .tags) ?? []
         sensitive = try values.decodeIfPresent(Bool.self, forKey: .sensitive) ?? false
+        schoolYear = try values.decodeIfPresent(Int.self, forKey: .schoolYear)
+        closed = try values.decodeIfPresent(Bool.self, forKey: .closed) ?? false
     }
 
     public static func decode(_ record: SyncRecord) throws -> Subject {

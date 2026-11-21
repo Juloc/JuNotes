@@ -87,7 +87,7 @@ extension AppModel {
                 open[calendar.startOfDay(for: day.date), default: 0] += remaining
             }
         }
-        let due = StudyQueue.counts(cards, now: Date()).due
+        let due = StudyQueue.counts(activeCards, now: Date()).due
         let reminders = ReminderPlanner.plan(now: Date(), timetable: Timetable(events: events), settings: settings, openStudyTasks: open, dueCards: due)
         await Notifier.schedule(reminders)
         await Notifier.announceNews(news)

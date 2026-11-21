@@ -77,6 +77,15 @@ Berichte und Praxisaufgaben, Beobachtungen zu einzelnen Kindern, Fotos und Proje
 - Backups verschlüsselt (gibt es schon), Bilder nicht ungefragt in Suche und KI.
 - Möglichkeit, Namen zu kürzen.
 
+### 10b. Schuljahre
+
+- Ein Ordner lässt sich als **Schuljahr** markieren (Beginn im August, „2026/27“). Fächer darin gehören zu diesem Jahr; ihre Noten sind damit getrennt.
+- Ein **abgeschlossenes** Schuljahr zählt nicht mehr für Stundenplan („Mathematik“ passt nur auf das aktuelle Mathe), „Heute“, Karteikarten und
+  Erinnerungen. Noten und Hefte bleiben. In der Seitenleiste erscheint es ausgegraut.
+- Gibt es einen Ordner für das aktuelle Schuljahr, zählen nur dessen Fächer (und Fächer, die in keinem Schuljahr liegen).
+- Die Noten wählen das Schuljahr (standardmäßig das aktuelle) und darin „Alles / 1. Halbjahr / 2. Halbjahr“.
+- „Nächstes Schuljahr anlegen“ am Schuljahr-Ordner kopiert Ordner und Fächer samt Notenskala, Gewichtung und Hauptfach leer in einen neuen Ordner.
+
 ### 11. Benachrichtigungen aus der Schule
 
 Gewünscht: Meldungen der Schule und rund ums Lernen als Benachrichtigung auf dem iPad.

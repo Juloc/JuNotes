@@ -70,3 +70,26 @@ extension AppModel {
         await update(changed)
     }
 }
+
+extension AppModel {
+    /// A finished school year drops out of the timetable, "Heute" and the cards; its marks and notebooks stay.
+    func setClosed(_ year: Subject, _ closed: Bool) async {
+        var changed = year
+        changed.closed = closed
+        await update(changed)
+        notice = closed ? "„\(year.name)“ ist abgeschlossen. Noten und Hefte bleiben, die Fächer zählen nicht mehr für Stundenplan und Karteikarten." : "„\(year.name)“ ist wieder offen."
+    }
+
+    /// The next school year next to this one, with the same folders and subjects (and their grading settings) but empty.
+    func startNextSchoolYear(from year: Subject) async {
+        guard let start = year.schoolYear else { return }
+        let label = SchoolYear.label(start + 1)
+        let name = year.name.contains(SchoolYear.label(start)) ? year.name.replacingOccurrences(of: SchoolYear.label(start), with: label) : "Schuljahr \(label)"
+        let next = await addFolder(name: name, color: year.color, symbol: year.symbol, isSubject: false, cover: year.cover, in: year.folderID, schoolYear: start + 1)
+        for copy in tree.copiesOfContents(of: year.id, into: next.id) {
+            await write { try await self.store.put(copy) }
+        }
+        await reload()
+        notice = "„\(name)“ ist angelegt, mit denselben Fächern und Einstellungen, aber leer."
+    }
+}
