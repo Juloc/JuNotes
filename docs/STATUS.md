@@ -96,6 +96,8 @@ unsignierte `.ipa`, Docker-Image und `compose.yaml`.
 1. **Server einrichten:** `compose.yaml`, `.env` mit `POSTGRES_PASSWORD` und `SYNC_TOKEN`, dazu `Admin__Password`, `Web__Password`, optional
    `School__TimetableIcsUrl`, `Backup__CopyTo` und `Backup__Passphrase`. Hinter einen Reverse Proxy mit HTTPS legen.
 2. **Codex im Image haben** und im Admin-Bereich unter „KI-Verbindung“ anmelden.
-3. **App aufs iPad:** die `.ipa` aus dem letzten grünen Lauf von „iPad app“ laden, mit iloader oder Impactor und einer Apple-ID installieren
-   (läuft 7 Tage, SideStore verlängert). In der App unter Einstellungen Adresse und Schlüssel eintragen.
+3. **App aufs iPad:** die erste Installation mit iloader oder Impactor und einer Apple-ID per USB (läuft 7 Tage). Danach SideStore einrichten und
+   diese Quelle eintragen: `https://github.com/Juloc/JuNotes/releases/download/latest/source.json`. Jede grüne CI baut dort eine neue Version
+   (0.1.<Laufnummer>), die SideStore als Update anbietet und alle 7 Tage neu signiert. Das ist **nicht ausprobiert**.
+   In der App unter Einstellungen Adresse und Schlüssel eintragen.
 4. **Eine Woche benutzen**, aufschreiben, was nicht stimmt, und erst dann die nächsten Schritte planen.

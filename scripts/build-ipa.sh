@@ -19,6 +19,7 @@ xcodebuild \
   -destination 'generic/platform=iOS' \
   -derivedDataPath "$out/derived" \
   CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
+  ${JUNOTES_VERSION:+MARKETING_VERSION="$JUNOTES_VERSION"} ${JUNOTES_BUILD:+CURRENT_PROJECT_VERSION="$JUNOTES_BUILD"} \
   build
 
 mkdir -p "$out/Payload"
