@@ -15,7 +15,11 @@ public enum GradeScale: String, Sendable, Codable, Equatable, CaseIterable {
     public func display(_ value: Double?, decimals: Int = 1) -> String {
         guard let value else { return "–" }
         switch self {
-        case .german: return GradeCalculator.format(value, decimals: decimals)
+        case .german:
+            // One place after the comma when that says it exactly (1,2), two when it does not (1,15).
+            let tenths = value * 10
+            let exact = abs(tenths - tenths.rounded()) < 1e-6
+            return GradeCalculator.format(value, decimals: max(decimals, exact ? 1 : 2))
         case .points: return GradeCalculator.format(value, decimals: 0)
         case .tendency:
             let whole = value.rounded()
@@ -33,10 +37,15 @@ public enum GradeScale: String, Sendable, Codable, Equatable, CaseIterable {
         case .points: return (0...15).map(Double.init)
         case .tendency: return [1.0, 1.3, 1.7, 2.0, 2.3, 2.7, 3.0, 3.3, 3.7, 4.0, 4.3, 4.7, 5.0, 5.3, 5.7, 6.0]
         case .german:
-            let step = decimals >= 2 ? 0.01 : 0.1
-            let count = Int(((6 - 1) / step).rounded())
-            return (0...count).map { ((1 + Double($0) * step) * 100).rounded() / 100 }
+            return choices(stepHundredths: decimals >= 2 ? 1 : 10)
         }
+    }
+
+    /// The values on the wheel for German grades: 1,0 to 6,0 in steps of 0,1 (10), 0,05 (5) or 0,01 (1) hundredths.
+    public func choices(stepHundredths: Int) -> [Double] {
+        guard self == .german else { return choices() }
+        let step = max(1, min(10, stepHundredths))
+        return stride(from: 100, through: 600, by: step).map { Double($0) / 100 }
     }
 
     /// Snaps a typed value to the scale and its range; nil when it cannot be a grade.
@@ -81,8 +90,10 @@ public enum GradeGroup: String, Sendable, Codable, Equatable {
 /// How one subject is graded. Schools differ, so everything here is hers to set.
 public struct GradingSettings: Sendable, Codable, Equatable {
     public var scale: GradeScale
-    /// 1 for tenths, 2 for hundredths, when the scale is German.
+    /// 1 for tenths, 2 for hundredths, when the scale is German: how finely a typed grade is kept (at most hundredths).
     public var decimals: Int
+    /// The step of the wheel for German grades, in hundredths: 10 (1,1 1,2), 5 (1,15 1,2 1,25) or 1.
+    public var wheelStep: Int
     /// The share of the oral part in percent; the written part takes the rest, so 30 means oral 30, written 70.
     public var oralPercent: Int
     /// A main subject ("maßgebendes Fach" or Hauptfach); main subjects get an average of their own.
@@ -94,16 +105,18 @@ public struct GradingSettings: Sendable, Codable, Equatable {
 
     public var writtenPercent: Int { 100 - oralPercent }
 
-    public init(scale: GradeScale = .german, decimals: Int = 1, oralPercent: Int = 50, isMajor: Bool = false, factor: Double = 1, averageDecimals: Int = 2) {
+    public init(scale: GradeScale = .german, decimals: Int = 1, oralPercent: Int = 50, isMajor: Bool = false, factor: Double = 1, averageDecimals: Int = 2, wheelStep: Int? = nil) {
         self.scale = scale
         self.decimals = min(2, max(1, decimals))
+        let step = wheelStep ?? (decimals >= 2 ? 1 : 10)
+        self.wheelStep = step <= 1 ? 1 : (step <= 5 ? 5 : 10)
         self.oralPercent = min(100, max(0, oralPercent))
         self.isMajor = isMajor
         self.factor = max(0, factor)
         self.averageDecimals = min(3, max(0, averageDecimals))
     }
 
-    enum CodingKeys: String, CodingKey { case scale, decimals, oralPercent, isMajor, factor, averageDecimals }
+    enum CodingKeys: String, CodingKey { case scale, decimals, oralPercent, isMajor, factor, averageDecimals, wheelStep }
 
     public init(from decoder: any Decoder) throws {
         let values = try decoder.container(keyedBy: CodingKeys.self)
@@ -113,7 +126,8 @@ public struct GradingSettings: Sendable, Codable, Equatable {
             oralPercent: try values.decodeIfPresent(Int.self, forKey: .oralPercent) ?? 50,
             isMajor: try values.decodeIfPresent(Bool.self, forKey: .isMajor) ?? false,
             factor: try values.decodeIfPresent(Double.self, forKey: .factor) ?? 1,
-            averageDecimals: try values.decodeIfPresent(Int.self, forKey: .averageDecimals) ?? 2
+            averageDecimals: try values.decodeIfPresent(Int.self, forKey: .averageDecimals) ?? 2,
+            wheelStep: try values.decodeIfPresent(Int.self, forKey: .wheelStep)
         )
     }
 }
