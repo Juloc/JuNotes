@@ -194,3 +194,44 @@ struct SchoolTermTests {
         #expect(SchoolTerm.number(of: beforeThat, calendar: calendar) == 2)
     }
 }
+
+struct WheelStepTests {
+    @Test func theWheelCanGoInTenthsHalfTenthsOrHundredths() {
+        let tenths = GradeScale.german.choices(stepHundredths: 10)
+        #expect(tenths.count == 51 && tenths[1] == 1.1)
+        let halves = GradeScale.german.choices(stepHundredths: 5)
+        #expect(halves.count == 101)
+        #expect(Array(halves.prefix(5)) == [1.0, 1.05, 1.1, 1.15, 1.2])
+        let hundredths = GradeScale.german.choices(stepHundredths: 1)
+        #expect(hundredths.count == 501 && hundredths[1] == 1.01 && hundredths.last == 6.0)
+        #expect(GradeScale.tendency.choices(stepHundredths: 5).count == 16)
+    }
+
+    @Test func aGradeShowsOnlyAsManyPlacesAsItNeeds() {
+        let scale = GradeScale.german
+        #expect(scale.display(1.2) == "1,2")
+        #expect(scale.display(1.15) == "1,15")
+        #expect(scale.display(1.0) == "1,0")
+        #expect(scale.display(2.37) == "2,37")
+        #expect(scale.display(1.2, decimals: 2) == "1,20")
+    }
+
+    @Test func anExactTypedNumberIsKeptToTheHundredth() {
+        #expect(GradeScale.german.normalized(1.37, decimals: 2) == 1.37)
+        #expect(GradeScale.german.normalized(1.375, decimals: 2) == 1.38)
+        #expect(GradeScale.german.normalized(1.37, decimals: 1) == 1.4)
+    }
+
+    @Test func theWheelStepIsLimitedAndOldSettingsKeepTheirFineness() throws {
+        #expect(GradingSettings(wheelStep: 7).wheelStep == 10)
+        #expect(GradingSettings(wheelStep: 3).wheelStep == 5)
+        #expect(GradingSettings(wheelStep: 0).wheelStep == 1)
+        #expect(GradingSettings().wheelStep == 10)
+        #expect(GradingSettings(decimals: 2).wheelStep == 1)
+        let old = try JSONDecoder().decode(GradingSettings.self, from: Data(##"{"scale":"german","decimals":2}"##.utf8))
+        #expect(old.wheelStep == 1)
+        let newer = GradingSettings(wheelStep: 5)
+        let back = try JSONDecoder().decode(GradingSettings.self, from: JSONEncoder().encode(newer))
+        #expect(back == newer)
+    }
+}

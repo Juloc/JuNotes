@@ -186,8 +186,8 @@ struct GradeSheet: View {
         self.target = target
         let grade = target.grade
         let grading = target.subject.grading
-        _text = State(initialValue: grade.map { GradeCalculator.format($0.value, decimals: grading.decimals) } ?? "")
-        _choice = State(initialValue: grade?.value ?? (grading.scale == .points ? 10 : 2))
+        _text = State(initialValue: grade.map { grading.scale.display($0.value) } ?? "")
+        _choice = State(initialValue: Self.nearest(grade?.value ?? (grading.scale == .points ? 10 : 2), in: grading))
         _category = State(initialValue: grade?.category ?? .written)
         _title = State(initialValue: grade?.title ?? "")
         _date = State(initialValue: grade?.date ?? Date())
@@ -197,13 +197,23 @@ struct GradeSheet: View {
 
     private var grading: GradingSettings { target.subject.grading }
 
+    /// The wheel's own value nearest to a number, so typing 1,17 puts the wheel at 1,15 or 1,2.
+    private static func nearest(_ value: Double, in grading: GradingSettings) -> Double {
+        let choices = grading.scale == .german ? grading.scale.choices(stepHundredths: grading.wheelStep) : grading.scale.choices()
+        return choices.min { abs($0 - value) < abs($1 - value) } ?? value
+    }
+
+    private var typed: Double? {
+        let cleaned = text.trimmingCharacters(in: .whitespaces).replacingOccurrences(of: ",", with: ".")
+        // A typed number is kept exactly, to the hundredth.
+        return Double(cleaned).flatMap { grading.scale.normalized($0, decimals: 2) }
+    }
+
+    /// German grades: what is typed, or while nothing is typed, what the wheel shows. Other scales: the wheel.
     private var value: Double? {
         switch grading.scale {
-        case .german:
-            let cleaned = text.trimmingCharacters(in: .whitespaces).replacingOccurrences(of: ",", with: ".")
-            return Double(cleaned).flatMap { grading.scale.normalized($0, decimals: grading.decimals) }
-        case .tendency, .points:
-            return choice
+        case .german: text.trimmingCharacters(in: .whitespaces).isEmpty ? choice : typed
+        case .tendency, .points: choice
         }
     }
 
@@ -212,9 +222,22 @@ struct GradeSheet: View {
             Form {
                 Section {
                     if grading.scale == .german {
-                        TextField(grading.decimals >= 2 ? "Zum Beispiel 2,37" : "Zum Beispiel 2,3", text: $text)
+                        Picker("Note", selection: $choice) {
+                            ForEach(grading.scale.choices(stepHundredths: grading.wheelStep), id: \.self) { Text(grading.scale.display($0, decimals: grading.wheelStep < 10 ? 2 : 1)).tag($0) }
+                        }
+                        .pickerStyle(.wheel)
+                        .frame(height: 120)
+                        .onChange(of: choice) { _, newValue in
+                            // The wheel moved: show its value, unless the typed number already belongs to this spot on the wheel.
+                            if let typed, Self.nearest(typed, in: grading) == newValue { return }
+                            text = grading.scale.display(newValue, decimals: grading.wheelStep < 10 ? 2 : 1)
+                        }
+                        TextField("Oder genau eintippen, zum Beispiel 1,37", text: $text)
                             .keyboardType(.decimalPad)
                             .font(.title2.weight(.semibold))
+                            .onChange(of: text) { _, _ in
+                                if let typed { choice = Self.nearest(typed, in: grading) }
+                            }
                     } else {
                         Picker("Note", selection: $choice) {
                             ForEach(grading.scale.choices(), id: \.self) { Text(grading.scale.display($0)).tag($0) }
