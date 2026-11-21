@@ -11,6 +11,11 @@ on:
 permissions:
   contents: read
 
+env:
+  # Every build is a new version, so SideStore sees an update.
+  JUNOTES_VERSION: 0.1.${{ github.run_number }}
+  JUNOTES_BUILD: ${{ github.run_number }}
+
 jobs:
   build:
     # The runner image that carries Xcode 27 (Swift 6.4); macos-latest still has Xcode 26.
@@ -56,3 +61,30 @@ jobs:
           name: JuNotes-screenshots
           path: ${{ runner.temp }}/screenshots/*.png
           retention-days: 14
+
+  publish:
+    # The newest build as a download and as a source for SideStore, from the "latest" release of this repository.
+    needs: build
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: JuNotes-unsigned-ipa
+          path: ipa
+      - name: Write the SideStore source
+        run: scripts/make-source.sh ipa/JuNotes.ipa "$JUNOTES_VERSION" "${{ github.repository }}" ipa/source.json
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          notes="Version $JUNOTES_VERSION, gebaut aus ${GITHUB_SHA::7}. Unsigniert: mit iloader oder SideStore auf dem iPad installieren."
+          if gh release view latest >/dev/null 2>&1; then
+            gh release edit latest --notes "$notes" --title "JuNotes (neueste Version)"
+          else
+            gh release create latest --notes "$notes" --title "JuNotes (neueste Version)" --prerelease
+          fi
+          gh release upload latest ipa/JuNotes.ipa ipa/source.json --clobber
