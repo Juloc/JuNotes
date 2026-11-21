@@ -129,7 +129,7 @@ struct GradesView: View {
                                 .font(.footnote).foregroundStyle(.secondary)
                         }
                         Spacer()
-                        Text(subject.grading.scale.display(grade.value, decimals: subject.grading.decimals)).font(.title3.weight(.semibold)).monospacedDigit().foregroundStyle(.primary)
+                        Text(subject.grading.scale.display(grade.value)).font(.title3.weight(.semibold)).monospacedDigit().foregroundStyle(.primary)
                     }
                 }
                 .buttonStyle(.plain)
@@ -319,13 +319,16 @@ struct GradingSettingsSheet: View {
                         Text("Punkte 0 bis 15").tag(GradeScale.points)
                     }
                     if settings.scale == .german {
-                        Picker("Genauigkeit", selection: $settings.decimals) {
-                            Text("Zehntel, 1,1").tag(1)
-                            Text("Hundertstel, 1,13").tag(2)
+                        Picker("Schritte am Rad", selection: $settings.wheelStep) {
+                            Text("0,1: 1,1 1,2 1,3").tag(10)
+                            Text("0,05: 1,15 1,2 1,25").tag(5)
+                            Text("0,01: 1,01 1,02").tag(1)
                         }
                     }
                 } header: {
                     Text("Notensystem")
+                } footer: {
+                    if settings.scale == .german { Text("Beim Eintragen kannst du immer auch eine genaue Zahl eintippen, zum Beispiel 1,37. Das Rad springt dann an die nächste Stelle.") }
                 }
 
                 Section {
@@ -356,7 +359,7 @@ struct GradingSettingsSheet: View {
                     Button("Sichern") {
                         Task {
                             var changed = subject
-                            changed.grading = GradingSettings(scale: settings.scale, decimals: settings.decimals, oralPercent: settings.oralPercent, isMajor: settings.isMajor, factor: settings.factor, averageDecimals: settings.averageDecimals)
+                            changed.grading = GradingSettings(scale: settings.scale, decimals: settings.wheelStep < 10 ? 2 : 1, oralPercent: settings.oralPercent, isMajor: settings.isMajor, factor: settings.factor, averageDecimals: settings.averageDecimals, wheelStep: settings.wheelStep)
                             await model.update(changed)
                             dismiss()
                         }
