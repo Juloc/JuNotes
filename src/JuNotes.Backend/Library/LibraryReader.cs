@@ -7,7 +7,13 @@ namespace JuNotes.Backend.Library
     // A folder: kind "subject" on the wire. It lies in ParentId, and only a subject (IsSubject) takes marks and cards.
     public sealed record SubjectInfo(Guid Id, string Name, string Color, string Symbol, int Sort, Guid? ParentId = null, bool IsSubject = true);
 
-    public sealed record NotebookInfo(Guid Id, Guid? SubjectId, string Title, string Type, string Template, DateTimeOffset? CreatedAt);
+    // The front of a notebook as she designed it: a colour, a gradient or her picture, with an emoji on it.
+    public sealed record CoverInfo(string Style, string ColorA, string ColorB, Guid? AssetId, string? Emoji);
+
+    public sealed record NotebookInfo(Guid Id, Guid? SubjectId, string Title, string Type, string Template, DateTimeOffset? CreatedAt, CoverInfo? Cover = null);
+
+    // Something she put on a page besides handwriting: a text box, photo, sticker, tape or recording. Positions are in page points.
+    public sealed record ObjectInfo(Guid Id, string Type, double X, double Y, double Width, double Height, double Rotation, string? Text, Guid? AssetId, string? Color, double FontSize, int Z);
 
     // The kinds of content a page can have: her own drawing, a scanned sheet or a page of an imported PDF.
     public sealed record PageInfo(
@@ -50,7 +56,14 @@ namespace JuNotes.Backend.Library
                     continue;
                 }
 
-                result.Add(new NotebookInfo(id, parent, Text(payload, "title") ?? "Heft", Text(payload, "type") ?? "pages", Text(payload, "template") ?? "ruled", Date(payload, "createdAt")));
+                CoverInfo? cover = null;
+                if (payload.TryGetProperty("cover", out var node) && node.ValueKind == JsonValueKind.Object)
+                {
+                    var colorA = Text(node, "colorA") ?? "#8e8e93";
+                    cover = new CoverInfo(Text(node, "style") ?? "gradient", colorA, Text(node, "colorB") ?? colorA, Guid.TryParse(Text(node, "assetID"), out var picture) ? picture : null, Text(node, "emoji"));
+                }
+
+                result.Add(new NotebookInfo(id, parent, Text(payload, "title") ?? "Heft", Text(payload, "type") ?? "pages", Text(payload, "template") ?? "ruled", Date(payload, "createdAt"), cover));
             }
 
             return result.OrderBy(notebook => notebook.CreatedAt).ThenBy(notebook => notebook.Title, StringComparer.CurrentCultureIgnoreCase).ToList();
@@ -78,6 +91,24 @@ namespace JuNotes.Backend.Library
 
             // Equal keys can come from two devices; the id makes the order the same everywhere.
             return result.OrderBy(page => page.Sort, StringComparer.Ordinal).ThenBy(page => page.Id).ToList();
+        }
+
+        public async Task<IReadOnlyList<ObjectInfo>> ObjectsAsync(Guid pageId, CancellationToken ct)
+        {
+            var result = new List<ObjectInfo>();
+            foreach (var (id, _, payload) in await ReadAsync("object", pageId, ct))
+            {
+                var type = Text(payload, "type");
+                if (type is not ("text" or "image" or "sticker" or "tape" or "audio"))
+                {
+                    continue;
+                }
+
+                result.Add(new ObjectInfo(id, type, Real(payload, "x", 0), Real(payload, "y", 0), Real(payload, "width", 100), Real(payload, "height", 40), Real(payload, "rotation", 0),
+                    Text(payload, "text"), Guid.TryParse(Text(payload, "assetID"), out var asset) ? asset : null, Text(payload, "color"), Real(payload, "fontSize", 16), (int)Real(payload, "z", 0)));
+            }
+
+            return result.OrderBy(item => item.Z).ThenBy(item => item.Id).ToList();
         }
 
         public async Task<IReadOnlyList<StrokeInfo>> StrokesAsync(Guid pageId, CancellationToken ct)
@@ -126,6 +157,8 @@ namespace JuNotes.Backend.Library
         private static bool IsTrashed(JsonElement payload) => payload.TryGetProperty("trashedAt", out var trashed) && trashed.ValueKind != JsonValueKind.Null;
 
         private static string? Text(JsonElement parent, string name) => parent.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.String ? value.GetString() : null;
+
+        private static double Real(JsonElement parent, string name, double fallback) => parent.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.Number && value.TryGetDouble(out var number) && double.IsFinite(number) ? number : fallback;
 
         private static int Number(JsonElement parent, string name) => parent.TryGetProperty(name, out var value) && value.TryGetInt32(out var number) ? number : 0;
 

@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Net;
 using System.Text;
 
 namespace JuNotes.Backend.Library
@@ -14,22 +15,87 @@ namespace JuNotes.Backend.Library
 
         public static (double Width, double Height) SizeOf(string notebookType) => notebookType == "whiteboard" ? (BoardWidth, BoardHeight) : (PageWidth, PageHeight);
 
-        public static string Svg(string notebookType, string template, IReadOnlyList<StrokeInfo> strokes)
+        public static string Svg(string notebookType, string template, IReadOnlyList<StrokeInfo> strokes, IReadOnlyList<ObjectInfo>? objects = null)
         {
             var (width, height) = SizeOf(notebookType);
             var svg = new StringBuilder();
             svg.Append(CultureInfo.InvariantCulture, $"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 {Num(width)} {Num(height)}\" preserveAspectRatio=\"xMidYMid meet\">");
             svg.Append("<g class=\"paper\" stroke-width=\"0.6\">");
             Background(svg, template, width, height);
+            svg.Append("</g>");
+
+            // Photos, text boxes, stickers and tape lie under the handwriting, as on the iPad; recordings lie on top.
+            var items = objects ?? [];
+            svg.Append("<g class=\"objects\">");
+            foreach (var item in items.Where(item => item.Type != "audio"))
+            {
+                Item(svg, item);
+            }
+
             svg.Append("</g><g class=\"ink\" fill=\"none\" stroke-linecap=\"round\" stroke-linejoin=\"round\">");
             foreach (var stroke in strokes)
             {
                 Stroke(svg, stroke);
             }
 
+            svg.Append("</g><g class=\"recordings\">");
+            foreach (var item in items.Where(item => item.Type == "audio"))
+            {
+                Item(svg, item);
+            }
+
             svg.Append("</g></svg>");
             return svg.ToString();
         }
+
+        // One object. Every value from the data is checked or encoded on its way into the SVG: colours must be plain hex, numbers finite and bounded, text encoded.
+        private static void Item(StringBuilder svg, ObjectInfo item)
+        {
+            var x = Clamp(item.X, -5000, 5000);
+            var y = Clamp(item.Y, -5000, 5000);
+            var width = Clamp(item.Width, 1, 5000);
+            var height = Clamp(item.Height, 1, 5000);
+            var rotation = Clamp(item.Rotation, -3600, 3600);
+            svg.Append(CultureInfo.InvariantCulture, $"<g transform=\"rotate({Num(rotation)} {Num(x + (width / 2))} {Num(y + (height / 2))})\">");
+            switch (item.Type)
+            {
+                case "text":
+                    var size = Clamp(item.FontSize, 6, 200);
+                    svg.Append(CultureInfo.InvariantCulture, $"<foreignObject x=\"{Num(x)}\" y=\"{Num(y)}\" width=\"{Num(width)}\" height=\"{Num(height)}\"><div xmlns=\"http://www.w3.org/1999/xhtml\" style=\"font:{Num(size)}px sans-serif;color:{SafeColor(item.Color, "#1d1d1f")};white-space:pre-wrap;overflow-wrap:anywhere\">{WebUtility.HtmlEncode(item.Text ?? string.Empty)}</div></foreignObject>");
+                    break;
+                case "image":
+                    if (item.AssetId is { } picture)
+                    {
+                        svg.Append(CultureInfo.InvariantCulture, $"<image href=\"/Notes/Asset/{picture}\" x=\"{Num(x)}\" y=\"{Num(y)}\" width=\"{Num(width)}\" height=\"{Num(height)}\" preserveAspectRatio=\"xMidYMid slice\"/>");
+                    }
+                    else
+                    {
+                        svg.Append(CultureInfo.InvariantCulture, $"<rect x=\"{Num(x)}\" y=\"{Num(y)}\" width=\"{Num(width)}\" height=\"{Num(height)}\" fill=\"#eeeeee\" stroke=\"none\"/>");
+                    }
+
+                    break;
+                case "sticker":
+                    // An emoji is drawn as it is. A symbol of the iPad has no counterpart here and becomes a star in its colour.
+                    var glyph = item.Text is { Length: > 0 } text && !text.Any(char.IsAsciiLetter) ? text : "★";
+                    var fill = glyph == item.Text ? "#000000" : SafeColor(item.Color, "#ff9f0a");
+                    svg.Append(CultureInfo.InvariantCulture, $"<text x=\"{Num(x + (width / 2))}\" y=\"{Num(y + (height / 2))}\" font-size=\"{Num(Math.Min(width, height) * 0.8)}\" text-anchor=\"middle\" dominant-baseline=\"central\" fill=\"{fill}\" stroke=\"none\">{WebUtility.HtmlEncode(glyph)}</text>");
+                    break;
+                case "tape":
+                    svg.Append(CultureInfo.InvariantCulture, $"<rect x=\"{Num(x)}\" y=\"{Num(y)}\" width=\"{Num(width)}\" height=\"{Num(height)}\" fill=\"{SafeColor(item.Color, "#ffd15c")}\" fill-opacity=\"0.62\" stroke=\"none\"/>");
+                    break;
+                case "audio":
+                    svg.Append(CultureInfo.InvariantCulture, $"<rect x=\"{Num(x)}\" y=\"{Num(y)}\" width=\"{Num(width)}\" height=\"{Num(height)}\" rx=\"{Num(height / 2)}\" fill=\"#6c5ce7\" stroke=\"none\"/><text x=\"{Num(x + (width / 2))}\" y=\"{Num(y + (height / 2))}\" font-size=\"{Num(Math.Min(14, height * 0.45))}\" text-anchor=\"middle\" dominant-baseline=\"central\" fill=\"#ffffff\" stroke=\"none\">▶ Aufnahme</text>");
+                    break;
+            }
+
+            svg.Append("</g>");
+        }
+
+        private static double Clamp(double value, double low, double high) => double.IsFinite(value) ? Math.Min(high, Math.Max(low, value)) : low;
+
+        // A colour from the data goes into an attribute, so only a plain hex colour is allowed through.
+        internal static string SafeColor(string? color, string fallback)
+            => color is { Length: 7 } && color[0] == '#' && color.Skip(1).All(char.IsAsciiHexDigit) ? color : fallback;
 
         private static readonly string[] Days = ["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag", "Sonntag"];
 

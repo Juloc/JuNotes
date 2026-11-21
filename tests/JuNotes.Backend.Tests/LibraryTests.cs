@@ -52,6 +52,68 @@ namespace JuNotes.Backend.Tests
             Assert.Equal(8, Count(planner, "line"));
         }
 
+        private static ObjectInfo Item(string type, string? text = null, string? color = null, Guid? asset = null, double rotation = 0)
+            => new(Guid.NewGuid(), type, 40, 120, 200, 60, rotation, text, asset, color, 18, 0);
+
+        [Fact]
+        public void Objects_are_drawn_under_the_ink_and_recordings_on_top()
+        {
+            var svg = PageRenderer.Svg("pages", "blank", [new StrokeInfo(Guid.NewGuid(), "pen", "#000000", 2, [(1, 1), (5, 5)])],
+                [Item("text", "Merken"), Item("tape", color: "#ff9fc4"), Item("audio")]);
+            var document = Parse(svg);
+
+            Assert.Contains("Merken", svg);
+            Assert.True(svg.IndexOf("class=\"objects\"", StringComparison.Ordinal) < svg.IndexOf("class=\"ink\"", StringComparison.Ordinal));
+            Assert.True(svg.IndexOf("class=\"ink\"", StringComparison.Ordinal) < svg.IndexOf("class=\"recordings\"", StringComparison.Ordinal));
+            Assert.Contains(document.Descendants(), node => node.Name.LocalName == "rect" && node.Attribute("fill")?.Value == "#ff9fc4");
+            Assert.Contains("▶ Aufnahme", svg);
+        }
+
+        [Fact]
+        public void A_photo_object_points_at_the_asset_route_and_a_symbol_sticker_becomes_a_star()
+        {
+            var asset = Guid.NewGuid();
+            var svg = PageRenderer.Svg("pages", "blank", [], [Item("image", asset: asset), Item("sticker", "star.fill", "#ff9f0a"), Item("sticker", "⭐️")]);
+
+            Assert.Contains($"href=\"/Notes/Asset/{asset}\"", svg);
+            Assert.Contains(">★<", svg);
+            Assert.Contains(">⭐️<", svg);
+            Assert.DoesNotContain("star.fill", svg);
+        }
+
+        [Fact]
+        public void Text_colours_and_numbers_from_the_data_cannot_break_out_of_the_svg()
+        {
+            var hostile = new ObjectInfo(Guid.NewGuid(), "text", double.NaN, double.PositiveInfinity, 1e12, -5, double.NaN, "<script>alert(1)</script> & \"quote\"", null, "red;\" onload=\"x", double.NaN, 0);
+            var svg = PageRenderer.Svg("pages", "blank", [], [hostile, Item("tape", color: "#12345\"/><script>")]);
+
+            Assert.DoesNotContain("<script>", svg);
+            Assert.DoesNotContain("onload", svg);
+            Assert.DoesNotContain("NaN", svg);
+            Assert.DoesNotContain("Infinity", svg);
+            Assert.Contains("&lt;script&gt;", svg);
+            Parse(svg);
+        }
+
+        [Fact]
+        public void An_unknown_colour_falls_back_and_a_cover_becomes_a_checked_style()
+        {
+            var plain = new NotebookInfo(Guid.NewGuid(), null, "Heft", "pages", "ruled", null);
+            Assert.Equal("background:#5b7cfa", CoverStyle.Css(plain, "#5b7cfa"));
+            Assert.Equal("background:#8e8e93", CoverStyle.Css(plain, "red; x"));
+
+            var gradient = plain with { Cover = new CoverInfo("gradient", "#111111", "#222222", null, "🧸") };
+            Assert.Equal("background:linear-gradient(135deg,#111111,#222222)", CoverStyle.Css(gradient, "#000000"));
+
+            var picture = Guid.NewGuid();
+            var image = plain with { Cover = new CoverInfo("image", "#111111", "#111111", picture, null) };
+            Assert.Equal($"background:url(/Notes/Asset/{picture}) center/cover, #111111", CoverStyle.Css(image, "#000000"));
+
+            var hostile = plain with { Cover = new CoverInfo("gradient", "red;}</style>", "#222222", null, null) };
+            Assert.DoesNotContain("<", CoverStyle.Css(hostile, "#000000"));
+            Assert.DoesNotContain("red", CoverStyle.Css(hostile, "#000000"));
+        }
+
         [Fact]
         public void Grid_paper_has_lines_both_ways_dots_have_circles_and_cornell_its_two_guides()
         {
@@ -148,6 +210,31 @@ namespace JuNotes.Backend.Tests
 
             Assert.Equal(["Deutsch", "Mathe"], subjects.Select(subject => subject.Name));
             Assert.Equal("#0a84ff", subjects[1].Color);
+        }
+
+        [RequiresDatabaseFact]
+        public async Task Objects_and_covers_are_read_back_and_unknown_kinds_of_object_are_skipped()
+        {
+            await using var database = await TestDatabase.CreateCurrentAsync();
+            var notebook = Guid.NewGuid();
+            var page = Guid.NewGuid();
+            await new SyncService(database.Data).PushAsync(new PushRequest(
+            [
+                Entity("notebook", notebook, null, """{"title":"Kindi","type":"pages","template":"ruled","createdAt":"2026-11-10T08:00:00Z","cover":{"style":"gradient","colorA":"#ffd15c","colorB":"#ff9f0a","emoji":"🧸"}}"""),
+                Entity("page", page, notebook, """{"sort":"m"}"""),
+                Entity("object", Guid.NewGuid(), page, """{"type":"text","x":40,"y":100,"width":200,"height":50,"text":"Hallo","color":"#ff375f","fontSize":20,"z":2}"""),
+                Entity("object", Guid.NewGuid(), page, """{"type":"sticker","text":"⭐️","z":1}"""),
+                Entity("object", Guid.NewGuid(), page, """{"type":"hologram"}"""),
+            ]), CancellationToken.None);
+            var reader = new LibraryReader(database.Data);
+
+            var objects = await reader.ObjectsAsync(page, CancellationToken.None);
+            Assert.Equal(["sticker", "text"], objects.Select(item => item.Type));
+            Assert.Equal(20, objects[1].FontSize);
+
+            var cover = (await reader.NotebookAsync(notebook, CancellationToken.None))!.Cover!;
+            Assert.Equal("🧸", cover.Emoji);
+            Assert.Equal("#ff9f0a", cover.ColorB);
         }
 
         [RequiresDatabaseFact]
