@@ -15,6 +15,10 @@ services:
       Web__Password: ${WEB_PASSWORD:-}
       School__TimetableIcsUrl: ${SCHOOL_TIMETABLE_ICS_URL:-}
       School__NewsFeedUrl: ${SCHOOL_NEWS_FEED_URL:-}
+      School__Untis__Server: ${UNTIS_SERVER:-}
+      School__Untis__School: ${UNTIS_SCHOOL:-}
+      School__Untis__User: ${UNTIS_USER:-}
+      School__Untis__Password: ${UNTIS_PASSWORD:-}
       Backup__CopyTo: ${BACKUP_COPY_TO:-}
       Backup__Passphrase: ${BACKUP_PASSPHRASE:-}
       Paperless__BaseUrl: ${PAPERLESS_BASE_URL:-}

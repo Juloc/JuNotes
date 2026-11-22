@@ -13,7 +13,7 @@
     <h2>Schule</h2>
     @if (!Model.School.TimetableConfigured && !Model.School.NewsConfigured)
     {
-        <p class="muted">Nicht eingerichtet. Setze <code>School__TimetableIcsUrl</code> (der iCal-Link des Stundenplans) und optional <code>School__NewsFeedUrl</code>.</p>
+        <p class="muted">Nicht eingerichtet. Setze entweder <code>School__TimetableIcsUrl</code> (der iCal-Link des Stundenplans) oder die Anmeldung bei WebUntis: <code>School__Untis__Server</code>, <code>School__Untis__School</code>, <code>School__Untis__User</code>, <code>School__Untis__Password</code>. Dazu optional <code>School__NewsFeedUrl</code>.</p>
     }
     else
     {

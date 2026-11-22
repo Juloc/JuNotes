@@ -67,6 +67,11 @@ namespace JuNotes.Backend.Service
             configuration.GetSection("School").Bind(school);
             services.AddSingleton(school);
             services.AddHttpClient<IFeedFetcher, FeedFetcher>(client => client.DefaultRequestHeaders.UserAgent.ParseAdd("JuNotes"));
+            services.AddHttpClient<IUntisSource, UntisClient>(client =>
+            {
+                client.DefaultRequestHeaders.UserAgent.ParseAdd("JuNotes");
+                client.Timeout = TimeSpan.FromSeconds(40);
+            });
             services.AddSingleton<SchoolStore>();
             services.AddSingleton<SchoolImportService>();
             services.AddSingleton<LibraryReader>();
