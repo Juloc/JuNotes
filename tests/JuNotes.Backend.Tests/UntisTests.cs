@@ -77,7 +77,7 @@ namespace JuNotes.Backend.Tests
             Assert.Null(handler.Calls[0].Cookie);
             Assert.All(handler.Calls.Skip(1), call => Assert.Equal("JSESSIONID=S3SS", call.Cookie));
             Assert.All(handler.Calls, call => Assert.Equal("https://xyz.webuntis.com/WebUntis/jsonrpc.do?school=Meine%20Schule", call.Url.AbsoluteUri));
-            Assert.Contains("geheim&sicher", handler.Calls[0].Body, StringComparison.Ordinal);
+            Assert.Equal("geheim&sicher", JsonElement.Parse(handler.Calls[0].Body).GetProperty("params").GetProperty("password").GetString());
             Assert.All(handler.Calls.Skip(1), call => Assert.DoesNotContain("geheim", call.Body, StringComparison.Ordinal));
             Assert.All(handler.Calls, call => Assert.DoesNotContain("geheim", call.Url.ToString(), StringComparison.Ordinal));
             Assert.Contains("\"startDate\":20261120", handler.Calls[1].Body, StringComparison.Ordinal);
