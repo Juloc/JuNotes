@@ -140,6 +140,9 @@ namespace JuNotes.Backend.Ai
         {
             var a = HexColor(Text(answer, "colorA")) ?? throw new Integrations.Codex.CodexFailedException("The cover had no usable colour.");
             var b = HexColor(Text(answer, "colorB")) ?? a;
+            // The symbol on a cover is white: a pastel colour would swallow it, so light colours are darkened until it can be read.
+            a = Readable(a);
+            b = Readable(b);
             var emoji = Text(answer, "emoji");
             // An emoji is a few characters without letters or digits; anything longer or with words in it is not an emoji.
             if (emoji is not null && (emoji.Length > 8 || emoji.Any(char.IsAsciiLetterOrDigit)))
@@ -155,6 +158,33 @@ namespace JuNotes.Backend.Ai
 
             var pattern = Text(answer, "pattern") is "lines" or "grid" or "dots" ? Text(answer, "pattern")! : "none";
             return new CoverResult(a, b, emoji, symbol, pattern);
+        }
+
+        // Relative luminance of an sRGB colour, 0 (black) to 1 (white).
+        internal static double Luminance(string hex)
+        {
+            static double Channel(string hex, int start)
+            {
+                var value = Convert.ToInt32(hex.Substring(start, 2), 16) / 255.0;
+                return value <= 0.04045 ? value / 12.92 : Math.Pow((value + 0.055) / 1.055, 2.4);
+            }
+
+            return (0.2126 * Channel(hex, 1)) + (0.7152 * Channel(hex, 3)) + (0.0722 * Channel(hex, 5));
+        }
+
+        internal static string Readable(string hex)
+        {
+            var color = hex;
+            for (var step = 0; step < 40 && Luminance(color) > 0.5; step++)
+            {
+                var factor = 0.92;
+                var r = (int)(Convert.ToInt32(color.Substring(1, 2), 16) * factor);
+                var g = (int)(Convert.ToInt32(color.Substring(3, 2), 16) * factor);
+                var b = (int)(Convert.ToInt32(color.Substring(5, 2), 16) * factor);
+                color = $"#{r:x2}{g:x2}{b:x2}";
+            }
+
+            return color;
         }
 
         private static string? HexColor(string? value)

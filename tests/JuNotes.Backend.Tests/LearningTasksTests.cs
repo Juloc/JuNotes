@@ -122,6 +122,18 @@ namespace JuNotes.Backend.Tests
         }
 
         [Fact]
+        public void A_pale_cover_colour_is_darkened_until_a_white_symbol_can_be_read()
+        {
+            var result = (CoverResult)LearningTasks.Normalize("cover", Json("""{"colorA":"#dbeafe","colorB":"#adc9e6","emoji":null,"symbol":"function","pattern":"grid"}"""));
+
+            Assert.True(LearningTasks.Luminance(result.ColorA) <= 0.5);
+            Assert.True(LearningTasks.Luminance(result.ColorB) <= 0.5);
+            Assert.StartsWith("#", result.ColorA, StringComparison.Ordinal);
+            // A colour that is dark enough stays as it is.
+            Assert.Equal("#112233", LearningTasks.Readable("#112233"));
+        }
+
+        [Fact]
         public void A_cover_without_a_usable_colour_fails() =>
             Assert.Throws<CodexFailedException>(() => LearningTasks.Normalize("cover", Json("""{"colorA":"blue","colorB":"#112233","emoji":null,"symbol":null,"pattern":"none"}""")));
 
