@@ -25,6 +25,16 @@
                 <option value="@option" selected="@(option == profile.Tone)">@option</option>
             }
         </select>
+        <label>Modell nur für diese Aufgabe</label>
+        <input type="text" name="model" value="@profile.Model" placeholder="leer = die allgemeine Einstellung" autocomplete="off" />
+        <label>Aufwand nur für diese Aufgabe</label>
+        <select name="effort">
+            <option value="" selected="@string.IsNullOrEmpty(profile.Effort)">wie allgemein eingestellt</option>
+            @foreach (var level in AiSettingsRules.Efforts)
+            {
+                <option value="@level" selected="@(level == profile.Effort)">@AdminFormat.Effort(level)</option>
+            }
+        </select>
         <label><input type="checkbox" name="enabled" value="on" checked="@profile.Enabled" /> Eingeschaltet</label>
         <div class="actions">
             <button type="submit">Speichern</button>

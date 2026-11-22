@@ -35,3 +35,32 @@
         <form method="post" asp-page-handler="Login"><div class="actions"><button type="submit">Anmelden</button></div></form>
     }
 </div>
+
+<form method="post" class="card" asp-page-handler="Settings">
+    <h2>Modell und Aufwand</h2>
+    <p class="muted">Gilt für alle Aufgaben, wenn ein Profil unter „KI-Profile“ nichts Eigenes einstellt. Leer lassen heißt: Standard des Kontos.</p>
+    <label>Modell</label>
+    <input type="text" name="model" value="@Model.Settings.Model" placeholder="leer = Standard des Kontos" autocomplete="off" />
+    <label>Aufwand (wie gründlich das Modell nachdenkt)</label>
+    <select name="effort">
+        <option value="" selected="@string.IsNullOrEmpty(Model.Settings.Effort)">Standard des Modells</option>
+        @foreach (var level in AiSettingsRules.Efforts)
+        {
+            <option value="@level" selected="@(level == Model.Settings.Effort)">@AdminFormat.Effort(level)</option>
+        }
+    </select>
+    <label>Tageslimit (Anfragen pro Tag für alle zusammen)</label>
+    <input type="number" name="dailyLimit" min="1" max="@AiSettingsRules.MaxDailyLimit" value="@Model.Settings.DailyLimit" placeholder="@Model.Limit (aus der Einrichtung)" />
+    <p class="muted">Höherer Aufwand gibt bessere Antworten, dauert länger und verbraucht mehr vom Kontingent des ChatGPT-Tarifs. Welche Namen es gibt, steht in Codex selbst (zum Beispiel mit <code>/model</code>).</p>
+    <div class="actions"><button type="submit">Speichern</button></div>
+</form>
+
+<div class="card">
+    <h2>Nutzung</h2>
+    <div class="row"><span>Heute</span><span>@Model.Today.Requests von @Model.Limit Anfragen@(Model.Today.Failures > 0 ? $", {Model.Today.Failures} fehlgeschlagen" : "")</span></div>
+    @foreach (var day in Model.Recent.Where(item => item.Day != Model.Today.Day))
+    {
+        <div class="row muted"><span>@AdminFormat.Day(day.Day)</span><span>@day.Requests Anfragen@(day.Failures > 0 ? $", {day.Failures} fehlgeschlagen" : "")</span></div>
+    }
+    <p class="muted">Das ist die Zählung dieses Servers. Das Kontingent deines ChatGPT-Tarifs selbst kann der Server nicht abfragen; das Tageslimit schützt davor, es zu verbrauchen.</p>
+</div>

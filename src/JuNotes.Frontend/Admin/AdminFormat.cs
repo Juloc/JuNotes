@@ -12,5 +12,16 @@ namespace JuNotes.Frontend.Admin
         public static string Day(DateOnly day) => day.ToString("dd.MM.yyyy", German);
 
         public static string Kilobytes(long bytes) => (bytes / 1024).ToString("N0", German) + " KB";
+
+        // The effort levels as the admin reads them.
+        public static string Effort(string? level) => level switch
+        {
+            "minimal" => "minimal",
+            "low" => "niedrig",
+            "medium" => "mittel",
+            "high" => "hoch",
+            "xhigh" => "sehr hoch",
+            _ => "Standard des Modells",
+        };
     }
 }

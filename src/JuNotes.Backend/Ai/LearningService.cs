@@ -9,7 +9,7 @@ namespace JuNotes.Backend.Ai
         public int StatusCode { get; } = statusCode;
     }
 
-    public sealed class LearningService(ICodexRunner codex, AiProfileStore profiles, AiUsageStore usage, AiOptions options, TimeProvider time)
+    public sealed class LearningService(ICodexRunner codex, AiProfileStore profiles, AiUsageStore usage, AiOptions options, TimeProvider time, AiSettingsStore? settingsStore = null)
     {
         public async Task<object> RunAsync(string task, AiRequest request, CancellationToken ct)
         {
@@ -20,15 +20,19 @@ namespace JuNotes.Backend.Ai
                 throw new AiRefusedException($"„{profile.Name}“ ist im Moment ausgeschaltet.", 403);
             }
 
+            var settings = settingsStore is null ? new AiSettings(null, null, null) : await settingsStore.GetAsync(ct);
             var day = DateOnly.FromDateTime(time.GetUtcNow().UtcDateTime);
-            if (!await usage.TryCountAsync(day, options.DailyLimit, ct))
+            if (!await usage.TryCountAsync(day, settings.DailyLimit ?? options.DailyLimit, ct))
             {
                 throw new AiRefusedException("Das Tageslimit für die KI ist erreicht. Morgen geht es weiter.", 429);
             }
 
             try
             {
-                var result = await codex.RunAsync(new CodexRequest(Instruction(profile, task, request), LearningTasks.Input(task, request), LearningTasks.Schema(task)), ct);
+                // A task's own choice wins over the general one, which wins over the account's default.
+                var model = string.IsNullOrWhiteSpace(profile.Model) ? settings.Model : profile.Model;
+                var effort = string.IsNullOrWhiteSpace(profile.Effort) ? settings.Effort : profile.Effort;
+                var result = await codex.RunAsync(new CodexRequest(Instruction(profile, task, request), LearningTasks.Input(task, request), LearningTasks.Schema(task), null, model, effort), ct);
                 return LearningTasks.Normalize(task, result.Json ?? throw new CodexFailedException("The answer was not JSON."));
             }
             catch (Exception error) when (error is CodexFailedException or CodexUnavailableException)

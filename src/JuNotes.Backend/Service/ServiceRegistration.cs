@@ -62,6 +62,7 @@ namespace JuNotes.Backend.Service
             services.AddSingleton(ai);
             services.AddSingleton<AiProfileStore>();
             services.AddSingleton<AiUsageStore>();
+            services.AddSingleton<AiSettingsStore>();
             services.AddSingleton<LearningService>();
             var school = new SchoolOptions();
             configuration.GetSection("School").Bind(school);

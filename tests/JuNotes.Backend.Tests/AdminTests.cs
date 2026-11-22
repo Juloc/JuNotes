@@ -294,6 +294,35 @@ namespace JuNotes.Backend.Tests
         }
 
         [RequiresDatabaseFact]
+        public async Task The_admin_chooses_model_effort_and_limit_and_sees_the_usage()
+        {
+            var (host, fake, database) = await StartAsync();
+            await using (database) using (fake) using (host)
+            {
+                var client = host.Browser();
+                await Web.LoginAsync(client);
+                var settings = host.Services.GetRequiredService<AiSettingsStore>();
+
+                var saved = await Web.PostAsync(client, "/Admin/Codex", "/Admin/Codex?handler=Settings", new() { ["model"] = "mein-modell", ["effort"] = "high", ["dailyLimit"] = "25" });
+                Assert.Equal(HttpStatusCode.Redirect, saved.StatusCode);
+                Assert.Equal(new AiSettings("mein-modell", "high", 25), await settings.GetAsync(CancellationToken.None));
+
+                var page = await client.GetStringAsync(new Uri("/Admin/Codex", UriKind.Relative));
+                Assert.Contains("Gespeichert", page, StringComparison.Ordinal);
+                Assert.Contains("mein-modell", page, StringComparison.Ordinal);
+                Assert.Contains("von 25 Anfragen", page, StringComparison.Ordinal);
+                Assert.Contains("von 25 Anfragen", await client.GetStringAsync(new Uri("/Admin", UriKind.Relative)), StringComparison.Ordinal);
+
+                await Web.PostAsync(client, "/Admin/Codex", "/Admin/Codex?handler=Settings", new() { ["model"] = "x", ["effort"] = "turbo", ["dailyLimit"] = "25" });
+                Assert.Contains("Aufwand muss aus der Liste", await client.GetStringAsync(new Uri("/Admin/Codex", UriKind.Relative)), StringComparison.Ordinal);
+                Assert.Equal("high", (await settings.GetAsync(CancellationToken.None)).Effort);
+
+                await Web.PostAsync(client, "/Admin/Codex", "/Admin/Codex?handler=Settings", new() { ["model"] = "", ["effort"] = "", ["dailyLimit"] = "viele" });
+                Assert.Contains("ganze Zahl", await client.GetStringAsync(new Uri("/Admin/Codex", UriKind.Relative)), StringComparison.Ordinal);
+            }
+        }
+
+        [RequiresDatabaseFact]
         public async Task An_empty_prompt_or_an_unknown_value_is_refused_with_a_message()
         {
             var (host, fake, database) = await StartAsync();

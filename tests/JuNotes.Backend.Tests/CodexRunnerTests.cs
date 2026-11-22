@@ -65,6 +65,24 @@ namespace JuNotes.Backend.Tests
         }
 
         [Fact]
+        public async Task A_models_and_an_effort_for_one_question_override_the_default_and_unknown_efforts_are_dropped()
+        {
+            using var fake = new FakeCodex(Answer42);
+            using var runner = Runner(fake, options => options.Model = "account-default");
+
+            await runner.RunAsync(new CodexRequest("x", "y", Schema, null, "task-model", "high"), CancellationToken.None);
+            var args = fake.Args;
+            Assert.Equal("task-model", args[Array.IndexOf(args, "-m") + 1]);
+            Assert.Equal("model_reasoning_effort=\"high\"", args[Array.IndexOf(args, "-c") + 1]);
+            Assert.DoesNotContain("account-default", args);
+
+            await runner.RunAsync(new CodexRequest("x", "y", Schema, null, null, "turbo; rm -rf"), CancellationToken.None);
+            var second = fake.Args;
+            Assert.Equal("account-default", second[Array.IndexOf(second, "-m") + 1]);
+            Assert.DoesNotContain("-c", second);
+        }
+
+        [Fact]
         public async Task The_instruction_and_the_material_go_in_through_stdin_and_the_schema_through_a_file()
         {
             using var fake = new FakeCodex("RECORD=\"$(dirname \"$0\")/record\"\nprompt=\"$(cat)\"\nprintf '%s' \"$prompt\" > \"$RECORD/prompt.txt\"\ncp \"$schema\" \"$RECORD/schema.json\"\nprintf '{\"answer\":1}' > \"$out\"");

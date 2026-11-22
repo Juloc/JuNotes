@@ -31,6 +31,7 @@
 <div class="card">
     <h2>KI</h2>
     <div class="row"><span><i class="dot @Model.CodexDot"></i>Verbindung</span><span>@Model.CodexText</span></div>
+    <div class="row"><span>Modell</span><span>@Model.ModelText</span></div>
     <div class="row"><span>Heute</span><span>@Model.Today.Requests von @Model.Limit Anfragen@(Model.Today.Failures > 0 ? $", {Model.Today.Failures} fehlgeschlagen" : "")</span></div>
     @foreach (var day in Model.Recent.Skip(1))
     {

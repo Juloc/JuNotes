@@ -173,6 +173,55 @@ namespace JuNotes.Backend.Tests
         }
 
         [RequiresDatabaseFact]
+        public async Task The_general_settings_and_a_tasks_own_choice_decide_model_effort_and_limit()
+        {
+            await using var fixture = await CreateAsync();
+            var settings = new AiSettingsStore(fixture.Database.Data);
+            var service = new LearningService(fixture.Runner, fixture.Profiles, fixture.Usage, new AiOptions { DailyLimit = 60 }, TimeProvider.System, settings);
+
+            await service.RunAsync("quiz", Material, CancellationToken.None);
+            Assert.Null(fixture.Runner.Last!.Model);
+            Assert.Null(fixture.Runner.Last.Effort);
+
+            Assert.True(await settings.SaveAsync(new AiSettings("general-model", "low", 2), CancellationToken.None));
+            await service.RunAsync("quiz", Material, CancellationToken.None);
+            Assert.Equal("general-model", fixture.Runner.Last.Model);
+            Assert.Equal("low", fixture.Runner.Last.Effort);
+
+            var quiz = (await fixture.Profiles.GetAsync("quiz", CancellationToken.None))!;
+            Assert.True(await fixture.Profiles.UpdateAsync(quiz with { Model = "quiz-model", Effort = "xhigh" }, CancellationToken.None));
+            await Assert.ThrowsAsync<AiRefusedException>(() => service.RunAsync("quiz", Material, CancellationToken.None));
+            Assert.Equal("general-model", fixture.Runner.Last.Model);
+
+            Assert.True(await settings.SaveAsync(new AiSettings("general-model", "low", 5), CancellationToken.None));
+            await service.RunAsync("quiz", Material, CancellationToken.None);
+            Assert.Equal("quiz-model", fixture.Runner.Last.Model);
+            Assert.Equal("xhigh", fixture.Runner.Last.Effort);
+        }
+
+        [RequiresDatabaseFact]
+        public async Task Settings_are_validated_and_empty_values_fall_back_to_the_default()
+        {
+            await using var fixture = await CreateAsync();
+            var settings = new AiSettingsStore(fixture.Database.Data);
+
+            Assert.False(await settings.SaveAsync(new AiSettings("bad name; x", null, null), CancellationToken.None));
+            Assert.False(await settings.SaveAsync(new AiSettings(null, "turbo", null), CancellationToken.None));
+            Assert.False(await settings.SaveAsync(new AiSettings(null, null, 0), CancellationToken.None));
+            Assert.False(await settings.SaveAsync(new AiSettings(null, null, AiSettingsRules.MaxDailyLimit + 1), CancellationToken.None));
+            Assert.Equal(new AiSettings(null, null, null), await settings.GetAsync(CancellationToken.None));
+
+            Assert.True(await settings.SaveAsync(new AiSettings(" model-1.2 ", "medium", 30), CancellationToken.None));
+            Assert.Equal(new AiSettings("model-1.2", "medium", 30), await settings.GetAsync(CancellationToken.None));
+            Assert.True(await settings.SaveAsync(new AiSettings("", "", null), CancellationToken.None));
+            Assert.Equal(new AiSettings(null, null, null), await settings.GetAsync(CancellationToken.None));
+
+            var quiz = (await fixture.Profiles.GetAsync("quiz", CancellationToken.None))!;
+            Assert.False(await fixture.Profiles.UpdateAsync(quiz with { Model = "x y" }, CancellationToken.None));
+            Assert.False(await fixture.Profiles.UpdateAsync(quiz with { Effort = "turbo" }, CancellationToken.None));
+        }
+
+        [RequiresDatabaseFact]
         public async Task The_defaults_are_created_once_and_never_overwrite_the_admins_changes()
         {
             await using var fixture = await CreateAsync();

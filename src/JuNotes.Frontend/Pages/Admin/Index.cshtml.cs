@@ -9,7 +9,7 @@ using Microsoft.AspNetCore.Mvc.RazorPages;
 
 namespace JuNotes.Frontend.Pages.Admin
 {
-    public sealed class IndexModel(HealthService health, BackupService backups, SchoolImportService school, AiUsageStore usage, AiOptions ai, CodexAccount codex, TimeProvider time) : PageModel
+    public sealed class IndexModel(HealthService health, BackupService backups, SchoolImportService school, AiUsageStore usage, AiOptions ai, AiSettingsStore aiSettings, CodexAccount codex, TimeProvider time) : PageModel
     {
         public bool DatabaseReady { get; private set; }
 
@@ -23,7 +23,9 @@ namespace JuNotes.Frontend.Pages.Admin
 
         public string CodexDot { get; private set; } = "warn";
 
-        public int Limit => ai.DailyLimit;
+        public int Limit { get; private set; }
+
+        public string ModelText { get; private set; } = "";
 
         public AiUsage Today { get; private set; } = new(default, 0, 0);
 
@@ -40,6 +42,9 @@ namespace JuNotes.Frontend.Pages.Admin
             var status = await codex.StatusAsync(ct);
             (CodexText, CodexDot) = !status.Installed ? ("Codex ist auf dem Server nicht installiert", "bad") : status.SignedIn ? ("angemeldet" + (status.SignIn == "chatgpt" ? " mit ChatGPT" : ""), "ok") : ("nicht angemeldet", "warn");
 
+            var settings = await aiSettings.GetAsync(ct);
+            Limit = settings.DailyLimit ?? ai.DailyLimit;
+            ModelText = (settings.Model ?? "Standard des Kontos") + ", Aufwand: " + AdminFormat.Effort(settings.Effort);
             var day = DateOnly.FromDateTime(time.GetUtcNow().UtcDateTime);
             Recent = await usage.RecentAsync(7, ct);
             Today = Recent.FirstOrDefault(item => item.Day == day) ?? new AiUsage(day, 0, 0);

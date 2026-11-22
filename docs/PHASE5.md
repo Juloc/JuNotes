@@ -115,3 +115,12 @@ Gewünscht: Meldungen der Schule und rund ums Lernen als Benachrichtigung auf de
 6. **Seiten-Raster, Lesezeichen, Sperre, Favoriten.**
 7. **Einfügen und Audio.**
 8. **Praxis-Datenschutz.**
+
+### 12. Stundenplan direkt aus WebUntis, KI-Einstellungen
+
+- **WebUntis ohne iCal-Link:** Der Server meldet sich mit ihrem WebUntis-Zugang an (Server, Schulname, Benutzer, Passwort in `.env`), liest den Stundenplan
+  und die Ferien und meldet sich wieder ab. Gestrichene Stunden (`cancelled`), Änderungen (`irregular`) und Klassenarbeiten (`ex`) kommen mit. Mit
+  einem iCal-Link zusammen hat WebUntis Vorrang. **Gegen das echte WebUntis der Schule ist das noch nicht ausprobiert**: Manche Schulen erlauben
+  Schülern diese Schnittstelle nicht (Fehler −8509). Die Meldung im Admin-Bereich sagt dann genau das.
+- **Modell, Aufwand und Tageslimit** stellt der Admin unter „KI-Verbindung“ ein, pro Aufgabe auch unter „KI-Profile“. Leer heißt: Standard des Kontos.
+  Das Kontingent des ChatGPT-Tarifs selbst kann der Server nicht abfragen, nur die eigene Zählung.

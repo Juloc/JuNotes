@@ -22,7 +22,8 @@ namespace JuNotes.Integrations.Codex
     }
 
     // One question for the model: what to do, the material, and the shape the answer must have.
-    public sealed record CodexRequest(string Instruction, string Input, string? SchemaJson = null, IReadOnlyList<string>? ImagePaths = null);
+    // Model and Effort override the program's defaults for this one question; empty means the account's own default.
+    public sealed record CodexRequest(string Instruction, string Input, string? SchemaJson = null, IReadOnlyList<string>? ImagePaths = null, string? Model = null, string? Effort = null);
 
     public sealed record CodexResult(string Text, JsonElement? Json);
 
@@ -41,6 +42,8 @@ namespace JuNotes.Integrations.Codex
     // folder is empty, nothing is stored, and the user's own config is ignored. The sign-in is the one under CODEX_HOME; nothing here reads or returns it.
     public sealed partial class CodexRunner(CodexOptions options) : ICodexRunner, IDisposable
     {
+        private static readonly HashSet<string> EffortLevels = new(["minimal", "low", "medium", "high", "xhigh"], StringComparer.Ordinal);
+
         private readonly SemaphoreSlim _slots = new(Math.Max(1, options.MaxParallel));
 
         public void Dispose() => _slots.Dispose();
@@ -74,10 +77,18 @@ namespace JuNotes.Integrations.Codex
                 start.ArgumentList.Add(argument);
             }
 
-            if (!string.IsNullOrWhiteSpace(options.Model))
+            var model = string.IsNullOrWhiteSpace(request.Model) ? options.Model : request.Model.Trim();
+            if (!string.IsNullOrWhiteSpace(model))
             {
                 start.ArgumentList.Add("-m");
-                start.ArgumentList.Add(options.Model);
+                start.ArgumentList.Add(model);
+            }
+
+            // How hard the model thinks, only from the known list, as a setting of the program ("-c key=value", the value as TOML text).
+            if (request.Effort?.Trim() is { Length: > 0 } effort && EffortLevels.Contains(effort))
+            {
+                start.ArgumentList.Add("-c");
+                start.ArgumentList.Add($"model_reasoning_effort=\"{effort}\"");
             }
 
             if (request.SchemaJson is not null)
