@@ -10,6 +10,15 @@ services:
     environment:
       ConnectionStrings__JuNotes: Host=postgres;Database=junotes;Username=junotes;Password=${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
       Sync__Token: ${SYNC_TOKEN:?set SYNC_TOKEN in .env}
+      # Optional; empty means off. See the README for what each one does.
+      Admin__Password: ${ADMIN_PASSWORD:-}
+      Web__Password: ${WEB_PASSWORD:-}
+      School__TimetableIcsUrl: ${SCHOOL_TIMETABLE_ICS_URL:-}
+      School__NewsFeedUrl: ${SCHOOL_NEWS_FEED_URL:-}
+      Backup__CopyTo: ${BACKUP_COPY_TO:-}
+      Backup__Passphrase: ${BACKUP_PASSPHRASE:-}
+      Paperless__BaseUrl: ${PAPERLESS_BASE_URL:-}
+      Paperless__Token: ${PAPERLESS_TOKEN:-}
     ports:
       - "127.0.0.1:8098:8080"
     volumes:

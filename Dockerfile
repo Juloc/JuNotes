@@ -14,7 +14,9 @@ RUN apt-get update \
  && . /etc/os-release \
  && echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt ${VERSION_CODENAME}-pgdg main" > /etc/apt/sources.list.d/pgdg.list \
  && apt-get update \
- && apt-get install -y --no-install-recommends postgresql-client-18 \
+ && apt-get install -y --no-install-recommends postgresql-client-18 nodejs npm \
+ && npm install -g @openai/codex \
+ && npm cache clean --force \
  && rm -rf /var/lib/apt/lists/* \
  && mkdir -p /data/backups /data/assets /data/codex && chown -R app:app /data
 
