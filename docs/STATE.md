@@ -57,6 +57,15 @@ auf die gemeinsame Basis um (Entscheidungen vom 24.11.2026 in SCOPE.md).
 10. **`check-app.sh`** meldet für die Kopie „unchanged“ und „up to date“ (0.3.2), und weiter zwei Regeln für die App: `OPS-01` (Compose heißt `compose.yaml`, braucht Variablen) und `CODE-07` (keine `CLAUDE.md`).
     Beides ist nicht angefasst (Einspielen und Arbeitsanweisungen sind eigene Entscheidungen).
 
+## Bekannte Abweichungen von den Regeln der Basis (`check-app.sh`)
+
+„Clean“ heißt für dieses Repository (Orchestrator, 24.11.2026): die Kopie von `base/` ist unverändert und aktuell, und es bleiben **nur diese zwei benannten Regelbefunde**:
+
+1. **OPS-01 / OPS-02** (`compose.yaml` mit Variablen und `.env`, statt einer Compose-Datei ohne Variablen): **bis zum Umzug der Installation**, den der Orchestrator plant. Nichts anfassen.
+2. **CODE-07** (keine `CLAUDE.md`): Sie legt Arbeitsanweisungen für Claude-Sitzungen fest und wird deshalb nicht auf Zuruf einer anderen Sitzung angelegt. **Der Eigentümer entscheidet**; der Orchestrator fragt ihn. Bis dahin bleibt es eine Abweichung.
+
+**Zentrale Paketverwaltung:** Die Versionen stehen jetzt in einer gemeinsamen Datei (`Directory.Packages.props`), ein zweites Paketsystem gibt es nicht; unsere Projekte nennen die Pakete nur noch ohne Version.
+
 ## Entscheidungen, die schon gefallen sind
 
 - Frei verschachtelbare Ordner und Hefte, Fächer sind Ordner mit Eigenschaften (PHASE5.md).
