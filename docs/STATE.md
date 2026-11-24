@@ -23,13 +23,17 @@ auf die gemeinsame Basis um (Entscheidungen vom 24.11.2026 in SCOPE.md).
 
 ## Nächster Schritt
 
-1. Der Orchestrator hat den Plan gelesen und angenommen (24.11.2026), mit Korrekturen, die jetzt in [SCOPE.md](SCOPE.md) und [ARCHITECTURE.md](ARCHITECTURE.md)
-   stehen. **Es wird nichts gebaut, bis der Orchestrator das Startzeichen für Meilenstein 0 gibt** (auf der Maschine laufen höchstens zwei bauende Sitzungen).
-2. Dann Meilenstein 0: Probe der Basis (öffentlich, MIT, 0.3.1, lokal `~/projects/base`) unter .NET 11, die Basis ins Repository holen, den Abgleichvertrag als
-   Tests einfrieren. Der WebUntis-Client bleibt bis zur Antwort des Eigentümers unangetastet und inaktiv.
-3. Umbenennen von Repository und Ordner macht der Orchestrator, nicht die Sitzung im Ordner.
-4. Akzentfarbe vorläufig `--accent-hue` 75 (Bernstein; belegt sind 299 für JulOS und den Standard der Basis und 168 für caddy). Der Eigentümer sieht sie in
-   Meilenstein 2 und kann sie ändern, es ist eine Variable.
+Meilenstein 0 (Startzeichen des Orchestrators vom 24.11.2026) ist **zur Hälfte** getan:
+
+- **Probe der Basis unter .NET 11:** Mit dem Analyselevel der Basis (`latest`) übersetzen Basis und Start-App unter net11 ohne Fehler und ohne Warnung. Mit **unserem**
+  Level (`latest-recommended`, Warnungen als Fehler) sind es 49 Stellen in der Basis (CA1848, CA1873, CA1068, CA2026, CA1822, CA1720, CA1000, CA1716, CA5350). Die Liste
+  liegt beim Orchestrator; **`base/` ist noch nicht im Repository**, bis er entscheidet (Vorschlag: unsere `Directory.Build.props` setzt für Projekte unter `base/` den
+  Level `latest`, die Kopie bleibt unverändert).
+- **Abgleichvertrag als Tests:** `tests/JuNotes.Backend.Tests/ApiContractTests.cs`, 15 Tests gegen den echten Host mit echter Datenbank (siehe unten). Alle grün. Dazu der
+  Test mit einem Datenbankstand durch alle Migrationen.
+
+Dann: auf die Antwort des Orchestrators warten (Level für `base/`), danach `base/` samt `MANIFEST` übernehmen und `check-app.sh` laufen lassen. Der WebUntis-Client
+bleibt unangetastet, die Antwort des Eigentümers steht aus. Umbenennen von Repository und Ordner macht der Orchestrator.
 
 ## Entscheidungen, die schon gefallen sind
 
@@ -54,7 +58,15 @@ dotnet test tests/JuNotes.Backend.Tests
 ```
 
 Ohne `JUNOTES_TEST_DB` werden die Datenbanktests übersprungen. Die Testdatenbank startet der Befehl in der README (Docker, Port 15434). Die Backup-Tests brauchen
-`pg_dump` und `pg_restore` in Version 18.
+`pg_dump` und `pg_restore` in Version 18. **Auf dieser Maschine liegt Version 17**; darum schlagen dort 6 Backup-Tests fehl (Stand 24.11.2026: 322 von 328
+grün), alle mit „unpassende Serverversion“. Das ist die Umgebung, kein Fehler im Code. Das .NET-11-SDK liegt in `~/.dotnet` (nicht auf dem PATH).
+
+**Was die Vertragstests festhalten** (`ApiContractTests`): `/api/v1/status` ist offen, alles andere antwortet ohne oder mit falschem Token mit 401 und leerem Körper;
+`push` antwortet `{"accepted":N,"seq":M}` mit N = Anzahl der geschickten Zeilen (auch wenn nichts gespeichert wurde) und M = höchste Nummer; ein verformter Stapel ist 400 und
+speichert nichts (auch nicht die guten Zeilen davor); `pull` antwortet `{"changes":[…],"cursor":…,"more":…}` in Nummernfolge, Begrenzung 1 bis 500; ein Strich wird nur
+hinzugefügt oder gelöscht, alles andere gilt „letzter schreibt“; **die Nummern haben Lücken** (jede geschickte Zeile verbraucht eine, eine Änderung zwei); Dateien:
+204/200/206/404/415/413/400; Schule, KI-Profile und Export haben feste Formen. Ändert sich eine dieser Antworten, ändert sich der Test im selben Commit. Stichprobe: Eine
+absichtlich falsche Antwortzahl und ein ausgeschalteter Token-Test ließen genau die zuständigen Tests rot werden (danach zurückgenommen).
 
 **Swift-Kern testen:**
 

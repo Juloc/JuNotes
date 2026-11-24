@@ -63,6 +63,20 @@ Grundsatz: **Nur hinzufügen, nie umbauen.** Die App kennt die Form der Daten un
    dem Server laufen auseinander, bis der Server diese Zeile von sich aus wieder ausliefert. Das ist umgekehrt zum Fehlerfall (dort Dauerblockade). **Für
    Meilenstein 1 hinnehmbar** (ein ehrliches Gerät schickt nie eine verbotene Zeile). **Vor Stufe 2 der Freigaben muss es gelöst sein** (siehe 3a, Vorbedingung).
 
+4. **`seq` bleibt global.** Der Pull einer Person liefert nur ihre Zeilen (und freigegebene) mit `seq` über ihrem Merker. Lücken in der Folge gibt es **heute
+   schon**: jede geschickte Zeile verbraucht eine Nummer, auch wenn nichts gespeichert wird, und eine Änderung verbraucht zwei (festgehalten in `ApiContractTests`).
+   Die App benutzt den Merker nur als „größer als“ (**ungeprüft:** ob sie irgendwo auf eine lückenlose Folge baut; gelesen habe ich nur `SyncEngine` und
+   `SQLiteStore.apply`).
+5. **Der bestehende App-Token** wird zum „Gerät des Eigentümers“: Der Server ordnet ihn bei jeder Anfrage der Person Eigentümer zu. Neue Token je Gerät
+   und Person kommen mit Meilenstein 3 aus der Basis (Geräte-Modul). Der alte Token wird erst abgeschaltet, wenn die App ihn nicht mehr schickt, und das
+   schaltet der Eigentümer von Hand.
+6. **Freigaben:** eigene Tabelle `shares(entity_id, recipient_id, mode, granted_seq, revoked_seq)`; Lesen prüft Besitz oder Freigabe. Ein freigegebenes Heft
+   bringt alle Seiten und Striche darunter mit (Zugriff über die `parent_id`-Kette, nur für Zeilen des Besitzers). **Offener Entwurfspunkt für Meilenstein 3:**
+   siehe Abschnitt 3a.
+7. **Beweis:** Der Test `A_database_from_an_older_version_answers_the_app_the_same_after_every_migration` (Meilenstein 0, vorhanden) legt einen Stand nach Migration 5 mit
+   Zeilen jeder Art an, lässt den Host die übrigen Migrationen laufen und prüft, dass `pull`, `push`, Dateien und die übrigen Wege danach dasselbe antworten. Jede
+   spätere Migration (Besitzer, Freigaben) läuft durch ihn und darf ihn nicht ändern.
+
 ### 3a. Freigaben und `seq` (offener Entwurfspunkt, Meilenstein 3)
 
 **Problem.** Wird ein Heft später freigegeben, haben seine Zeilen ein `seq` unter dem Merker der Empfängerin; ihr Pull sähe sie nie. Beim Entziehen muss sie
