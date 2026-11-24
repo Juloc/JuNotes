@@ -26,9 +26,11 @@ namespace JuNotes.Backend.Tests
             var host = new AdminHost(database, fake.Executable);
             if (seed)
             {
+                // The notes are stored for whoever signs in first (they are theirs: a reader sees only their own).
+                host.SeedFor = async person =>
+                {
                 var pageA = Guid.Parse("00000000-0000-0000-0000-0000000000c1");
                 var pageB = Guid.Parse("00000000-0000-0000-0000-0000000000c2");
-                _ = host.Services;
                 await host.Services.GetRequiredService<SyncService>().PushAsync(new PushRequest(
                 [
                     Entity("subject", Subject, null, """{"name":"Mathe","color":"#0a84ff","symbol":"function","sort":0}"""),
@@ -41,8 +43,9 @@ namespace JuNotes.Backend.Tests
                     Entity("stroke", Guid.NewGuid(), pageA, """{"tool":"pen","color":"#1d3a8a","width":2.5,"points":[{"x":10,"y":20},{"x":30,"y":40}]}"""),
                     Entity("stroke", Guid.NewGuid(), pageA, """{"tool":"pen","color":"\"><script>x</script>","width":2,"points":[{"x":1,"y":1}]}"""),
                     Entity("page", Guid.NewGuid(), Board, """{"sort":"i"}"""),
-                ]), CancellationToken.None);
-                await host.Services.GetRequiredService<AssetService>().SaveAsync(Scan, new MemoryStream(Jpeg), CancellationToken.None);
+                ]), person, null, CancellationToken.None);
+                await host.Services.GetRequiredService<AssetService>().SaveAsync(Scan, new MemoryStream(Jpeg), person.Id, CancellationToken.None);
+                };
             }
 
             return (host, fake, database);

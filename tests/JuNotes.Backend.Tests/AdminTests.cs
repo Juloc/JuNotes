@@ -52,6 +52,9 @@ namespace JuNotes.Backend.Tests
 
         // A person with a session of the base, made directly in the database (the sign-in itself, with its second factor, is tested in the base). The throwaway
         // names and values exist only in the test database.
+        // What to store for the first person who signs in, as their own (the notes of a test).
+        public Func<JuNotes.Backend.Data.Sync.SyncOwner, Task>? SeedFor { get; set; }
+
         public async Task<HttpClient> SignedInAsync(string role = "admin")
         {
             var (_, client) = await SignedInPersonAsync(role);
@@ -65,6 +68,12 @@ namespace JuNotes.Backend.Tests
             var token = await Services.GetRequiredService<Base.Accounts.SessionStore>().CreateAsync(user.Id, "127.0.0.1", "tests");
             var client = Browser();
             client.DefaultRequestHeaders.Add("Cookie", "notes_sid=" + token);
+            if (SeedFor is { } seed)
+            {
+                SeedFor = null;
+                await seed(new JuNotes.Backend.Data.Sync.SyncOwner(user.Id, user.Name, "test"));
+            }
+
             return (user.Id, client);
         }
 

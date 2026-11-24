@@ -15,6 +15,9 @@ namespace JuNotes.Frontend.Admin
         public const string AdminPolicy = "Admin";
         public const string ReaderPolicy = "Reader";
 
+        // The person behind the session, for the pages that show only their notes.
+        public static Guid PersonId(this System.Security.Claims.ClaimsPrincipal user) => Guid.Parse(user.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+
         public static IServiceCollection AddJuNotesSignIn(this IServiceCollection services)
         {
             services.AddSingleton<CodexLoginSession>();
@@ -29,7 +32,7 @@ namespace JuNotes.Frontend.Admin
         }
     }
 
-    internal sealed class BaseSessionHandler(IOptionsMonitor<AuthenticationSchemeOptions> options, ILoggerFactory logger, UrlEncoder encoder, SessionCookie cookie, AccountService accounts)
+    internal sealed class BaseSessionHandler(IOptionsMonitor<AuthenticationSchemeOptions> options, ILoggerFactory logger, UrlEncoder encoder, SessionCookie cookie, AccountService accounts, OwnerDirectory owners)
         : AuthenticationHandler<AuthenticationSchemeOptions>(options, logger, encoder)
     {
         protected override async Task<AuthenticateResult> HandleAuthenticateAsync()
@@ -49,6 +52,9 @@ namespace JuNotes.Frontend.Admin
             {
                 cookie.Write(Context, fresh);
             }
+
+            // The first account may have just been made: the rows nobody owns yet are given to it.
+            await owners.EnsureClaimedAsync(Context.RequestAborted);
 
             var claims = new List<Claim> { new(ClaimTypes.NameIdentifier, who.UserId.ToString()), new(ClaimTypes.Name, who.UserName) };
             claims.AddRange(who.Roles.Select(role => new Claim(ClaimTypes.Role, role)));

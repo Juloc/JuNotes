@@ -28,6 +28,24 @@ namespace JuNotes.Backend.Data.Sync
 
     public sealed record PullResponse(IReadOnlyList<SyncRecord> Changes, long Cursor, bool More);
 
+    // Who is writing: the person the instance token stands for, as a name for the security log, and the way they came in.
+    public sealed record SyncOwner(Guid Id, string Name, string Device);
+
+    public static class SecurityRules
+    {
+        // A change to a row that is somebody else's.
+        public const string ForeignRow = "sync.foreign_row";
+
+        // A change that would hang a row under a parent that is somebody else's.
+        public const string ForeignParent = "sync.foreign_parent";
+    }
+
+    // Where the server writes down that a rule was broken: the person, the device, the kind of rule and how many; never what was in it.
+    public interface ISecurityLog
+    {
+        void RuleBroken(SyncOwner owner, string rule, int count);
+    }
+
     // The request itself is wrong (a bad kind, too many changes), as opposed to the server failing.
     public sealed class SyncValidationException(string message) : Exception(message);
 }

@@ -32,8 +32,11 @@ namespace JuNotes.Backend.Library
     public sealed record StrokeInfo(Guid Id, string Tool, string Color, double Width, IReadOnlyList<(double X, double Y)> Points);
 
     // Reads what the iPad synced, for the web view. Everything it hands out is what is not in the trash and not deleted.
-    public sealed class LibraryReader(NpgsqlDataSource dataSource)
+    public sealed class LibraryReader(NpgsqlDataSource dataSource, Guid? owner = null)
     {
+        // The same reader, held to one person's rows: what somebody else owns is not there. Without a person (the plain reader) it reads everything.
+        public LibraryReader Of(Guid person) => new(dataSource, person);
+
         public async Task<IReadOnlyList<SubjectInfo>> SubjectsAsync(CancellationToken ct)
         {
             var result = new List<SubjectInfo>();
@@ -138,11 +141,16 @@ namespace JuNotes.Backend.Library
         {
             var rows = new List<(Guid, Guid?, JsonElement)>();
             await using var command = dataSource.CreateCommand("select id, parent_id, payload::text from entities where kind = $1 and not deleted and payload is not null"
-                + (parent is null ? "" : " and parent_id = $2") + " order by seq");
+                + (parent is null ? "" : " and parent_id = $2") + (owner is null ? "" : " and owner_id = $" + (parent is null ? "2" : "3")) + " order by seq");
             command.Parameters.Add(new NpgsqlParameter { Value = kind });
             if (parent is { } value)
             {
                 command.Parameters.Add(new NpgsqlParameter { Value = value });
+            }
+
+            if (owner is { } person)
+            {
+                command.Parameters.Add(new NpgsqlParameter { Value = person });
             }
 
             await using var reader = await command.ExecuteReaderAsync(ct);

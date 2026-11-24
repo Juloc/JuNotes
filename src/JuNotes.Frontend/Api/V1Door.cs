@@ -9,6 +9,7 @@ using JuNotes.Backend.Backup;
 using JuNotes.Backend.Data.Sync;
 using JuNotes.Backend.School;
 using JuNotes.Backend.Service;
+using JuNotes.Frontend.Admin;
 using JuNotes.Integrations.Codex;
 using JuNotes.Integrations.Paperless;
 
@@ -63,11 +64,11 @@ namespace JuNotes.Frontend.Api
 
             var secured = endpoints.MapGroup("/api/v1");
             var sync = secured.MapGroup("/sync");
-            sync.MapPost("/push", async (PushRequest request, SyncService service, CancellationToken ct) =>
+            sync.MapPost("/push", async (PushRequest request, SyncService service, OwnerDirectory owners, ISecurityLog log, CancellationToken ct) =>
             {
                 try
                 {
-                    return Json(await service.PushAsync(request, ct));
+                    return Json(await service.PushAsync(request, await owners.TokenOwnerAsync(ct), log, ct));
                 }
                 catch (SyncValidationException error)
                 {
@@ -75,7 +76,7 @@ namespace JuNotes.Frontend.Api
                 }
             });
             sync.MapGet("/info", (BackupService backup, TimeProvider time) => Json(new { serverTime = time.GetUtcNow(), lastBackupAt = backup.Latest()?.At }));
-            sync.MapGet("/pull", async (long? since, int? limit, SyncService service, CancellationToken ct) => Json(await service.PullAsync(since ?? 0, limit ?? SyncService.MaxChanges, ct)));
+            sync.MapGet("/pull", async (long? since, int? limit, SyncService service, OwnerDirectory owners, CancellationToken ct) => Json(await service.PullAsync(since ?? 0, limit ?? SyncService.MaxChanges, (await owners.TokenOwnerAsync(ct))?.Id, ct)));
 
             var schoolApi = secured.MapGroup("/school");
             schoolApi.MapGet("/status", (SchoolImportService import) => Json(import.Status));
@@ -90,11 +91,12 @@ namespace JuNotes.Frontend.Api
             schoolApi.MapGet("/news", async (int? limit, SchoolStore store, CancellationToken ct) => Json(await store.NewsAsync(limit ?? 20, ct)));
 
             var assetApi = secured.MapGroup("/assets");
-            assetApi.MapPut("/{id:guid}", async (Guid id, HttpRequest request, AssetService assets, CancellationToken ct) =>
+            assetApi.MapPut("/{id:guid}", async (Guid id, HttpRequest request, AssetService assets, OwnerDirectory owners, CancellationToken ct) =>
             {
                 try
                 {
-                    await assets.SaveAsync(id, request.Body, ct);
+                    // A file of somebody else is left alone and the answer is the same as for a stored one.
+                    await assets.SaveAsync(id, request.Body, (await owners.TokenOwnerAsync(ct))?.Id, ct);
                     return Results.NoContent();
                 }
                 catch (AssetException error)
@@ -102,8 +104,8 @@ namespace JuNotes.Frontend.Api
                     return Results.Problem(error.Message, statusCode: error.StatusCode);
                 }
             });
-            assetApi.MapMethods("/{id:guid}", ["HEAD"], (Guid id, AssetService assets) => assets.Exists(id) ? Results.Ok() : Results.NotFound());
-            assetApi.MapGet("/{id:guid}", (Guid id, AssetService assets) => assets.Open(id) is { } file ? Results.Stream(file.Stream, file.ContentType, enableRangeProcessing: true) : Results.NotFound());
+            assetApi.MapMethods("/{id:guid}", ["HEAD"], async (Guid id, AssetService assets, OwnerDirectory owners, CancellationToken ct) => await assets.ExistsAsync(id, (await owners.TokenOwnerAsync(ct))?.Id, ct) ? Results.Ok() : Results.NotFound());
+            assetApi.MapGet("/{id:guid}", async (Guid id, AssetService assets, OwnerDirectory owners, CancellationToken ct) => await assets.OpenAsync(id, (await owners.TokenOwnerAsync(ct))?.Id, ct) is { } file ? Results.Stream(file.Stream, file.ContentType, enableRangeProcessing: true) : Results.NotFound());
 
             var aiApi = secured.MapGroup("/ai");
             aiApi.MapGet("/profiles", async (AiProfileStore store, CancellationToken ct) => Json((await store.ListAsync(ct)).Select(profile => new { profile.Key, profile.Name, profile.Enabled })));

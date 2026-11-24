@@ -61,6 +61,8 @@ builder.Services.AddRazorPages(options =>
     options.Conventions.AuthorizeFolder("/Notes", AdminSetup.ReaderPolicy);
 });
 builder.Services.AddJuNotesSignIn();
+builder.Services.AddSingleton<OwnerDirectory>();
+builder.Services.AddSingleton<ISecurityLog, SecurityLog>();
 // After the base, so that the one data source of the server is ours (the base asks for "the" NpgsqlDataSource and gets this one).
 builder.Services.AddJuNotesServices(builder.Configuration);
 builder.Services.AddJuNotesWorkers();
@@ -87,6 +89,7 @@ await app.StartBaseAsync();
 await DatabaseUpgrade.RunAsync(data, migrations, DatabaseUpgrade.ReadBaseline(backend), stopping);
 
 await app.Services.GetRequiredService<AiProfileStore>().EnsureDefaultsAsync(stopping);
+await app.Services.GetRequiredService<OwnerDirectory>().EnsureClaimedAsync(stopping);
 
 // The contract with the iPad app is its own door and comes before everything of the base.
 app.UseV1Door();

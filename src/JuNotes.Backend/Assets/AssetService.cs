@@ -1,3 +1,5 @@
+using Npgsql;
+
 namespace JuNotes.Backend.Assets
 {
     public sealed class AssetOptions
@@ -11,7 +13,7 @@ namespace JuNotes.Backend.Assets
     }
 
     // Scans and imported PDFs are files, not rows: they are too big for a sync entry. One file per id, named by the id only.
-    public sealed class AssetService(AssetOptions options)
+    public sealed class AssetService(AssetOptions options, NpgsqlDataSource? dataSource = null)
     {
         public const long MaxBytes = 20 * 1024 * 1024;
 
@@ -40,8 +42,16 @@ namespace JuNotes.Backend.Assets
             return null;
         }
 
-        public async Task SaveAsync(Guid id, Stream body, CancellationToken ct)
+        public async Task SaveAsync(Guid id, Stream body, CancellationToken ct) => _ = await SaveAsync(id, body, null, ct);
+
+        // With an owner: a file that belongs to somebody else is not touched and nothing is said about it (false); the answer is the same as for a stored one.
+        public async Task<bool> SaveAsync(Guid id, Stream body, Guid? owner, CancellationToken ct)
         {
+            if (owner is { } person && await OwnerOfAsync(id, ct) is { } current && current != person)
+            {
+                return false;
+            }
+
             if (id == Guid.Empty)
             {
                 throw new AssetException("An asset needs an id.", 400);
@@ -81,10 +91,55 @@ namespace JuNotes.Backend.Assets
 
                 // The same id always holds the same file, so a repeated upload simply replaces it.
                 File.Move(partial, path, overwrite: true);
+                if (owner is { } stored)
+                {
+                    await using var claim = dataSource!.CreateCommand("insert into assets (id, owner_id) values ($1, $2) on conflict (id) do nothing");
+                    claim.Parameters.Add(new NpgsqlParameter { Value = id });
+                    claim.Parameters.Add(new NpgsqlParameter { Value = stored });
+                    await claim.ExecuteNonQueryAsync(ct);
+                }
+
+                return true;
             }
             finally
             {
                 File.Delete(partial);
+            }
+        }
+
+        // Who a file belongs to; nobody when there is no row (files made before the table existed get their owner from the claim).
+        private async Task<Guid?> OwnerOfAsync(Guid id, CancellationToken ct)
+        {
+            await using var command = dataSource!.CreateCommand("select owner_id from assets where id = $1");
+            command.Parameters.Add(new NpgsqlParameter { Value = id });
+            return await command.ExecuteScalarAsync(ct) as Guid?;
+        }
+
+        public async Task<bool> ExistsAsync(Guid id, Guid? owner, CancellationToken ct) => Exists(id) && (owner is not { } person || await OwnerOfAsync(id, ct) == person);
+
+        // A file of somebody else looks exactly like a file that is not there.
+        public async Task<(Stream Stream, string ContentType)?> OpenAsync(Guid id, Guid? owner, CancellationToken ct)
+            => owner is { } person && await OwnerOfAsync(id, ct) != person ? null : Open(id);
+
+        // Gives every file that has no owner yet to this person, once, when the first account exists.
+        public async Task ClaimFilesAsync(Guid owner, CancellationToken ct)
+        {
+            if (!System.IO.Directory.Exists(options.Directory))
+            {
+                return;
+            }
+
+            foreach (var file in System.IO.Directory.EnumerateFiles(options.Directory))
+            {
+                if (!Guid.TryParseExact(Path.GetFileName(file), "N", out var id))
+                {
+                    continue;
+                }
+
+                await using var claim = dataSource!.CreateCommand("insert into assets (id, owner_id) values ($1, $2) on conflict (id) do nothing");
+                claim.Parameters.Add(new NpgsqlParameter { Value = id });
+                claim.Parameters.Add(new NpgsqlParameter { Value = owner });
+                await claim.ExecuteNonQueryAsync(ct);
             }
         }
 
