@@ -1,6 +1,6 @@
 # Notes (JuNotes): working rules
 
-Built on the shared base of the app family. base version: **0.3.2** (the copy in `base/`). This repository is public.
+Built on the shared base of the app family. base version: **0.3.4** (the copy in `base/`). This repository is public.
 
 1. **Scope first.** Read [docs/SCOPE.md](docs/SCOPE.md) (what this project becomes and what stays out), then [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) (the draft), and keep [docs/STATE.md](docs/STATE.md) current: it is the hand-over page (what is done, the next step, how to start, test and publish, what is not verified). Build only the milestone the orchestrator has started.
 2. **The rulebook is [base/RULES.md](base/RULES.md).** Every rule there applies here; cite the numbers (`AUTH-03`) in comments and reviews. A deviation is written down with its reason in `docs/STATE.md` ("Known deviations"); today: `OPS-01`/`OPS-02` (the Compose file with variables, until the installation moves).

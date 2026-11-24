@@ -26,7 +26,7 @@ auf die gemeinsame Basis um (Entscheidungen vom 24.11.2026 in SCOPE.md).
 **Meilenstein 1 ist fertig** (1a, 1b, 1c; lokal committet, nichts gepusht, kein Release). Der Orchestrator prüft, die Sicherheitsprüfung (eigene Sitzung) liest 1a und 1b vor dem Einspielen
 (Liste unten). Meilenstein 2 beginnt erst mit seinem Startzeichen. Das Einspielen auf die laufende Installation ist seine Sache, mit Sicherung davor und dem Ja des Eigentümers.
 
-- **1a Basis eingehängt** (`base/` jetzt **0.3.2**, byteweise wie im Manifest): Konten, Sitzungen, Einrichtungsassistent, Rollen `admin` und `member`, Hub-Anmeldung, `/api/about`, `/api/health`, Einstellungen.
+- **1a Basis eingehängt** (`base/` jetzt **0.3.4**, byteweise wie im Manifest): Konten, Sitzungen, Einrichtungsassistent, Rollen `admin` und `member`, Hub-Anmeldung, `/api/about`, `/api/health`, Einstellungen.
   `/api/v1` ist eine **eigene Tür der Basis** (SEC-07, `BaseAppOptions.Doors`), die Prüfung ist der Instanz-Token. Die Tabelle der Basis heißt `base_migrations` (DATA-04), unsere bleibt
   `schema_migrations`. Die alten Razor-Seiten (`/Notes`, `/Admin`) stehen hinter der Sitzung der Basis, mit **einer** Prüfung (`BaseSessionHandler`); Anmelde- und Abmeldeseiten und die Passwörter
   `ADMIN_PASSWORD`/`WEB_PASSWORD` sind weg. Die Startseite `/` ist eine Seite im Baukasten (Anmeldung, Einrichtung, Einstellungen, Kacheln zu `/Notes` und `/Admin`).
@@ -156,6 +156,32 @@ den der Eigentümer einmal sieht und außerhalb aufbewahrt, während der Server 
   Konto gehört alles dem Administrator (0 ohne Besitzer, 8 mit) und die Datei hat ihren Besitzer; `/Notes` mit der Sitzung zeigt das Heft. Der Rückweg (Umkehr-SQL unten) brachte das Schema auf den Altstand zurück.
 - **Nicht gezeigt:** Anmeldung über den Hub, HTTPS, ein echter iPad-Abgleich (die App wurde nicht angefasst und nicht gestartet).
 
+## Sicherheitsprüfung Meilenstein 1: Befunde und Behebung (25.11.2026)
+
+Die unabhängige Prüfung von 1a und 1b fand keinen Weg, auf dem jemand ohne Zugang oder eine zweite angemeldete Person an Hefte, Dateien oder Verwaltung kommt, und zwei Befunde, mit denen nicht eingespielt wird. Alle sind behoben,
+je Punkt ein Commit (Zeitfolge `eec8b5a`, `5ff1e62`, danach Sicherungen und Sync der Basis) und ein Test. Die Basis liegt jetzt auf **0.3.4** (0.3.3 bringt SEC-08 und die zwei Basis-Punkte).
+
+| Nr. | Befund | Behebung | Test |
+|---|---|---|---|
+| 1 | Der Service Worker hob private Seiten auf | `sw.js` nach dem Muster der Basis: nur die statische Hülle, `notes-v2`; `Cache-Control: no-store` auf `/Notes`, `/Admin` und Scans; beim Abmelden werden die Zwischenspeicher geleert | `DoorsTests.The_service_worker_names_only_the_static_shell_…`, `…Private_pages_and_scans_are_never_kept_…` |
+| 2 | Person hinter dem Token wurde bei jeder Anfrage neu bestimmt | Beim ersten Zuweisen einmal festgeschrieben (`app_instance_settings`, Schlüssel `token_owner`); ist die Person nicht aktiv, antwortet `/api/v1` mit 401, nie wird jemand anderes gewählt | `SecurityFindingsTests.The_person_behind_the_token_is_written_down_once_…` (herabgestuft: weiter dieselbe Person; gesperrt oder gelöscht: 401, zweite Person bekommt nichts) |
+| 3 | `ForeignAsync` prüfte Art und id, `ForeignParentsAsync` nur die id | Beide prüfen die id allein: niemand legt eine Zeile unter einer id an, die jemand anderes benutzt | `SecurityFindingsTests.Nobody_puts_a_row_of_any_kind_under_an_id_…` |
+| 4 | „Kein Besitzer“-Modus, wann immer kein Administrator gefunden wurde | Nur solange **kein** Konto existiert, das sich anmelden kann; sonst 401 | `SecurityFindingsTests.The_token_works_without_an_owner_only_while_no_account_exists` |
+| 5 | Zuweisung und Migration unter der 5-Sekunden-Grenze | Eigene Verbindung ohne Zeitgrenze (`MaintenanceData`) für die Zuweisung und für die Migration unserer Folge; eine gescheiterte Zuweisung wird protokolliert, nicht neu versucht (bis zum nächsten Start) und lässt **keine** Anfrage mit 500 scheitern: `/api/v1` antwortet 503 mit einem Satz, es wird nichts auf besitzerlosen Zeilen geschrieben | `SecurityFindingsTests.A_claim_that_fails_is_a_503_…` |
+| 6 | Umbenennen vor der Sicherung | `PendingAsync` ist nur lesend, die Umbenennung kommt nach der Sicherung | `DatabaseUpgradeTests.Looking_at_what_is_pending_changes_nothing_…` |
+| 7 | Dateien: Besitz nach der Datei geschrieben | Erst der Körper wird geprüft (gleiche Antwort für alle), dann wird die id in `assets` beansprucht, dann die Datei an ihren Platz gelegt; zwei gleichzeitige PUTs können Besitz und Inhalt nicht vertauschen | `SecurityFindingsTests.A_file_for_an_id_of_somebody_else_gets_the_same_answers_…` |
+| 8 | Falsche Token ohne Bremse, Protokoll, Mindestlänge | Start verweigert bei einem Token unter **32 Zeichen** (klare Meldung); mehr als 10 falsche Token je Adresse und Minute sperren die Adresse bis zum Ende der Minute (auch für das richtige Token) mit dem `RateLimit` der Basis und einer eigenen Sperrliste; eine Zeile `api.token_refused` im Sicherheitsprotokoll, nie das Token | `SyncAccessTests` (Länge), `SecurityFindingsTests.Too_many_wrong_tokens_lock_the_address_…` |
+| – | `on conflict … do update` ohne Besitzbedingung | Beide Anweisungen tragen `owner_id is not distinct from excluded.owner_id` | durch die Zwei-Personen-Tests in `OwnerTests` mit abgedeckt (die Vorprüfung fängt zuerst; der Wächter in der Anweisung selbst ist **nicht einzeln getestet**, weil er nur bei einem Wettlauf greift) |
+| – | `/status` war ein Präfix | exakter Pfad | `SecurityFindingsTests.Only_the_exact_status_path_is_open` |
+| – | Anmelde-Middleware las das Cookie auch unter `/api` | `NoResult()` für alles unter `/api` | durch `DoorsTests.A_session_opens_nothing_under_api_v1` und die Tests der Basis-Pfade mit abgedeckt |
+| – | Razor-Fangnetz | `AuthorizeFolder("/")` | `AdminTests` (Rollen, ohne Sitzung) |
+| – | Sicherungen ohne `secret.key` | Mit Passphrase geht der Schlüssel verschlüsselt (`….key.enc`) zu jeder Kopie, wird zusammen mit seiner Sicherung gelöscht und liegt nie im Klartext neben einem Dump; ohne Passphrase kommt er nicht hinein und die Sicherungsseite warnt deutlich | `BackupKeyTests` (4; mit einem Ersatz für `pg_dump`, laufen deshalb auch hier) |
+
+**Nicht gefolgt / anders gelöst:** Bei Punkt 8 zählt die Bremse **falsche Versuche** mit dem `RateLimit` der Basis (es kann nur zählen, nicht nachsehen) und führt die Sperre selbst. Bei Punkt 5 wird die Migration **unserer** Folge über die Verbindung ohne Zeitgrenze
+gefahren; die Skripte der Basis laufen über die normale Verbindung (kleine neue Tabellen).
+
+**Offene Frage des Orchestrators an den Eigentümer** (nichts gebaut): Die Zuweisung gibt alle heutigen Hefte der Person, die die Einrichtung abschließt; der Besitzer ändert sich später nicht mehr.
+
 ## Für das Einspielen (Meilenstein 1 auf die laufende Installation)
 
 Nichts davon ist an der laufenden Installation ausgeführt. Einspielen ist Sache des Orchestrators, mit Sicherung davor und dem Ja des Eigentümers.
@@ -167,6 +193,13 @@ Nichts davon ist an der laufenden Installation ausgeführt. Einspielen ist Sache
 - Die Datenbankverbindung bleibt `ConnectionStrings__JuNotes`; die Basis liest sie, wenn `BASE_DB` fehlt.
 - `Admin__Password`, `Web__Password` und ihre Umgebungswerte werden nicht mehr gelesen und können später aus der Compose-Datei verschwinden.
 - Der Port, die Gesundheitsprüfung (`/health/live`) und der Reverse-Proxy bleiben. Die Basis glaubt `X-Forwarded-*` von privaten Netzen; die Einstellung „vertrauenswürdige Proxys“ ist in der App einstellbar.
+
+**Zusätzlich nach der Prüfung (25.11.2026):**
+- **`Sync__Token` muss mindestens 32 Zeichen haben,** sonst startet der Server nicht (Meldung nennt `Sync__Token` und die Länge, nicht den Wert). **Der Orchestrator prüft die Länge des echten Tokens vor dem Einspielen** und tauscht es bei Bedarf (in der App und im Server zugleich).
+- **Der App-Token steht danach für eine festgeschriebene Person** (`token_owner` in `app_instance_settings`), die beim ersten Zuweisen bestimmt wird. Wird sie gesperrt oder gelöscht, antwortet `/api/v1` mit 401; es wird nie jemand anderes gewählt.
+- **Sicherung:** `secret.key` geht nur mit einer Passphrase (`Backup__Passphrase`) und einem zweiten Ort verschlüsselt mit; ohne beides warnt die Sicherungsseite, und der Schlüssel muss getrennt aufgehoben werden (Datei im Volume unter `/data/base`).
+- **Zuweisung:** läuft auf einer eigenen Verbindung ohne Zeitgrenze, beim Start und bei der ersten Anmeldung; scheitert sie, antwortet `/api/v1` mit 503, bis der Server neu gestartet wird (es steht im Log).
+- Der Service Worker heißt jetzt `notes-v2`; Browser, die noch die alte Fassung haben, räumen beim ersten Besuch auf.
 
 **Was beim ersten Start passiert:** Vor der ersten Migration läuft die automatische Sicherung (`Backup__BeforeMigration`, schlägt sie fehl, startet der Server nicht). Dann: die Tabelle `instance_settings` heißt `app_instance_settings`;
 die Basis legt ihre Tabellen an (`users`, `sessions`, … und `base_migrations`); Migration 8 fügt `entities.owner_id` und die Tabelle `assets` hinzu. **Keine Zeile wird verändert.** Im Log steht
