@@ -50,7 +50,7 @@ Jeder endet in etwas, das er aufmachen kann. Reihenfolge und Zuschnitt gegenübe
 - Probe: Passt der Code der Basis (.NET 10, öffentlich, 0.3.1) unter .NET 11 hier? **Entschieden: `notes` bleibt auf net11, wenn die Probe grün ist.** Ist sie es
   nicht, gehen die Fehler an den Orchestrator, bevor an der Kopie etwas geändert wird (Änderungen gehören in die Basis).
 - Die Basis ins Repository holen (`base/` samt `MANIFEST`, danach `check-app.sh` und `sync-base.sh`), siehe ARCHITECTURE.md 4a.
-- Den Abgleichvertrag mit der iPad-App als Test einfrieren (Golden-Tests auf `/api/v1`), damit jeder spätere Schritt beweisbar nichts bricht.
+- Den Abgleichvertrag mit der iPad-App als Test einfrieren (Golden-Tests auf `/api/v1`), damit jeder spätere Schritt beweisbar nichts bricht, **einschließlich der Antwort auf `push`** (Form von `accepted` und `seq`, Statuscodes), damit die neue Auslass-Regel aus Meilenstein 1 als bewusste, additive Änderung sichtbar wird.
 - **Aufmachen kann er:** eine grüne Testliste, die den Vertrag der App beschreibt. Am laufenden System ändert sich nichts.
 
 ### 1. Anmeldung und Personen aus der Basis, neben dem App-Token
@@ -81,6 +81,9 @@ Jeder endet in etwas, das er aufmachen kann. Reihenfolge und Zuschnitt gegenübe
 - **Offener Entwurfspunkt:** Wie kommt ein später freigegebenes Heft in den Abgleich der Empfängerin (ihr Merker liegt schon darüber), und wie erfährt sie vom
   Entziehen? Vorschlag in zwei Stufen: **in diesem Meilenstein Freigaben nur im Web** (kein Merker nötig), die App der Empfängerin später durch Neustempeln des
   Teilbaums. Einzelheiten in ARCHITECTURE.md 3a.
+- **Freigaben im Abgleich (Stufe 2) sind nicht Teil dieses Meilensteins.** **Vorbedingung dafür ist eine kleine App-Änderung** mit eigenem Entwurf: beim Löschen
+  eines Hefts die Kinder mitnehmen, einen Lese-Marker an der Wurzelzeile einer Freigabe auswerten, die lokale Suche beim Löschen aufräumen (zu prüfen), und
+  die App lernt, dass der Server eine Zeile auslassen kann (`accepted` auswerten oder verworfene Zeilen nicht still verlieren). Siehe ARCHITECTURE.md 3a.
 - **Aufmachen kann er:** ein zweites Konto anlegen, ein Heft teilen, und es erscheint im Web dort, nicht bei der dritten Person.
 
 ### 4. Schule pro Person *(vorgezogen, damit Meilenstein 5 und 6 mit echten Daten laufen)*

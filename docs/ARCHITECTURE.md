@@ -46,20 +46,22 @@ Grundsatz: **Nur hinzufügen, nie umbauen.** Die App kennt die Form der Daten un
    - Zugriff über die Elternkette gilt nur für Zeilen, die dem Besitzer des Hefts gehören.
    - Dateien (`PUT`/`GET /api/v1/assets/{id}`) prüfen den Besitz genauso.
    - **Jede dieser Regeln bekommt einen Test mit zwei Personen.**
-   - **Wie der Server eine Verletzung beantwortet, ist durch die App festgelegt** (gelesen in `SyncEngine.swift`): Die App schickt ihre Änderungen in
-     Stapeln und bricht den **ganzen** Abgleich ab, sobald der Server einen Stapel mit einem Fehlerstatus ablehnt (`TransportError.rejected`). Der Stapel
-     bleibt im Postausgang und wird beim nächsten Versuch wieder geschickt: **eine einzige abgelehnte Zeile blockiert dieses Gerät dauerhaft** (die
-     Statuszeile zeigt „Server nicht erreichbar“). Darum antwortet der Server auf eine Zeile, die gegen die Schreibregeln verstößt, **nicht mit einem Fehler**,
-     sondern lässt sie aus, nimmt den Rest des Stapels an, meldet in `accepted` nur die angenommenen und schreibt eine Warnung ins Protokoll. Ob das die
-     gewünschte Strenge ist, ist eine Entscheidung für den Orchestrator (Alternative: Fehler, dann bräuchte die App eine Änderung).
-4. **`seq` bleibt global.** Der Pull einer Person liefert nur ihre Zeilen (und freigegebene) mit `seq` über ihrem Merker. Lücken in der Folge sind für den
-   Merker der App harmlos, weil sie nur „größer als“ benutzt (**ungeprüft: App-Code noch einmal gegen Lücken lesen**).
-5. **Der bestehende App-Token** wird zum „Gerät des Eigentümers“: Der Server ordnet ihn bei jeder Anfrage der Person Eigentümer zu. Neue Token je Gerät
-   und Person kommen mit Meilenstein 3 aus der Basis (Geräte-Modul). Der alte Token wird erst abgeschaltet, wenn die App ihn nicht mehr schickt, und das
-   schaltet der Eigentümer von Hand.
-6. **Freigaben:** eigene Tabelle `shares(entity_id, recipient_id, mode, granted_seq, revoked_seq)`; Lesen prüft Besitz oder Freigabe. Ein freigegebenes Heft
-   bringt alle Seiten und Striche darunter mit (Zugriff über die `parent_id`-Kette, nur für Zeilen des Besitzers). **Offener Entwurfspunkt für Meilenstein 3:**
-   siehe Abschnitt 3a.
+   - **Wie der Server eine Verletzung beantwortet (entschieden, Orchestrator 24.11.2026):** Eine Zeile, die gegen die Schreibregeln verstößt, wird **ausgelassen**.
+     Der Rest des Stapels wird angenommen, `accepted` nennt nur die angenommenen Zeilen, und es gibt **keinen Fehlerstatus** für den Stapel. Grund: In
+     Meilenstein 1 gehört alles dem Eigentümer, ein ehrliches Gerät trifft die Regel nie; ein Fehler würde nur ein ehrliches Gerät mit einem Programmfehler dauerhaft
+     blockieren (siehe unten, was die App bei Fehlern tut).
+     - Die Antwort verrät nichts über die fremde Zeile, außer dass **diese eine** nicht angenommen wurde.
+     - Ein Eintrag im Sicherheitsprotokoll nennt Person, Gerät und Art der Regel, **keine Inhalte**, und ist gedrosselt, damit ein Gerät das Protokoll nicht fluten kann.
+     - Ein **verformter** Stapel (Prüfung der Form, `SyncValidationException`, heute Status 400) bleibt ein Fehler; das ist keine Besitzfrage.
+     - **Tests:** Ein Stapel mit einer verbotenen und zwei erlaubten Zeilen speichert genau die zwei; die fremde Zeile ist danach Byte für Byte unverändert;
+       dasselbe für ein fremdes `parent_id`-Ziel. Die Golden-Tests aus Meilenstein 0 halten das heutige Verhalten der Push-Antwort fest (Form von `accepted`
+       und `seq`, Statuscodes), damit die neue Regel in Meilenstein 1 als bewusste, **additive** Änderung sichtbar wird.
+
+   **Was die App mit Zeilen macht, die nicht in `accepted` stehen** (gelesen in `SyncEngine.swift`, nichts ausgeführt): Sie **wertet die Antwort gar nicht aus**
+   (`_ = try await push(pending)`), sondern löscht nach jedem Push ohne Fehler **alle** gerade geschickten Zeilen aus dem Postausgang (`markPushed`).
+   Eine ausgelassene Zeile wird also **nicht** wieder geschickt, sie ist für den Server verloren. Auf dem Gerät bleibt die lokale Fassung stehen; der Stand dort und auf
+   dem Server laufen auseinander, bis der Server diese Zeile von sich aus wieder ausliefert. Das ist umgekehrt zum Fehlerfall (dort Dauerblockade). **Für
+   Meilenstein 1 hinnehmbar** (ein ehrliches Gerät schickt nie eine verbotene Zeile). **Vor Stufe 2 der Freigaben muss es gelöst sein** (siehe 3a, Vorbedingung).
 
 ### 3a. Freigaben und `seq` (offener Entwurfspunkt, Meilenstein 3)
 
@@ -95,10 +97,9 @@ erfahren, dass die Zeilen verschwinden. Die iPad-App kennt als Merker nur eine Z
    mindestens: Server lässt solche Zeilen still aus (siehe oben), **und** die App erfährt, dass ein Heft nur lesbar ist (neues additives Feld an der
    Wurzelzeile), sonst schreibt die Empfängerin ins Leere. Das ist eine App-Änderung und gehört nicht zu Meilenstein 3.
 
-**Folge:** Stufe 1 (nur Web) bleibt richtig. Stufe 2 ist erst entwerfbar, wenn der Orchestrator entschieden hat, ob eine kleine App-Änderung (Kinder mitnehmen,
-lesend markieren) eingeplant wird.
-7. **Beweis:** vor Meilenstein 1 ein Test, der einen Stand der Datenbank (Seite mit Strichen, Note, Karte, Objekt, Scan) durch alle neuen Migrationen
-   schickt und danach über `/api/v1` mit dem alten Token exakt dieselben Antworten bekommt wie vorher.
+**Folge (mit dem Orchestrator abgestimmt):** Stufe 1 (nur Web) bleibt richtig und ist alles, was Meilenstein 3 liefert. **Vorbedingung von Stufe 2** ist eine kleine
+App-Änderung mit eigenem Entwurf: Kinder beim Löschen mitnehmen, Lese-Marker an der Wurzelzeile, Aufräumen der lokalen Suche prüfen, und die App darf
+ausgelassene Zeilen nicht mehr still verlieren.
 
 ## 4. .NET 11 hier, .NET 10 in der Basis
 
