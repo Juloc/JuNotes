@@ -71,5 +71,33 @@ namespace JuNotes.Backend.Tests
                 await Assert.ThrowsAsync<InvalidOperationException>(() => DatabaseUpgrade.RunAsync(data, Set(), baseline, CancellationToken.None));
             }
         }
+
+        [RequiresDatabaseFact]
+        public async Task Looking_at_what_is_pending_changes_nothing_and_the_rename_comes_with_the_upgrade()
+        {
+            await using var database = await TestDatabase.CreateAsync();
+            var data = database.Data;
+            var assembly = typeof(MigrationSet).Assembly;
+            // A database as an older server left it: the settings table under the name the base also uses.
+            await DatabaseUpgrade.RunAsync(data, Set(), DatabaseUpgrade.ReadBaseline(assembly), CancellationToken.None);
+            await using (var back = data.CreateCommand("alter table app_instance_settings rename to instance_settings"))
+            {
+                await back.ExecuteNonQueryAsync();
+            }
+
+            // The check that runs before the backup is read only.
+            _ = await DatabaseUpgrade.PendingAsync(data, Set(("0001_extra.sql", "create table extra (id int)")), CancellationToken.None);
+            await using (var still = data.CreateCommand("select to_regclass('instance_settings') is not null and to_regclass('app_instance_settings') is null"))
+            {
+                Assert.True((bool)(await still.ExecuteScalarAsync())!);
+            }
+
+            // The rename is its own step, taken after the backup.
+            await DatabaseUpgrade.RenameLegacyTableAsync(data, CancellationToken.None);
+            await using (var renamed = data.CreateCommand("select to_regclass('instance_settings') is null and to_regclass('app_instance_settings') is not null"))
+            {
+                Assert.True((bool)(await renamed.ExecuteScalarAsync())!);
+            }
+        }
     }
 }

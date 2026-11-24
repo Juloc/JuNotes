@@ -213,7 +213,7 @@ namespace JuNotes.Backend.Tests
             {
                 // Before any account everything is as it was: the token of the app writes rows and files that belong to nobody yet.
                 using var app = host.Browser();
-                app.DefaultRequestHeaders.Authorization = new("Bearer", "sync-token");
+                app.DefaultRequestHeaders.Authorization = new("Bearer", AdminHost.Token);
                 var push = await app.PostAsync(Url("/api/v1/sync/push"), new StringContent("""{"changes":[{"kind":"subject","id":"20000000-0000-0000-0000-000000000011","parentId":null,"payload":{"name":"Altbestand"},"deleted":false}]}""", Encoding.UTF8, "application/json"));
                 Assert.Equal("""{"accepted":1,"seq":1}""", await push.Content.ReadAsStringAsync());
                 Assert.Equal(HttpStatusCode.NoContent, (await app.PutAsync(Url($"/api/v1/assets/{Scan}"), new ByteArrayContent(Jpeg))).StatusCode);
@@ -264,7 +264,7 @@ namespace JuNotes.Backend.Tests
                 var before = await scene.SnapshotAsync("subject", foreign);
 
                 using var app = scene.Host.Browser();
-                app.DefaultRequestHeaders.Authorization = new("Bearer", "sync-token");
+                app.DefaultRequestHeaders.Authorization = new("Bearer", AdminHost.Token);
                 var own = Guid.NewGuid();
                 async Task<string> PushAsync() => await (await app.PostAsync(Url("/api/v1/sync/push"), new StringContent(
                     $$"""{"changes":[{"kind":"subject","id":"{{foreign}}","parentId":null,"payload":{"name":"Zugriff"},"deleted":false},{"kind":"subject","id":"{{Guid.NewGuid()}}","parentId":null,"payload":{"name":"{{own}}"},"deleted":false}]}""", Encoding.UTF8, "application/json"))).Content.ReadAsStringAsync();

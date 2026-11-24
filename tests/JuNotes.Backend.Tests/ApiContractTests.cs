@@ -12,7 +12,7 @@ namespace JuNotes.Backend.Tests
     // the test is changed in the same commit that changes the answer.
     public class ApiContractTests
     {
-        private const string Token = "sync-token";
+        private const string Token = AdminHost.Token;
         private static readonly Guid Subject = Guid.Parse("10000000-0000-0000-0000-000000000001");
         private static readonly Guid Notebook = Guid.Parse("10000000-0000-0000-0000-000000000002");
         private static readonly Guid Page = Guid.Parse("10000000-0000-0000-0000-000000000003");

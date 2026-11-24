@@ -32,7 +32,6 @@ namespace JuNotes.Backend.Service
             var skipped = new HashSet<int>();
             if (owner is { } person)
             {
-                await ClaimAsync(connection, transaction, person.Id, ct);
                 var foreignRows = await ForeignAsync(connection, transaction, request.Changes, person.Id, ct);
                 var foreignParents = await ForeignParentsAsync(connection, transaction, request.Changes, person.Id, ct);
                 var rowCount = 0;
@@ -40,7 +39,7 @@ namespace JuNotes.Backend.Service
                 for (var index = 0; index < request.Changes.Count; index++)
                 {
                     var change = request.Changes[index];
-                    if (foreignRows.Contains((change.Kind, change.Id)))
+                    if (foreignRows.Contains(change.Id))
                     {
                         skipped.Add(index);
                         rowCount++;
@@ -111,32 +110,26 @@ namespace JuNotes.Backend.Service
         }
 
         // Gives every row that has no owner yet to the first administrator: one statement, and nothing to do once it has run (the partial index holds only unowned rows).
-        public async Task ClaimAsync(Guid owner, CancellationToken ct)
+        // The caller names the connection: it may take long on a big table and is not held to the time limit of the web.
+        public static async Task ClaimAsync(Guid owner, NpgsqlDataSource source, CancellationToken ct)
         {
-            await using var connection = await dataSource.OpenConnectionAsync(ct);
-            await ClaimAsync(connection, null, owner, ct);
-        }
-
-        private static async Task ClaimAsync(NpgsqlConnection connection, NpgsqlTransaction? transaction, Guid owner, CancellationToken ct)
-        {
-            await using var claim = new NpgsqlCommand("update entities set owner_id = $1 where owner_id is null", connection, transaction);
+            await using var connection = await source.OpenConnectionAsync(ct);
+            await using var claim = new NpgsqlCommand("update entities set owner_id = $1 where owner_id is null", connection) { CommandTimeout = 0 };
             claim.Parameters.Add(new NpgsqlParameter { Value = owner });
             await claim.ExecuteNonQueryAsync(ct);
         }
 
-        // Rows of this batch that already exist and belong to somebody else.
-        private static async Task<HashSet<(string Kind, Guid Id)>> ForeignAsync(NpgsqlConnection connection, NpgsqlTransaction transaction, IReadOnlyList<SyncChange> changes, Guid owner, CancellationToken ct)
+        // Ids of this batch that already stand in the table, under any kind, and belong to somebody else: nobody puts a row under an id that somebody else uses.
+        private static async Task<HashSet<Guid>> ForeignAsync(NpgsqlConnection connection, NpgsqlTransaction transaction, IReadOnlyList<SyncChange> changes, Guid owner, CancellationToken ct)
         {
-            var found = new HashSet<(string, Guid)>();
-            await using var command = new NpgsqlCommand(
-                "select e.kind, e.id from entities e join unnest($1::text[], $2::uuid[]) as t(kind, id) on e.kind = t.kind and e.id = t.id where e.owner_id is distinct from $3", connection, transaction);
-            command.Parameters.Add(new NpgsqlParameter { Value = changes.Select(change => change.Kind).ToArray(), NpgsqlDbType = NpgsqlDbType.Array | NpgsqlDbType.Text });
-            command.Parameters.Add(new NpgsqlParameter { Value = changes.Select(change => change.Id).ToArray(), NpgsqlDbType = NpgsqlDbType.Array | NpgsqlDbType.Uuid });
+            var found = new HashSet<Guid>();
+            await using var command = new NpgsqlCommand("select distinct id from entities where id = any($1::uuid[]) and owner_id is distinct from $2", connection, transaction);
+            command.Parameters.Add(new NpgsqlParameter { Value = changes.Select(change => change.Id).Distinct().ToArray(), NpgsqlDbType = NpgsqlDbType.Array | NpgsqlDbType.Uuid });
             command.Parameters.Add(new NpgsqlParameter { Value = owner });
             await using var reader = await command.ExecuteReaderAsync(ct);
             while (await reader.ReadAsync(ct))
             {
-                found.Add((reader.GetString(0), reader.GetGuid(1)));
+                found.Add(reader.GetGuid(0));
             }
 
             return found;
@@ -209,9 +202,9 @@ namespace JuNotes.Backend.Service
         {
             // A stroke that exists stays as it is unless this deletes it; other kinds take the new values unless nothing would change.
             var conflict = change.Kind == EntityKinds.Stroke
-                ? "on conflict (kind, id) do update set deleted = true, seq = nextval('change_seq') where excluded.deleted and not entities.deleted"
+                ? "on conflict (kind, id) do update set deleted = true, seq = nextval('change_seq') where excluded.deleted and not entities.deleted and entities.owner_id is not distinct from excluded.owner_id"
                 : "on conflict (kind, id) do update set parent_id = excluded.parent_id, payload = excluded.payload, deleted = excluded.deleted, seq = nextval('change_seq') "
-                    + "where (entities.parent_id, entities.payload, entities.deleted) is distinct from (excluded.parent_id, excluded.payload, excluded.deleted)";
+                    + "where entities.owner_id is not distinct from excluded.owner_id and (entities.parent_id, entities.payload, entities.deleted) is distinct from (excluded.parent_id, excluded.payload, excluded.deleted)";
 
             await using var command = new NpgsqlCommand(
                 "insert into entities (kind, id, parent_id, payload, deleted, seq, owner_id) values ($1, $2, $3, $4, $5, nextval('change_seq'), $6) " + conflict, connection, transaction);

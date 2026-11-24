@@ -60,12 +60,19 @@ builder.AddBase(new BaseAppOptions("notes", "Notes", typeof(Program).Assembly)
 });
 builder.Services.AddRazorPages(options =>
 {
+    // The net under everything: a page nobody thought of is not open either.
+    options.Conventions.AuthorizeFolder("/");
     // Until the web pages move to the base (milestone 2): behind the session of the base, one policy per folder, nothing open.
     options.Conventions.AuthorizeFolder("/Admin", AdminSetup.AdminPolicy);
     options.Conventions.AuthorizeFolder("/Notes", AdminSetup.ReaderPolicy);
 });
 builder.Services.AddJuNotesSignIn();
+// A connection of its own without a time limit for what may take long on a big table (the schema upgrade and the giving of old rows to their owner).
+var maintenanceConnection = new NpgsqlConnectionStringBuilder(builder.Configuration.GetConnectionString("JuNotes")) { CommandTimeout = 0, ApplicationName = "notes-maintenance", MaxPoolSize = 2 };
+var maintenance = new MaintenanceData(Base.Data.Database.Create(maintenanceConnection.ConnectionString, builder.Configuration["BASE_DB_PASSWORD_FILE"]));
+builder.Services.AddSingleton(maintenance);
 builder.Services.AddSingleton<OwnerDirectory>();
+builder.Services.AddSingleton<TokenBrake>();
 builder.Services.AddSingleton<ISecurityLog, SecurityLog>();
 // After the base, so that the one data source of the server is ours (the base asks for "the" NpgsqlDataSource and gets this one).
 builder.Services.AddJuNotesServices(builder.Configuration);
@@ -81,7 +88,6 @@ var migrations = MigrationSet.FromAssembly(backend);
 
 // Two sequences of migrations live in the one database: ours (numbers, table schema_migrations) and those of the base (table base_migrations). One table of our
 // baseline has the name of a table of the base and is renamed first. The base goes first, so that ours may point at its tables.
-await DatabaseUpgrade.RenameLegacyTableAsync(data, stopping);
 var backups = app.Services.GetRequiredService<BackupService>();
 if (backups.Options.BeforeMigration && await AnythingToUpgradeAsync(data, migrations, stopping))
 {
@@ -89,8 +95,10 @@ if (backups.Options.BeforeMigration && await AnythingToUpgradeAsync(data, migrat
     await backups.RunAsync(BackupKind.BeforeMigration, stopping);
 }
 
+// Only now, after the backup: the one rename (a table that only has another name afterwards, nothing is rewritten).
+await DatabaseUpgrade.RenameLegacyTableAsync(maintenance.Source, stopping);
 await app.StartBaseAsync();
-await DatabaseUpgrade.RunAsync(data, migrations, DatabaseUpgrade.ReadBaseline(backend), stopping);
+await DatabaseUpgrade.RunAsync(maintenance.Source, migrations, DatabaseUpgrade.ReadBaseline(backend), stopping);
 
 await app.Services.GetRequiredService<AiProfileStore>().EnsureDefaultsAsync(stopping);
 await app.Services.GetRequiredService<OwnerDirectory>().EnsureClaimedAsync(stopping);

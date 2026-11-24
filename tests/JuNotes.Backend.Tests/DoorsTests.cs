@@ -25,7 +25,7 @@ namespace JuNotes.Backend.Tests
             using (host)
             {
                 using var client = host.Browser();
-                client.DefaultRequestHeaders.Authorization = new("Bearer", "sync-token");
+                client.DefaultRequestHeaders.Authorization = new("Bearer", AdminHost.Token);
 
                 // Everything of the base that needs a session, and a path under /api/web/v1 that does not exist yet but will: the token is not a key to any of them.
                 foreach (var path in new[] { "/api/people", "/api/settings", "/api/web/v1/library", "/api/web/v1/me", "/api/auth/sessions" })
@@ -80,7 +80,7 @@ namespace JuNotes.Backend.Tests
                 }
 
                 using var app = host.Browser();
-                app.DefaultRequestHeaders.Authorization = new("Bearer", "sync-token");
+                app.DefaultRequestHeaders.Authorization = new("Bearer", AdminHost.Token);
                 Assert.Equal(HttpStatusCode.OK, (await app.GetAsync(Url("/API/V1/sync/pull"))).StatusCode);
             }
         }
@@ -94,7 +94,7 @@ namespace JuNotes.Backend.Tests
             {
                 // The app sends neither X-Base nor an Origin: its push must still go through, which is why /api/v1 is a door of its own.
                 using var app = host.Browser();
-                app.DefaultRequestHeaders.Authorization = new("Bearer", "sync-token");
+                app.DefaultRequestHeaders.Authorization = new("Bearer", AdminHost.Token);
                 var push = await app.PostAsync(Url("/api/v1/sync/push"), new StringContent("""{"changes":[{"kind":"subject","id":"00000000-0000-0000-0000-000000000009","parentId":null,"payload":{"name":"x"},"deleted":false}]}""", System.Text.Encoding.UTF8, "application/json"));
                 Assert.Equal(HttpStatusCode.OK, push.StatusCode);
 

@@ -119,7 +119,7 @@ namespace JuNotes.Backend.Tests
         private static HttpClient Api(AdminHost host)
         {
             var client = host.Browser();
-            client.DefaultRequestHeaders.Authorization = new("Bearer", "sync-token");
+            client.DefaultRequestHeaders.Authorization = new("Bearer", AdminHost.Token);
             return client;
         }
 

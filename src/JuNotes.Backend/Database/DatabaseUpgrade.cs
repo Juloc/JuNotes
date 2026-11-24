@@ -28,7 +28,6 @@ namespace JuNotes.Backend.Database
         // How many migrations the database still lacks; 0 for a database that is new (nothing worth saving yet) or current.
         public static async Task<int> PendingAsync(NpgsqlDataSource dataSource, MigrationSet migrations, CancellationToken ct)
         {
-            await RenameLegacyTableAsync(dataSource, ct);
             await using var connection = await dataSource.OpenConnectionAsync(ct);
             await using var exists = new NpgsqlCommand("select to_regclass('schema_migrations') is not null", connection);
             if (!(bool)(await exists.ExecuteScalarAsync(ct))!)

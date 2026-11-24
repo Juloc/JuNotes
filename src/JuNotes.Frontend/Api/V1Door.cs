@@ -25,16 +25,46 @@ namespace JuNotes.Frontend.Api
         // The largest body of a request at this door: what Kestrel allowed before (a scan or a PDF is at most 20 MB, a batch of changes less).
         public const long MaxBodyBytes = 30_000_000;
 
-        public static ValueTask<bool> CheckAsync(HttpContext context)
+        private const string OwnerKey = "notes.token-owner";
+
+        // The check of the door. Only /status (the exact path) is open. Everything else needs the token; too many wrong tokens from one address lock that address for a minute, also
+        // for the right one, and are written to the security log once. With the token the person it stands for is looked up (OwnerDirectory) and kept for the endpoints; if the
+        // token has no person any more the door says 401.
+        public static async ValueTask<bool> CheckAsync(HttpContext context)
         {
-            if (context.Request.Path.StartsWithSegments(Prefix + "/status", StringComparison.OrdinalIgnoreCase))
+            if (context.Request.Path.Equals(Prefix + "/status", StringComparison.OrdinalIgnoreCase))
             {
-                return ValueTask.FromResult(true);
+                return true;
+            }
+
+            var brake = context.RequestServices.GetRequiredService<TokenBrake>();
+            var address = Base.Web.Auth.RequestIdentity.ClientIp(context);
+            if (brake.IsLocked(address))
+            {
+                return false;
             }
 
             var access = context.RequestServices.GetRequiredService<SyncAccess>();
-            return ValueTask.FromResult(access.IsConfigured && access.IsAuthorized(context.Request.Headers.Authorization));
+            if (!access.IsConfigured || !access.IsAuthorized(context.Request.Headers.Authorization))
+            {
+                brake.Failed(address);
+                return false;
+            }
+
+            var owner = await context.RequestServices.GetRequiredService<OwnerDirectory>().TokenOwnerAsync(context.RequestAborted);
+            if (owner.State == TokenState.Refused)
+            {
+                return false;
+            }
+
+            context.Items[OwnerKey] = owner;
+            return true;
         }
+
+        private static TokenOwner OwnerOf(HttpContext context) => (TokenOwner)context.Items[OwnerKey]!;
+
+        // The person for a sync or file request: null while no account exists (as it was); the door has already refused a token without a person.
+        private static Guid? PersonId(HttpContext context) => OwnerOf(context).Person?.Id;
 
         // The answers are written as they always were: the options of the framework (camel case, its own escaping) with the nulls kept. The base leaves the nulls
         // out of its own answers, and the app, which has never heard of that, would no longer find them.
@@ -53,12 +83,16 @@ namespace JuNotes.Frontend.Api
             endpoints.MapGet("/api/v1/status", () => Json(new { name = "JuNotes", version = Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "0.0.0", api = 1 }));
 
             var secured = endpoints.MapGroup("/api/v1");
+            // Giving the old rows to their owner did not work (logged, tried again at the next start): no sync on rows nobody owns.
+            secured.AddEndpointFilter(async (invocation, next) => invocation.HttpContext.Items[OwnerKey] is TokenOwner { State: TokenState.Pending }
+                ? Results.Problem("The server is not ready: the notes are not assigned yet. Try again later.", statusCode: 503)
+                : await next(invocation));
             var sync = secured.MapGroup("/sync");
-            sync.MapPost("/push", async (PushRequest request, SyncService service, OwnerDirectory owners, ISecurityLog log, CancellationToken ct) =>
+            sync.MapPost("/push", async (PushRequest request, HttpContext context, SyncService service, ISecurityLog log, CancellationToken ct) =>
             {
                 try
                 {
-                    return Json(await service.PushAsync(request, await owners.TokenOwnerAsync(ct), log, ct));
+                    return Json(await service.PushAsync(request, OwnerOf(context).Person, log, ct));
                 }
                 catch (SyncValidationException error)
                 {
@@ -66,7 +100,7 @@ namespace JuNotes.Frontend.Api
                 }
             });
             sync.MapGet("/info", (BackupService backup, TimeProvider time) => Json(new { serverTime = time.GetUtcNow(), lastBackupAt = backup.Latest()?.At }));
-            sync.MapGet("/pull", async (long? since, int? limit, SyncService service, OwnerDirectory owners, CancellationToken ct) => Json(await service.PullAsync(since ?? 0, limit ?? SyncService.MaxChanges, (await owners.TokenOwnerAsync(ct))?.Id, ct)));
+            sync.MapGet("/pull", async (long? since, int? limit, HttpContext context, SyncService service, CancellationToken ct) => Json(await service.PullAsync(since ?? 0, limit ?? SyncService.MaxChanges, PersonId(context), ct)));
 
             var schoolApi = secured.MapGroup("/school");
             schoolApi.MapGet("/status", (SchoolImportService import) => Json(import.Status));
@@ -81,12 +115,12 @@ namespace JuNotes.Frontend.Api
             schoolApi.MapGet("/news", async (int? limit, SchoolStore store, CancellationToken ct) => Json(await store.NewsAsync(limit ?? 20, ct)));
 
             var assetApi = secured.MapGroup("/assets");
-            assetApi.MapPut("/{id:guid}", async (Guid id, HttpRequest request, AssetService assets, OwnerDirectory owners, CancellationToken ct) =>
+            assetApi.MapPut("/{id:guid}", async (Guid id, HttpRequest request, HttpContext context, AssetService assets, CancellationToken ct) =>
             {
                 try
                 {
                     // A file of somebody else is left alone and the answer is the same as for a stored one.
-                    await assets.SaveAsync(id, request.Body, (await owners.TokenOwnerAsync(ct))?.Id, ct);
+                    await assets.SaveAsync(id, request.Body, PersonId(context), ct);
                     return Results.NoContent();
                 }
                 catch (AssetException error)
@@ -94,8 +128,8 @@ namespace JuNotes.Frontend.Api
                     return Results.Problem(error.Message, statusCode: error.StatusCode);
                 }
             });
-            assetApi.MapMethods("/{id:guid}", ["HEAD"], async (Guid id, AssetService assets, OwnerDirectory owners, CancellationToken ct) => await assets.ExistsAsync(id, (await owners.TokenOwnerAsync(ct))?.Id, ct) ? Results.Ok() : Results.NotFound());
-            assetApi.MapGet("/{id:guid}", async (Guid id, AssetService assets, OwnerDirectory owners, CancellationToken ct) => await assets.OpenAsync(id, (await owners.TokenOwnerAsync(ct))?.Id, ct) is { } file ? Results.Stream(file.Stream, file.ContentType, enableRangeProcessing: true) : Results.NotFound());
+            assetApi.MapMethods("/{id:guid}", ["HEAD"], async (Guid id, HttpContext context, AssetService assets, CancellationToken ct) => await assets.ExistsAsync(id, PersonId(context), ct) ? Results.Ok() : Results.NotFound());
+            assetApi.MapGet("/{id:guid}", async (Guid id, HttpContext context, AssetService assets, CancellationToken ct) => await assets.OpenAsync(id, PersonId(context), ct) is { } file ? Results.Stream(file.Stream, file.ContentType, enableRangeProcessing: true) : Results.NotFound());
 
             var aiApi = secured.MapGroup("/ai");
             aiApi.MapGet("/profiles", async (AiProfileStore store, CancellationToken ct) => Json((await store.ListAsync(ct)).Select(profile => new { profile.Key, profile.Name, profile.Enabled })));

@@ -13,6 +13,9 @@ namespace JuNotes.Backend.Tests
     {
         public const string SetupCode = "test-setup-code";
 
+        // Longer than the least the server accepts (32 characters).
+        public const string Token = "token-of-the-tests-0123456789-abcdefghij";
+
         private readonly TestDatabase _database;
         private readonly string _codex;
         private readonly (string Url, string Token)? _paperless;
@@ -29,7 +32,7 @@ namespace JuNotes.Backend.Tests
         protected override void ConfigureWebHost(Microsoft.AspNetCore.Hosting.IWebHostBuilder builder)
         {
             builder.UseSetting("ConnectionStrings:JuNotes", _database.ConnectionString);
-            builder.UseSetting("Sync:Token", "sync-token");
+            builder.UseSetting("Sync:Token", Token);
             builder.UseSetting("Backup:Directory", BackupDirectory);
             builder.UseSetting("Backup:BeforeMigration", "false");
             builder.UseSetting("Backup:PgDump", PostgresTools.PgDump);
@@ -207,7 +210,7 @@ namespace JuNotes.Backend.Tests
             await using (database) using (fake) using (host)
             {
                 var client = host.Browser();
-                client.DefaultRequestHeaders.Authorization = new("Bearer", "sync-token");
+                client.DefaultRequestHeaders.Authorization = new("Bearer", AdminHost.Token);
 
                 Assert.Equal(HttpStatusCode.Redirect, (await client.GetAsync(new Uri("/Admin", UriKind.Relative))).StatusCode);
             }

@@ -44,14 +44,11 @@ namespace JuNotes.Backend.Assets
 
         public async Task SaveAsync(Guid id, Stream body, CancellationToken ct) => _ = await SaveAsync(id, body, null, ct);
 
-        // With an owner: a file that belongs to somebody else is not touched and nothing is said about it (false); the answer is the same as for a stored one.
+        // With an owner: the file is checked first (the answer for a wrong file is the same for everybody), then the id is claimed in the table (whoever asks first for a free
+        // id owns it), and only then the file is put in place. A file of somebody else is not touched and the answer is the same as for a stored one (false). A stop in between
+        // leaves a row without a file, never a file without an owner.
         public async Task<bool> SaveAsync(Guid id, Stream body, Guid? owner, CancellationToken ct)
         {
-            if (owner is { } person && await OwnerOfAsync(id, ct) is { } current && current != person)
-            {
-                return false;
-            }
-
             if (id == Guid.Empty)
             {
                 throw new AssetException("An asset needs an id.", 400);
@@ -89,16 +86,23 @@ namespace JuNotes.Backend.Assets
                     }
                 }
 
-                // The same id always holds the same file, so a repeated upload simply replaces it.
-                File.Move(partial, path, overwrite: true);
-                if (owner is { } stored)
+                if (owner is { } person)
                 {
-                    await using var claim = dataSource!.CreateCommand("insert into assets (id, owner_id) values ($1, $2) on conflict (id) do nothing");
-                    claim.Parameters.Add(new NpgsqlParameter { Value = id });
-                    claim.Parameters.Add(new NpgsqlParameter { Value = stored });
-                    await claim.ExecuteNonQueryAsync(ct);
+                    await using (var claim = dataSource!.CreateCommand("insert into assets (id, owner_id) values ($1, $2) on conflict (id) do nothing"))
+                    {
+                        claim.Parameters.Add(new NpgsqlParameter { Value = id });
+                        claim.Parameters.Add(new NpgsqlParameter { Value = person });
+                        await claim.ExecuteNonQueryAsync(ct);
+                    }
+
+                    if (await OwnerOfAsync(id, ct) != person)
+                    {
+                        return false;
+                    }
                 }
 
+                // The same id always holds the same file, so a repeated upload simply replaces it.
+                File.Move(partial, path, overwrite: true);
                 return true;
             }
             finally
@@ -122,7 +126,7 @@ namespace JuNotes.Backend.Assets
             => owner is { } person && await OwnerOfAsync(id, ct) != person ? null : Open(id);
 
         // Gives every file that has no owner yet to this person, once, when the first account exists.
-        public async Task ClaimFilesAsync(Guid owner, CancellationToken ct)
+        public async Task ClaimFilesAsync(Guid owner, NpgsqlDataSource source, CancellationToken ct)
         {
             if (!System.IO.Directory.Exists(options.Directory))
             {
@@ -136,7 +140,7 @@ namespace JuNotes.Backend.Assets
                     continue;
                 }
 
-                await using var claim = dataSource!.CreateCommand("insert into assets (id, owner_id) values ($1, $2) on conflict (id) do nothing");
+                await using var claim = source.CreateCommand("insert into assets (id, owner_id) values ($1, $2) on conflict (id) do nothing");
                 claim.Parameters.Add(new NpgsqlParameter { Value = id });
                 claim.Parameters.Add(new NpgsqlParameter { Value = owner });
                 await claim.ExecuteNonQueryAsync(ct);

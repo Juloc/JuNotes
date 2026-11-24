@@ -37,6 +37,12 @@ namespace JuNotes.Frontend.Admin
     {
         protected override async Task<AuthenticateResult> HandleAuthenticateAsync()
         {
+            // Under /api the guard of the base reads the session, and under the doors nobody does: this handler stays out of it (one reading of the cookie per request).
+            if (Request.Path.StartsWithSegments("/api"))
+            {
+                return AuthenticateResult.NoResult();
+            }
+
             if (cookie.Read(Request) is not { } token)
             {
                 return AuthenticateResult.NoResult();
