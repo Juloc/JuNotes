@@ -23,10 +23,12 @@ auf die gemeinsame Basis um (Entscheidungen vom 24.11.2026 in SCOPE.md).
 
 ## Nächster Schritt
 
-1. Der Orchestrator sieht [SCOPE.md](SCOPE.md) und [ARCHITECTURE.md](ARCHITECTURE.md) durch. **Bis dahin wird nichts gebaut.**
-2. Danach Meilenstein 0: Entscheidung über den WebUntis-Client (Empfehlung: entfernen), Probe .NET 10 Basis gegen .NET 11 hier, Abgleichvertrag als Tests
-   einfrieren.
+1. Der Orchestrator hat den Plan gelesen und angenommen (24.11.2026), mit Korrekturen, die jetzt in [SCOPE.md](SCOPE.md) und [ARCHITECTURE.md](ARCHITECTURE.md)
+   stehen. **Es wird nichts gebaut, bis der Orchestrator das Startzeichen für Meilenstein 0 gibt** (auf der Maschine laufen höchstens zwei bauende Sitzungen).
+2. Dann Meilenstein 0: Probe der Basis (öffentlich, MIT, 0.3.1, lokal `~/projects/base`) unter .NET 11, die Basis ins Repository holen, den Abgleichvertrag als
+   Tests einfrieren. Der WebUntis-Client bleibt bis zur Antwort des Eigentümers unangetastet und inaktiv.
 3. Umbenennen von Repository und Ordner macht der Orchestrator, nicht die Sitzung im Ordner.
+4. Offen beim Orchestrator: Akzentfarbe (mein Vorschlag `--accent-hue` 75, Bernstein) und die Frage zur Sicherungs-Passphrase (siehe Liste unten).
 
 ## Entscheidungen, die schon gefallen sind
 
@@ -35,6 +37,9 @@ auf die gemeinsame Basis um (Entscheidungen vom 24.11.2026 in SCOPE.md).
 - Kostenloses Apple-ID-Sideloading, kein Mac, die CI baut.
 - Zugangsdaten tippt immer der Eigentümer selbst.
 - Die Entscheidungen 1 bis 8 vom 24.11.2026 (SCOPE.md).
+- Orchestrator, 24.11.2026: `notes` bleibt auf net11 (wenn die Probe grün ist); `notes` zählt die KI pro Person selbst; Besitzer leer = „erster Administrator“;
+  `/api/v1` ist eine eigene Tür; der Hub-Schlüssel wird in der Verwaltung eingetragen, nicht in der Umgebung; Web-App als Seiten der Basis, Razor fällt weg.
+- Das Schulische bleibt aus dem öffentlichen Repository (jetzt auch die Basis öffentlich): kein Name, keine Adresse, kein Passwort.
 - **Fragen vor dem Bauen:** Bei mehreren möglichen Entwürfen erst fragen (interaktiv, auf Deutsch), dann einmal bauen.
 
 ## Starten, testen, veröffentlichen
@@ -66,6 +71,28 @@ veröffentlicht `JuNotes.ipa` plus `source.json` als Release `latest`. Installie
 (Image neu bauen, Container neu starten). Vor jeder Migration entsteht automatisch eine Sicherung.
 
 **Nicht pushen**, bevor der Orchestrator es sagt: Der Entwurf des Umzugs ist lokal committet.
+
+## Einstellungen aus der Umgebung und wann sie wegfallen
+
+Heute kommen sie aus `.env` über `compose.yaml`. Die Basis verlangt eine Compose-Datei ohne Variablen und ohne `.env`; Geheimnisse liegen verschlüsselt in der
+Datenbank. Es kommen keine neuen Geheimnisse in die Umgebung.
+
+| Variable (Umgebungswert) | Wofür | Fällt weg in |
+|---|---|---|
+| `POSTGRES_PASSWORD` (`ConnectionStrings__JuNotes`) | Datenbank | Meilenstein 2, mit der Compose-Datei der Basis (**ungeprüft:** wie die Basis die Datenbank-Anmeldung ohne Variable löst) |
+| `SYNC_TOKEN` (`Sync__Token`) | gemeinsamer Token der iPad-App | 3, wenn die App Gerätetoken je Person schickt; abgeschaltet von Hand durch den Eigentümer |
+| `ADMIN_PASSWORD` (`Admin__Password`) | Verwaltung im Web | 1, mit dem eigenen Konto |
+| `WEB_PASSWORD` (`Web__Password`) | Lesen im Web | 1, mit dem eigenen Konto |
+| `UNTIS_SERVER`, `UNTIS_SCHOOL`, `UNTIS_USER`, `UNTIS_PASSWORD` (`School__Untis__*`) | WebUntis-Client | 0, **wenn der Eigentümer das Entfernen entscheidet** |
+| `SCHOOL_TIMETABLE_ICS_URL`, `SCHOOL_NEWS_FEED_URL` (`School__TimetableIcsUrl`, `School__NewsFeedUrl`) | Kalender-Abo und Feed, heute einer für alle | 4, dann je Person in der Datenbank |
+| `PAPERLESS_BASE_URL`, `PAPERLESS_TOKEN` (`Paperless__*`) | Export | spätestens 5, in der Verwaltung (verschlüsselt) |
+| `BACKUP_COPY_TO` (`Backup__CopyTo`) | zweiter Ort für Sicherungen | 5, in der Verwaltung |
+| `BACKUP_PASSPHRASE` (`Backup__Passphrase`) | Schlüssel der verschlüsselten Sicherungen | **offen, siehe unten** |
+| Codex-Anmeldung (Volume `CODEX_HOME`, kein Umgebungswert) | eigene Brücke | 6, im Modus Hub ist sie aus |
+
+**Frage an den Orchestrator:** Die Passphrase der Sicherungen kann nicht nur verschlüsselt in der Datenbank liegen, die sie selbst sichert; ohne sie wäre eine
+Sicherung bei verlorener Datenbank nicht lesbar. Wie löst die Basis das (Schlüssel außerhalb, zum Beispiel beim Eigentümer)? Bis dahin bleibt sie eine
+Umgebungsvariable.
 
 ## Offene Punkte
 
