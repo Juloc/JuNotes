@@ -23,17 +23,21 @@ auf die gemeinsame Basis um (Entscheidungen vom 24.11.2026 in SCOPE.md).
 
 ## Nächster Schritt
 
-Meilenstein 0 (Startzeichen des Orchestrators vom 24.11.2026) ist **zur Hälfte** getan:
+Meilenstein 0 (Startzeichen des Orchestrators vom 24.11.2026) ist **fertig**:
 
-- **Probe der Basis unter .NET 11:** Mit dem Analyselevel der Basis (`latest`) übersetzen Basis und Start-App unter net11 ohne Fehler und ohne Warnung. Mit **unserem**
-  Level (`latest-recommended`, Warnungen als Fehler) sind es 49 Stellen in der Basis (CA1848, CA1873, CA1068, CA2026, CA1822, CA1720, CA1000, CA1716, CA5350). Die Liste
-  liegt beim Orchestrator; **`base/` ist noch nicht im Repository**, bis er entscheidet (Vorschlag: unsere `Directory.Build.props` setzt für Projekte unter `base/` den
-  Level `latest`, die Kopie bleibt unverändert).
-- **Abgleichvertrag als Tests:** `tests/JuNotes.Backend.Tests/ApiContractTests.cs`, 15 Tests gegen den echten Host mit echter Datenbank (siehe unten). Alle grün. Dazu der
-  Test mit einem Datenbankstand durch alle Migrationen.
+- **Probe der Basis unter .NET 11:** Mit dem Level der Basis (`latest`) übersetzen Basis und Start-App unter net11 ohne Fehler und Warnung; mit unserem Level (`latest-recommended`) sind es
+  49 Stellen. Entscheidung siehe unten (Level der Basis für `base/`). Geprüft, dass die Bedingung greift: `base/` bekommt `latest`, unser Code `latest-recommended`.
+- **`base/` samt `MANIFEST` ist übernommen** (Version 0.3.1, 82 Dateien, byteweise wie im Manifest). `check-app.sh` der Basis meldet für die Kopie „unchanged (81 files)“ und „up to date“. Es meldet
+  außerdem zwei Befunde zu **Regeln für die App**, die nicht die Kopie betreffen: `OPS-01` (es gibt keine `docker-compose.yml`; unsere heißt `compose.yaml` und braucht Variablen, `OPS-02`) und
+  `CODE-07` (keine `CLAUDE.md`). Beides gehört zum Umzug der Installation und zur Frage, wie dieses Repository seine Arbeitsanweisungen führt; **beides ist nicht angefasst**, die Entscheidung liegt
+  beim Orchestrator und beim Eigentümer.
+- **Base-Projekte sind noch nicht in `JuNotes.slnx`** und werden von der App nicht gebaut: Sie brauchen die zentrale Paketverwaltung der Basis (`Directory.Packages.props`), die unsere Projekte
+  (Versionen im Projekt) stören würde. Das löst sich beim Einhängen in Meilenstein 1.
+- **Abgleichvertrag als Tests:** `tests/JuNotes.Backend.Tests/ApiContractTests.cs`, 15 Tests gegen den echten Host mit echter Datenbank (siehe unten). Alle grün. Dazu der Test mit einem
+  Datenbankstand durch alle Migrationen.
 
-Dann: auf die Antwort des Orchestrators warten (Level für `base/`), danach `base/` samt `MANIFEST` übernehmen und `check-app.sh` laufen lassen. Der WebUntis-Client
-bleibt unangetastet, die Antwort des Eigentümers steht aus. Umbenennen von Repository und Ordner macht der Orchestrator.
+Dann: das Urteil des Orchestrators über Meilenstein 0 abwarten; Meilenstein 1 beginnt erst mit seinem Startzeichen. Der WebUntis-Client bleibt unangetastet, die Antwort des Eigentümers steht aus.
+Umbenennen von Repository und Ordner macht der Orchestrator.
 
 ## Entscheidungen, die schon gefallen sind
 
@@ -44,6 +48,9 @@ bleibt unangetastet, die Antwort des Eigentümers steht aus. Umbenennen von Repo
 - Die Entscheidungen 1 bis 8 vom 24.11.2026 (SCOPE.md).
 - Orchestrator, 24.11.2026: `notes` bleibt auf net11 (wenn die Probe grün ist); `notes` zählt die KI pro Person selbst; Besitzer leer = „erster Administrator“;
   `/api/v1` ist eine eigene Tür; der Hub-Schlüssel wird in der Verwaltung eingetragen, nicht in der Umgebung; Web-App als Seiten der Basis, Razor fällt weg.
+- Orchestrator, 24.11.2026: **`base/` wird mit dem Analyselevel der Basis (`latest`) übersetzt, unser Code bleibt bei `latest-recommended` mit Warnungen als Fehler** (Bedingung auf den Projektpfad in
+  `Directory.Build.props`). Begründung: Die Kopie wird in der Basis mit eigenen Regeln und Tests geprüft und bleibt byteweise gleich dem `MANIFEST`, statt in jeder App noch einmal mit anderen Maßstäben.
+  Die 49 Stellen bei unserem Level gehen als Liste an die Basis (ein strengerer Level dort ist eine spätere, eigene Entscheidung; CA5350 bei TOTP bliebe eine begründete Ausnahme).
 - Das Schulische bleibt aus dem öffentlichen Repository (jetzt auch die Basis öffentlich): kein Name, keine Adresse, kein Passwort.
 - **Fragen vor dem Bauen:** Bei mehreren möglichen Entwürfen erst fragen (interaktiv, auf Deutsch), dann einmal bauen.
 

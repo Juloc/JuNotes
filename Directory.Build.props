@@ -8,4 +8,10 @@
     <AnalysisLevel>latest-recommended</AnalysisLevel>
     <Deterministic>true</Deterministic>
   </PropertyGroup>
+
+  <!-- The copy of the base in base/ is checked in the base, with its own rules and tests, and must stay byte for byte as it came (CODE-07). So its projects are
+       held to the analysis level of the base ("latest"), not to ours; our own code keeps "latest-recommended" with warnings as errors. -->
+  <PropertyGroup Condition="$(MSBuildProjectDirectory.StartsWith('$(MSBuildThisFileDirectory)base/')) Or $(MSBuildProjectDirectory.StartsWith('$(MSBuildThisFileDirectory)base\'))">
+    <AnalysisLevel>latest</AnalysisLevel>
+  </PropertyGroup>
 </Project>
