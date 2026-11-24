@@ -26,18 +26,25 @@ dass die heutige iPad-App dabei kaputtgeht, und dessen KI über den gemeinsamen 
    Tag, keine doppelten Anfragen, keine Anfragen im Hintergrund ohne Anlass, Abbruch beim Verlassen der Seite, sichtbare Nutzung.
 8. **Verwaltung im Web:** Personen und Rollen (aus der Basis), KI-Profile und Grenzen, Sicherungen und Geräte mit Abgleichstand. **Die Schule gehört nicht
    in die Verwaltung.** Jede Person verbindet Stundenplan und Schul-Intranet mit ihrem eigenen Zugang, nur für sich.
+   **Präzisiert am 24.11.2026 (Eigentümer, auf Frage „nur Kalender-Link oder eigene Anmeldung“): „Eigene Anmeldung“ für den Stundenplan.** Das ändert die Regel „nie ein Passwort
+   speichern“ für genau diesen Fall (unten). Das **Schul-Intranet** ist **noch nicht entschieden**: Der Eigentümer sieht es sich erst an, was es offiziell anbietet.
 
 ### Regeln für alles Schulische
 
-- Nur offizielle Wege für den Kontoinhaber: Kalender-Abo, Feed, Export.
-- Sie meldet sich selbst an. **Nie ein Passwort speichern oder eintippen.**
-- Nichts hinter der Anmeldung abgreifen, solange die Schule das nicht erlaubt hat.
-- Keine Schülerdaten aus dem System der Schule.
-- Schulname und Domain stehen nie in einem Repository (nur in der nicht eingecheckten `LOCAL.md`).
+1. **Die Person meldet sich selbst an,** in ihrer eigenen Einstellungsseite, mit ihren eigenen Händen. Niemand sonst tippt ihr Passwort, auch keine Sitzung und kein Test. Es gibt keinen gemeinsamen Schulzugang
+   und nichts Schulisches in der Verwaltung; ein Administrator sieht nur „verbunden / nicht verbunden“, nie Zugangsdaten oder Inhalte.
+2. **So wenig Geheimnis wie möglich.** Gibt es nach einer einmaligen Anmeldung ein dauerhaftes App-Geheimnis oder einen Token, mit dem der Server ohne Passwort weiterarbeiten kann, dann liegt das Passwort nur für diesen
+   einen Austausch im Speicher und wird nie gespeichert. Nur wenn es nachweislich nicht anders geht, liegt es je Person verschlüsselt (`SecretBox` der Basis, Schlüssel außerhalb der Datenbank). In beiden Fällen: nie
+   in der Umgebung, nie im Protokoll, nie in einer Antwort der API, nie im Klartext in einer Sicherung; „Trennen“ löscht es sofort und endgültig; das Löschen der Person löscht es mit.
+3. **Nur das Eigene der Person:** ihr Stundenplan (Zeiten, Fächer, Räume, Klassenbezeichnungen). Keine Schülerlisten, keine Noten, keine Nachrichten mit Schülernamen; keine Schülerdaten verlassen das System der Schule.
+   Abgerufen wird sparsam (feste Abstände, kein Dauerabruf) und nur über die dokumentierte Schnittstelle des Dienstes.
+4. **Das Schul-Intranet** ist ein eigener Fall: Hat es keine dokumentierte Schnittstelle, wäre „eigene Anmeldung“ dort das Auslesen von Seiten hinter der Anmeldung. Das bleibt ausgeschlossen, solange die Schule es nicht
+   erlaubt hat. **Offener Punkt, ohne Entwurf und ohne Code:** Der Eigentümer sieht es sich erst an und entscheidet dann. Geplant wird nur, was es offiziell anbietet (Feed, Export, Kalender-Abo); der vorhandene Import-Code
+   für Neuigkeiten bleibt unangetastet und inaktiv.
+5. Schulname und Domain stehen nie in einem Repository (nur in der nicht eingecheckten `LOCAL.md`). Tests laufen gegen eine Attrappe, nie gegen den echten Dienst und nie mit echten Zugangsdaten.
 
-Folge für den Code von heute: Der WebUntis-Client (`src/JuNotes.Backend/School/UntisClient.cs`) legt ihr Passwort in der `.env` des Servers ab und
-widerspricht diesen Regeln. Er ist ausgeliefert, aber ohne Zugangsdaten inaktiv. **Empfehlung: entfernen** (Meilenstein 0). Das ist eine Entscheidung des
-Eigentümers, nicht meine.
+Folge für den Code von heute: Der WebUntis-Client (`src/JuNotes.Backend/School/UntisClient.cs`) mit einem Zugang für alle und dem Passwort im Klartext in der Umgebung (`School__Untis__*`) verschwindet **in dieser Form**.
+Bis Meilenstein 4 bleibt er unangetastet und inaktiv; dort wird er auf „je Person, wie in Punkt 2“ umgebaut, und `School__Untis__*` entfällt.
 
 ## Meilensteine
 
@@ -88,8 +95,11 @@ Jeder endet in etwas, das er aufmachen kann. Reihenfolge und Zuschnitt gegenübe
 
 ### 4. Schule pro Person *(vorgezogen, damit Meilenstein 5 und 6 mit echten Daten laufen)*
 
-- Jede Person hinterlegt für sich einen Kalender-Abo-Link oder Feed. Kein Passwort, kein Abgreifen. Was die Schule nicht anbietet, gibt es nicht.
-- **Aufmachen kann er:** sein eigener Stundenplan in der App und im Web, aus seinem eigenen Link.
+- **Stundenplan mit eigener Anmeldung:** Jede Person verbindet in ihrer Einstellungsseite den Stundenplan-Dienst der Schule mit ihrem eigenen Schulkonto, nur für sich (Regeln oben). Die Variante (dauerhaftes App-Geheimnis
+  statt gespeichertem Passwort, oder Passwort verschlüsselt) wird am Anfang des Meilensteins an einem Konto der Person selbst entschieden (ARCHITECTURE.md 8). Der Administrator sieht nur „verbunden / nicht verbunden“.
+- **Was die Schule sonst offiziell anbietet** (Kalender-Abo, Feed, Export) bleibt als Weg für Neuigkeiten und als Rückfall.
+- **Schul-Intranet: offener Punkt.** Kein Entwurf für eine Anmeldung dort, kein Code, bis der Eigentümer entschieden hat.
+- **Aufmachen kann er:** sein eigener Stundenplan in der App und im Web, aus seinem eigenen Schulkonto; „Trennen“ löscht die Verbindung auf der Stelle.
 
 ### 5. Web-Verwaltung
 

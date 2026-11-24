@@ -210,11 +210,31 @@ abgelegt; Budgets je App, Tag und Monat; Rate-Limit je Minute; standardmäßig a
 
 ## 8. Schule pro Person
 
-- Pro Person: ein Link zu einem Kalender-Abo oder Feed (Eintrag in der Datenbank der Person). Kein Passwort, kein Benutzername, nichts hinter einer
-  Anmeldung. Der Server liest den Link mit `SchoolImportService` ohne Zugangsdaten.
-- Wo die Schule keinen Link anbietet, gibt es nichts. Wir bauen keinen Ersatz.
-- `UntisClient` und `School__Untis__*` werden entfernt, **wenn der Eigentümer das entscheidet** (er wird gefragt). Bis dahin bleibt der Code unangetastet und
-  inaktiv.
+Entscheidung des Eigentümers (24.11.2026): **eigene Anmeldung für den Stundenplan**, je Person, nur für sich. Regeln in SCOPE.md („Regeln für alles Schulische“). Gebaut wird es in Meilenstein 4.
+
+**Wie das gebaut würde:**
+- Eine Seite in den Einstellungen der Person (Seite der Basis), auf der **die Person selbst** Server, Schule und Konto des Stundenplan-Dienstes einträgt und anmeldet („Verbinden“, „Trennen“). Nichts Schulisches in der
+  Verwaltung; die Verwaltung zeigt je Person nur „verbunden / nicht verbunden“.
+- Der Server ruft den Dienst **sparsam** ab (feste Abstände, kein Dauerabruf; ein Abruf beim Verbinden, danach höchstens einige Male am Tag) und speichert **nur den Stundenplan der Person** (Zeiten, Fächer, Räume,
+  Klassenbezeichnungen) in einer Tabelle, die ihr gehört. Keine Schülerlisten, keine Noten, keine Nachrichten.
+- Tests laufen gegen eine Attrappe des Dienstes, nie gegen den echten und nie mit echten Zugangsdaten. Niemand außer der Person tippt ihr Passwort.
+- Der heutige `UntisClient` (ein Zugang für alle, Passwort in `School__Untis__*`) bleibt bis Meilenstein 4 **unangetastet und inaktiv**; dort wird er umgebaut und `School__Untis__*` entfällt.
+  `SchoolImportService` liest weiter Feeds ohne Zugangsdaten (Kalender-Abo, Neuigkeiten), solange es sie gibt.
+- **Schul-Intranet:** offener Punkt. Ohne dokumentierte Schnittstelle wäre eine Anmeldung dort das Auslesen von Seiten hinter der Anmeldung und bleibt ausgeschlossen, bis die Schule es erlaubt und der Eigentümer
+  entschieden hat. Kein Entwurf, kein Code.
+
+**Welche Variante für das Geheimnis möglich ist (nach dem Lesen, Stand 24.11.2026; nichts davon gegen die echte Schule ausprobiert):**
+- **Variante A, dauerhaftes App-Geheimnis statt Passwort (Passwort nie gespeichert): technisch möglich, aber nicht offiziell dokumentiert.** Die Gemeinschaftsbibliothek `untis` (Elixir) spricht den „Untis Mobile“-Zugang an und
+  meldet mit `user`, einem Einmalpasswort (`otp`) und der Uhrzeit an; sie sagt von sich, sie speichere nie Passwörter, müsse aber das geteilte App-Geheimnis behalten
+  ([Dokumentation der Bibliothek](https://untis.hexdocs.pm/json-rpc.html)). Laut Beschreibung der Bibliothek stammt das Geheimnis aus dem Profil im Stundenplan-Dienst oder aus dem QR-Code dort
+  (Suchergebnis, die Seite selbst, die ich gelesen habe, sagt es nicht). **Die Person könnte also das Geheimnis einmal selbst aus ihrem Profil nehmen und eintragen, und das Passwort käme gar nicht zu uns.**
+- **Variante B, Passwort verschlüsselt je Person:** der Weg des heutigen `UntisClient` (Anmeldung mit Benutzer und Passwort über die JSON-RPC-Schnittstelle).
+- **Die Quellenlage:** Eine **offizielle, öffentliche Beschreibung der JSON-RPC-Schnittstelle gibt es nicht**; mehrere Autoren von Bibliotheken schreiben, das Dokument gebe es nur auf Anfrage bei Untis
+  ([Beispiel](https://webuntis.noim.me/)). Öffentlich dokumentiert ist die REST-Schnittstelle für Integrationspartner
+  ([Untis Help Center](https://help.untis.at/hc/de/articles/4886785534354-API-documentation-for-integration-partners)); die Seite war für mich nicht lesbar (403), ich weiß also nicht, ob und wie eine einzelne Person sie nutzen darf.
+- **Meine Einschätzung:** A ist die richtige Wahl, **wenn** die Schule den Zugang „Untis Mobile“ eingeschaltet hat und das Geheimnis der Person zugänglich ist; das ist am Anfang von Meilenstein 4 an einem Konto der Person
+  selbst zu prüfen (sie tippt, nicht wir). Beide Wege nutzen eine Schnittstelle, die Untis nicht öffentlich beschreibt: Das sollte der Eigentümer wissen, und im Zweifel fragt man bei Untis oder der Schule nach, ob die Nutzung
+  für das eigene Konto in Ordnung ist. Kann A nicht bestätigt werden, gilt B nur mit der Regel „nachweislich nicht anders“, und der Eigentümer entscheidet.
 
 ## 9. Reihenfolge der Risiken
 
