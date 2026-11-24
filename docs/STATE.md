@@ -135,7 +135,7 @@ den der Eigentümer einmal sieht und außerhalb aufbewahrt, während der Server 
 
 ## Nachweis Meilenstein 1 (1c)
 
-- **Tests:** 315 Tests, **309 grün**, die 6 Backup-Tests sind die oben genannten (pg_dump 17 gegen Server 18). Neu: `DoorsTests` (6), `OwnerTests` (8). Alle 15 Vertragstests aus Meilenstein 0 laufen
+- **Tests:** 316 Tests, **310 grün**, die 6 Backup-Tests sind die oben genannten (pg_dump 17 gegen Server 18). Neu: `DoorsTests` (6), `OwnerTests` (8). Alle 15 Vertragstests aus Meilenstein 0 laufen
   **unverändert**, bis auf die eine Abweichung 2 (Fehlerkörper bei 401). Geändert wurden außerdem Tests, die zum alten Passwort-Anmeldeweg gehörten (entfallen: Anmeldeseiten, Sperre nach fünf Versuchen, Rückkehr-Adresse;
   die Anmeldung der Basis prüft die Basis) und `DatabaseUpgradeTests` (Tabellenname). Der Migrationstest läuft über die neuen Migrationen (Altstand nach Migration 5, `instance_settings` wieder unter dem alten Namen).
   Stichproben: Ein ausgeschalteter Eltern-Test und ein abgeschalteter Besitzer-Filter ließen genau die zuständigen Tests rot werden.
