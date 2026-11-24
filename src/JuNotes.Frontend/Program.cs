@@ -110,6 +110,8 @@ app.Use((context, next) =>
     if (context.Request.Path.StartsWithSegments("/Notes", StringComparison.OrdinalIgnoreCase) || context.Request.Path.StartsWithSegments("/Admin", StringComparison.OrdinalIgnoreCase))
     {
         context.Response.Headers.ContentSecurityPolicy = SecurityHeaders.Csp + "; style-src-attr 'unsafe-inline'";
+        // Whatever these pages show belongs to the person signed in: no browser or proxy keeps it (the service worker keeps only the static shell, SEC-08).
+        context.Response.Headers.CacheControl = "no-store";
     }
 
     return next();

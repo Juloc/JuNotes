@@ -143,5 +143,45 @@ namespace JuNotes.Backend.Tests
                 Assert.Equal(1L, (long)(await ours.ExecuteScalarAsync())!);
             }
         }
+
+        // 1: what the service worker may keep, and that private pages say "no-store".
+        [Fact]
+        public async Task The_service_worker_names_only_the_static_shell_and_its_cache_has_a_new_name()
+        {
+            var text = await File.ReadAllTextAsync(Path.Combine(AppContext.BaseDirectory, "../../../../../src/JuNotes.Frontend/wwwroot/sw.js"));
+
+            Assert.Contains("const CACHE = 'notes-v2'", text, StringComparison.Ordinal);
+            Assert.Contains("!isShell(url.pathname)) return", text, StringComparison.Ordinal);
+            // No private path is in the list, and the old rule (everything outside /api) is gone.
+            foreach (var private_ in new[] { "/Notes", "/Admin", "/api" })
+            {
+                Assert.DoesNotContain("'" + private_, text, StringComparison.Ordinal);
+            }
+
+            Assert.DoesNotContain("startsWith('/api/')", text, StringComparison.Ordinal);
+        }
+
+        [RequiresDatabaseFact]
+        public async Task Private_pages_and_scans_are_never_kept_by_a_browser_or_a_proxy()
+        {
+            var (host, database) = await StartAsync();
+            await using (database)
+            using (host)
+            {
+                var (person, client) = await host.SignedInPersonAsync();
+                var sync = Microsoft.Extensions.DependencyInjection.ServiceProviderServiceExtensions.GetRequiredService<JuNotes.Backend.Service.SyncService>(host.Services);
+                var notebook = Guid.NewGuid();
+                var asset = Guid.NewGuid();
+                await sync.PushAsync(new JuNotes.Backend.Data.Sync.PushRequest([new("notebook", notebook, null, JsonElement.Parse("""{"title":"x","type":"pages","template":"blank"}"""), false)]), new JuNotes.Backend.Data.Sync.SyncOwner(person, "p", "test"), null, default);
+                await Microsoft.Extensions.DependencyInjection.ServiceProviderServiceExtensions.GetRequiredService<JuNotes.Backend.Assets.AssetService>(host.Services).SaveAsync(asset, new MemoryStream([0xFF, 0xD8, 0xFF, 0xE0, 0, 16, (byte)'J', (byte)'F', (byte)'I', (byte)'F', 0, 1, 1, 0, 0, 1, 0, 1]), person, default);
+
+                foreach (var path in new[] { "/Notes", $"/Notes/{notebook}", $"/Notes/Asset/{asset}", "/Admin", "/Admin/Codex", "/Admin/Backups" })
+                {
+                    var response = await client.GetAsync(Url(path));
+                    Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+                    Assert.Contains("no-store", response.Headers.CacheControl?.ToString(), StringComparison.Ordinal);
+                }
+            }
+        }
     }
 }

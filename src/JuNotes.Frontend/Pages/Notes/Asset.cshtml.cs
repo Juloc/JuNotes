@@ -15,7 +15,7 @@ namespace JuNotes.Frontend.Pages.Notes
                 return NotFound();
             }
 
-            Response.Headers.CacheControl = "private, max-age=86400";
+            Response.Headers.CacheControl = "no-store";
             Response.Headers.XContentTypeOptions = "nosniff";
             return File(file.Stream, file.ContentType);
         }

@@ -26,7 +26,12 @@ function run(me) {
     person: { name: me.user },
     menu: [{ label: t('shell.settings'), icon: 'sliders', href: '#/settings' }],
     // somebody who came through the central sign-in is sent on to its sign-out, which ends its own session and tells the other apps
-    onSignOut: async () => { const r = await api('POST', '/api/auth/logout'); if (r && r.hubLogoutUrl) location.assign(r.hubLogoutUrl); else location.reload(); },
+    onSignOut: async () => {
+      const r = await api('POST', '/api/auth/logout');
+      // the worker keeps only the static shell (SEC-08); the copies are emptied at sign-out all the same
+      if ('caches' in window) await caches.keys().then((keys) => Promise.all(keys.map((k) => caches.delete(k)))).catch(() => { /* nothing to empty */ });
+      if (r && r.hubLogoutUrl) location.assign(r.hubLogoutUrl); else location.reload();
+    },
   });
   document.body.append(frame.el);
   router({ '/': homePage, '/settings': settingsPage }, frame);
