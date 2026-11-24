@@ -46,6 +46,12 @@ Grundsatz: **Nur hinzufügen, nie umbauen.** Die App kennt die Form der Daten un
    - Zugriff über die Elternkette gilt nur für Zeilen, die dem Besitzer des Hefts gehören.
    - Dateien (`PUT`/`GET /api/v1/assets/{id}`) prüfen den Besitz genauso.
    - **Jede dieser Regeln bekommt einen Test mit zwei Personen.**
+   - **Wie der Server eine Verletzung beantwortet, ist durch die App festgelegt** (gelesen in `SyncEngine.swift`): Die App schickt ihre Änderungen in
+     Stapeln und bricht den **ganzen** Abgleich ab, sobald der Server einen Stapel mit einem Fehlerstatus ablehnt (`TransportError.rejected`). Der Stapel
+     bleibt im Postausgang und wird beim nächsten Versuch wieder geschickt: **eine einzige abgelehnte Zeile blockiert dieses Gerät dauerhaft** (die
+     Statuszeile zeigt „Server nicht erreichbar“). Darum antwortet der Server auf eine Zeile, die gegen die Schreibregeln verstößt, **nicht mit einem Fehler**,
+     sondern lässt sie aus, nimmt den Rest des Stapels an, meldet in `accepted` nur die angenommenen und schreibt eine Warnung ins Protokoll. Ob das die
+     gewünschte Strenge ist, ist eine Entscheidung für den Orchestrator (Alternative: Fehler, dann bräuchte die App eine Änderung).
 4. **`seq` bleibt global.** Der Pull einer Person liefert nur ihre Zeilen (und freigegebene) mit `seq` über ihrem Merker. Lücken in der Folge sind für den
    Merker der App harmlos, weil sie nur „größer als“ benutzt (**ungeprüft: App-Code noch einmal gegen Lücken lesen**).
 5. **Der bestehende App-Token** wird zum „Gerät des Eigentümers“: Der Server ordnet ihn bei jeder Anfrage der Person Eigentümer zu. Neue Token je Gerät
@@ -74,6 +80,23 @@ erfahren, dass die Zeilen verschwinden. Die iPad-App kennt als Merker nur eine Z
   - *Eigener Merker je Freigabe:* Der Pull liefert zusätzlich `grants` mit dem Teilbaum seit dem Freigabezeitpunkt. Sauberer, aber **ändert die Antwort** des
     Abgleichs (nur additiv, die alte App ignoriert das Feld) und braucht Client-Arbeit.
   Ich würde mit „neu stempeln“ beginnen, solange Hefte klein sind, und den eigenen Merker nur einführen, wenn es in der Praxis zu viel Verkehr gibt.
+
+**Ergebnis aus dem App-Code (gelesen am 24.11.2026, nichts ausgeführt):**
+
+1. **Löschen nimmt die Kinder nicht mit.** `SQLiteStore.apply` und `upsert` setzen bei einer gelöschten Zeile nur diese eine Zeile auf `deleted = 1`. Die App
+   löscht ein Heft nie mit einem Schlag: `AppModel.deleteFolder` verlangt einen leeren Ordner, und Seiten gehen einzeln in den Papierkorb. Eine synthetische
+   Löschung der Wurzel bei Entzug **verbirgt** das Heft in der Ansicht (die Abfragen filtern nach Elternzeile und `deleted = 0`), lässt aber Seiten, Striche
+   und Dateien **auf dem Gerät der Empfängerin liegen**. Entzug heißt also nur: nicht mehr sichtbar, nicht: von dort gelöscht. Für ein echtes Entfernen müsste
+   der Server auch für jede Kindzeile eine Löschung schicken (viele Zeilen) oder die App lernt, Kinder mitzunehmen (App-Änderung).
+2. **Die Suche auf dem Gerät** (`page_text`, eine lokale Volltexttabelle) wird beim Löschen einer Zeile nicht aufgeräumt, soweit ich gelesen habe. Text aus
+   einem entzogenen Heft könnte in den Treffern bleiben. **Ungeprüft**, vor Stufe 2 gezielt nachlesen.
+3. **Die App kennt keinen Besitzer.** Sie behandelt jede Zeile als ihre eigene und lässt sie bearbeiten. Schreibt die Empfängerin auf ein nur lesend
+   freigegebenes Heft, lehnt der Server das ab, und das **blockiert wegen des Stapelverhaltens (oben) ihren ganzen Abgleich**. Stufe 2 braucht deshalb
+   mindestens: Server lässt solche Zeilen still aus (siehe oben), **und** die App erfährt, dass ein Heft nur lesbar ist (neues additives Feld an der
+   Wurzelzeile), sonst schreibt die Empfängerin ins Leere. Das ist eine App-Änderung und gehört nicht zu Meilenstein 3.
+
+**Folge:** Stufe 1 (nur Web) bleibt richtig. Stufe 2 ist erst entwerfbar, wenn der Orchestrator entschieden hat, ob eine kleine App-Änderung (Kinder mitnehmen,
+lesend markieren) eingeplant wird.
 7. **Beweis:** vor Meilenstein 1 ein Test, der einen Stand der Datenbank (Seite mit Strichen, Note, Karte, Objekt, Scan) durch alle neuen Migrationen
    schickt und danach über `/api/v1` mit dem alten Token exakt dieselben Antworten bekommt wie vorher.
 

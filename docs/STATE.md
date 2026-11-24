@@ -28,7 +28,8 @@ auf die gemeinsame Basis um (Entscheidungen vom 24.11.2026 in SCOPE.md).
 2. Dann Meilenstein 0: Probe der Basis (öffentlich, MIT, 0.3.1, lokal `~/projects/base`) unter .NET 11, die Basis ins Repository holen, den Abgleichvertrag als
    Tests einfrieren. Der WebUntis-Client bleibt bis zur Antwort des Eigentümers unangetastet und inaktiv.
 3. Umbenennen von Repository und Ordner macht der Orchestrator, nicht die Sitzung im Ordner.
-4. Offen beim Orchestrator: Akzentfarbe (mein Vorschlag `--accent-hue` 75, Bernstein) und die Frage zur Sicherungs-Passphrase (siehe Liste unten).
+4. Akzentfarbe vorläufig `--accent-hue` 75 (Bernstein; belegt sind 299 für JulOS und den Standard der Basis und 168 für caddy). Der Eigentümer sieht sie in
+   Meilenstein 2 und kann sie ändern, es ist eine Variable.
 
 ## Entscheidungen, die schon gefallen sind
 
@@ -79,7 +80,7 @@ Datenbank. Es kommen keine neuen Geheimnisse in die Umgebung.
 
 | Variable (Umgebungswert) | Wofür | Fällt weg in |
 |---|---|---|
-| `POSTGRES_PASSWORD` (`ConnectionStrings__JuNotes`) | Datenbank | Meilenstein 2, mit der Compose-Datei der Basis (**ungeprüft:** wie die Basis die Datenbank-Anmeldung ohne Variable löst) |
+| `POSTGRES_PASSWORD` (`ConnectionStrings__JuNotes`) | Datenbank | nicht in 0 bis 2; erst beim Umzug der Installation (siehe „Betriebspunkt“ unten) |
 | `SYNC_TOKEN` (`Sync__Token`) | gemeinsamer Token der iPad-App | 3, wenn die App Gerätetoken je Person schickt; abgeschaltet von Hand durch den Eigentümer |
 | `ADMIN_PASSWORD` (`Admin__Password`) | Verwaltung im Web | 1, mit dem eigenen Konto |
 | `WEB_PASSWORD` (`Web__Password`) | Lesen im Web | 1, mit dem eigenen Konto |
@@ -90,9 +91,20 @@ Datenbank. Es kommen keine neuen Geheimnisse in die Umgebung.
 | `BACKUP_PASSPHRASE` (`Backup__Passphrase`) | Schlüssel der verschlüsselten Sicherungen | **offen, siehe unten** |
 | Codex-Anmeldung (Volume `CODEX_HOME`, kein Umgebungswert) | eigene Brücke | 6, im Modus Hub ist sie aus |
 
-**Frage an den Orchestrator:** Die Passphrase der Sicherungen kann nicht nur verschlüsselt in der Datenbank liegen, die sie selbst sichert; ohne sie wäre eine
-Sicherung bei verlorener Datenbank nicht lesbar. Wie löst die Basis das (Schlüssel außerhalb, zum Beispiel beim Eigentümer)? Bis dahin bleibt sie eine
-Umgebungsvariable.
+**Benannte Ausnahme `BACKUP_PASSPHRASE`:** Sie darf nicht nur in der Datenbank liegen, die sie sichert; sonst wäre eine Sicherung bei verlorener Datenbank
+nicht lesbar. Die Basis hat noch kein Sicherungs-Modul, deshalb bleibt sie vorerst eine Umgebungsvariable. Die richtige Lösung (ein Wiederherstellungsschlüssel,
+den der Eigentümer einmal sieht und außerhalb aufbewahrt, während der Server nur das zum Verschlüsseln Nötige hält) kommt mit dem Sicherungs-Modul der Basis.
+**Dafür wird hier nichts Eigenes gebaut.**
+
+## Betriebspunkt: die laufende Installation
+
+Die Basis löst das Datenbank-Passwort so (laut Orchestrator, gelesen in ihrem Beispiel `samples/StartApp/docker-compose.yml`): Ein einmaliger Dienst `init`
+legt im einen Volume die Ordner an und erzeugt beim allerersten Start ein zufälliges Passwort als Datei (Rechte 400); PostgreSQL liest sie über
+`POSTGRES_PASSWORD_FILE`, die App liest dieselbe Datei. In der Compose-Datei steht kein Geheimnis.
+
+**Für die laufende Installation heißt das:** Das heutige Passwort und die heutige Aufteilung der Volumes bleiben, bis der Orchestrator den Umzug der Installation
+plant, mit Sicherung davor und dem Ja des Eigentümers. **In den Meilensteinen 0 bis 2 werden Compose-Datei und Volumes der laufenden Installation nicht
+angefasst.** Das ist ein offener Betriebspunkt, kein Auftrag an diese Sitzung.
 
 ## Offene Punkte
 
