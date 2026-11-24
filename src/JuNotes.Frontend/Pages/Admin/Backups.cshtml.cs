@@ -18,6 +18,11 @@ namespace JuNotes.Frontend.Pages.Admin
 
         public IReadOnlyList<BackupMirror.Result> LastResults => backups.Mirror?.Last ?? [];
 
+        // The key of the server decrypts the accounts' second factors in every dump. Where it is kept is said on the page: with an encrypted copy, or nowhere but the server.
+        public string KeyState => backups.Options.KeyFile is not { } file || !System.IO.File.Exists(file)
+            ? "none"
+            : backups.Mirror is { IsActive: true, Encrypts: true } ? "with-copies" : "nowhere";
+
         public void OnGet() => Files = BackupFiles.List(backups.Options.Directory);
 
         public async Task<IActionResult> OnPostRunAsync(CancellationToken ct)

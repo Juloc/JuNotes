@@ -30,6 +30,8 @@ namespace JuNotes.Backend.Service
             configuration.GetSection("Backup").Bind(backup);
             // The backup takes the scanned files along with the database.
             backup.AssetsDirectory ??= assets.Directory;
+            // The key of the server: the file the base keeps in BASE_DATA (there is none when the key comes from a setting).
+            backup.KeyFile ??= Path.Combine(configuration["BASE_DATA"] ?? "data", "secret.key");
             services.AddSingleton(backup);
             services.AddSingleton(provider =>
             {

@@ -271,7 +271,7 @@ namespace JuNotes.Backend.Backup
 
         internal static string Stem(string name)
         {
-            foreach (var ending in new[] { ".enc", ".assets.zip", ".dump" })
+            foreach (var ending in new[] { ".enc", ".assets.zip", ".key", ".dump" })
             {
                 while (name.EndsWith(ending, StringComparison.Ordinal))
                 {

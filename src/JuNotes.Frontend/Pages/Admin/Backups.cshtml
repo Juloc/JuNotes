@@ -9,6 +9,21 @@
     <form method="post" asp-page-handler="Run"><div class="actions"><button type="submit">Jetzt sichern</button></div></form>
 </div>
 <div class="card">
+    <h2>Schlüssel des Servers</h2>
+    @switch (Model.KeyState)
+    {
+        case "with-copies":
+            <p class="muted">Die Datei <code>secret.key</code> liegt verschlüsselt bei jeder Kopie an einem weiteren Ort (Endung <code>.key.enc</code>). Ohne sie sind die zweiten Faktoren der Konten in einer wiederhergestellten Datenbank nicht lesbar; es blieben nur die Wiederherstellungscodes.</p>
+            break;
+        case "nowhere":
+            <div class="notice bad">Der Schlüssel des Servers (<code>secret.key</code>, im Ordner <code>BASE_DATA</code>, im Image <code>/data/base</code>) ist in <strong>keiner</strong> Sicherung. Die Datenbank-Sicherungen enthalten die Konten samt zweitem Faktor, und der ist ohne diese Datei nicht lesbar. Setze <code>Backup__Passphrase</code> und einen weiteren Ort, dann geht der Schlüssel verschlüsselt mit, oder hebe die Datei an einem sicheren Platz getrennt auf.</div>
+            break;
+        default:
+            <p class="muted">Der Schlüssel kommt hier nicht aus einer Datei, sondern aus einer Einstellung; es gibt nichts mitzusichern.</p>
+            break;
+    }
+</div>
+<div class="card">
     <h2>Weitere Orte</h2>
     @if (Model.Destinations.Count == 0)
     {

@@ -56,6 +56,9 @@ namespace JuNotes.Backend.Backup
         // The scanned files that belong to a dump: junotes-…-kind.dump has junotes-…-kind.assets.zip beside it.
         public static string AssetsArchiveFor(string dumpPath) => dumpPath[..^Extension.Length] + ".assets.zip";
 
+        // The key of the server, as it goes along with a copy: the name of the dump's file without its ending, then .key (a file name only, no folder).
+        public static string KeyFileFor(string dumpPath) => Path.GetFileName(dumpPath)[..^Extension.Length] + ".key";
+
         // Newest first. Files that are not ours, and half-written ones, are ignored.
         public static IReadOnlyList<BackupFile> List(string directory)
         {

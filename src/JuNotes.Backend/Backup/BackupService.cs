@@ -24,6 +24,10 @@ namespace JuNotes.Backend.Backup
         // A second folder every backup is copied to, such as a share of the NAS mounted into the container.
         public string? CopyTo { get; set; }
 
+        // The key file of the server (the base keeps the secrets of the accounts under it). It goes along with a copy only when the copy is encrypted: next to a dump in the
+        // clear it would undo the point of the key. Null when the key comes from a setting and not from a file.
+        public string? KeyFile { get; set; }
+
         // With a passphrase, copies that leave the server are encrypted first. Without one they leave as they are.
         public string? Passphrase { get; set; }
 
@@ -78,7 +82,26 @@ namespace JuNotes.Backend.Backup
                         files.Add(BackupFiles.AssetsArchiveFor(final));
                     }
 
-                    await mirror.MirrorAsync(files, prune: kind != BackupKind.Manual, ct);
+                    // The key of the server goes with an encrypted copy, under the name of the backup (so pruning keeps and removes them together).
+                    string? keyCopy = null;
+                    if (mirror.Encrypts && options.KeyFile is { } keyFile && File.Exists(keyFile))
+                    {
+                        keyCopy = Path.Combine(Path.GetTempPath(), BackupFiles.KeyFileFor(final));
+                        File.Copy(keyFile, keyCopy, overwrite: true);
+                        files.Add(keyCopy);
+                    }
+
+                    try
+                    {
+                        await mirror.MirrorAsync(files, prune: kind != BackupKind.Manual, ct);
+                    }
+                    finally
+                    {
+                        if (keyCopy is not null)
+                        {
+                            File.Delete(keyCopy);
+                        }
+                    }
                 }
 
                 LogWritten(logger, kind, bytes, removed.Count);
