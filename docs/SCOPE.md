@@ -53,7 +53,7 @@ Jeder endet in etwas, das er aufmachen kann. Reihenfolge und Zuschnitt gegenübe
 - Den Abgleichvertrag mit der iPad-App als Test einfrieren (Golden-Tests auf `/api/v1`), damit jeder spätere Schritt beweisbar nichts bricht, **einschließlich der Antwort auf `push`** (Form von `accepted` und `seq`, Statuscodes), damit die neue Auslass-Regel aus Meilenstein 1 als bewusste, additive Änderung sichtbar wird.
 - **Aufmachen kann er:** eine grüne Testliste, die den Vertrag der App beschreibt. Am laufenden System ändert sich nichts.
 
-### 1. Anmeldung und Personen aus der Basis, neben dem App-Token
+### 1. Anmeldung und Personen aus der Basis, neben dem App-Token *(gebaut, 24.11.2026; Stand und Abweichungen in STATE.md)*
 
 - Konten, Sitzungen, Rollen, Einladungen aus der Basis; Anmeldung über den Hub oder eigenes Konto (Argon2id, TOTP).
 - **Zusätzlich:** jede Zeile in `entities` bekommt einen Besitzer. Die Migration legt die Spalte **leer** an (leer heißt: gehört dem ersten Administrator), weil das

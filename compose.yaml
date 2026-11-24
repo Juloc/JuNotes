@@ -11,8 +11,6 @@ services:
       ConnectionStrings__JuNotes: Host=postgres;Database=junotes;Username=junotes;Password=${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
       Sync__Token: ${SYNC_TOKEN:?set SYNC_TOKEN in .env}
       # Optional; empty means off. See the README for what each one does.
-      Admin__Password: ${ADMIN_PASSWORD:-}
-      Web__Password: ${WEB_PASSWORD:-}
       School__TimetableIcsUrl: ${SCHOOL_TIMETABLE_ICS_URL:-}
       School__NewsFeedUrl: ${SCHOOL_NEWS_FEED_URL:-}
       School__Untis__Server: ${UNTIS_SERVER:-}

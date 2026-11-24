@@ -55,9 +55,10 @@ Backup__Passphrase='…' dotnet JuNotes.Frontend.dll decrypt-backup junotes-….
 Paperless (optional): `Paperless__BaseUrl` und `Paperless__Token` (ein API-Token eines Paperless-Benutzers, der Dokumente und Tags anlegen darf).
 Die App schickt dann fertige Hefte als PDF dorthin, mit dem Fach als Tag. Das ist ein Archiv, kein Backup.
 
-Web-Ansicht zum Lesen im Browser: `Web__Password` setzen, dann die Adresse des Servers öffnen. Das Admin-Passwort öffnet sie auch.
-
-Das Passwort für den Admin-Bereich (`/Admin`) steht in `Admin__Password`; ohne es bleibt der Bereich geschlossen.
+Anmeldung im Browser: Beim ersten Start steht ein **Einrichtungscode** im Log des Servers (`docker compose logs junotes`). Wer die Adresse des Servers öffnet und ihn eingibt,
+legt das erste Konto an (Name, Passwort, zweiter Faktor mit einer Authenticator-App); es verwaltet die Installation. Weitere Personen lädt der Administrator in den
+Einstellungen ein. Die Konten, die Sitzungen und der Schlüssel des Servers (`secret.key`, im Ordner `BASE_DATA`, im Image `/data/base`) liegen im Volume `/data` bzw. in der
+Datenbank. Die Passwörter `Admin__Password` und `Web__Password` gibt es nicht mehr. Die iPad-App meldet sich weiter mit `Sync__Token` an, bis sie ein Gerätetoken je Person bekommt.
 
 Server ohne Docker starten (legt die Datenbank bei Bedarf selbst an):
 

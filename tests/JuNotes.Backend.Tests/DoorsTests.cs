@@ -63,6 +63,29 @@ namespace JuNotes.Backend.Tests
         }
 
         [RequiresDatabaseFact]
+        public async Task The_door_is_the_same_door_in_any_spelling_of_its_path()
+        {
+            var (host, database) = await StartAsync();
+            await using (database)
+            using (host)
+            {
+                var admin = await host.SignedInAsync();
+                using var anonymous = host.Browser();
+
+                foreach (var path in new[] { "/API/V1/sync/pull", "/Api/v1/Sync/Pull", "/api/V1/school/status" })
+                {
+                    // Without the token, and with the cookie of a signed-in administrator: neither opens it, whatever the case of the path.
+                    Assert.Equal(HttpStatusCode.Unauthorized, (await anonymous.GetAsync(Url(path))).StatusCode);
+                    Assert.Equal(HttpStatusCode.Unauthorized, (await admin.GetAsync(Url(path))).StatusCode);
+                }
+
+                using var app = host.Browser();
+                app.DefaultRequestHeaders.Authorization = new("Bearer", "sync-token");
+                Assert.Equal(HttpStatusCode.OK, (await app.GetAsync(Url("/API/V1/sync/pull"))).StatusCode);
+            }
+        }
+
+        [RequiresDatabaseFact]
         public async Task The_token_door_needs_no_header_of_the_base_and_the_base_door_does()
         {
             var (host, database) = await StartAsync();
@@ -104,7 +127,7 @@ namespace JuNotes.Backend.Tests
         }
 
         [RequiresDatabaseFact]
-        public async Task The_old_and_the_new_tables_of_a_migration_do_not_clash_and_both_sequences_are_recorded()
+        public async Task Both_sequences_of_migrations_are_recorded_in_tables_of_their_own_and_the_two_tables_of_the_same_name_do_not_clash()
         {
             var (host, database) = await StartAsync();
             await using (database)
@@ -112,11 +135,12 @@ namespace JuNotes.Backend.Tests
             {
                 _ = host.Browser();
 
-                Assert.True(await database.CountAsync("app_migrations") >= 8);
-                Assert.True(await database.CountAsync("schema_migrations") >= 4);
+                // Ours: schema_migrations with numbers. The base's: base_migrations with ids and checksums.
+                Assert.True(await database.CountAsync("schema_migrations") >= 9);
+                Assert.True(await database.CountAsync("base_migrations") >= 4);
                 Assert.Equal(0, await database.CountAsync("app_instance_settings"));
-                await using var legacy = database.Data.CreateCommand("select count(*) from information_schema.columns where table_name = 'schema_migrations' and column_name = 'number'");
-                Assert.Equal(0L, (long)(await legacy.ExecuteScalarAsync())!);
+                await using var ours = database.Data.CreateCommand("select count(*) from information_schema.columns where table_name = 'schema_migrations' and column_name = 'number'");
+                Assert.Equal(1L, (long)(await ours.ExecuteScalarAsync())!);
             }
         }
     }

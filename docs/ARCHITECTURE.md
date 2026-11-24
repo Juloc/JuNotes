@@ -31,11 +31,12 @@ gebaut. Was ich aus dem Code der Basis nicht selbst gelesen habe, ist als **unge
 
 Grundsatz: **Nur hinzufügen, nie umbauen.** Die App kennt die Form der Daten und wird nicht zugleich geändert.
 
-1. **Migrationen** laufen wie heute nummeriert (`0008…`) in einer Transaktion, mit Sicherung davor (`DatabaseUpgrade`). Der Umzug darf keine Zeile
+1. **Migrationen** laufen wie heute nummeriert (`0008…`) in einer Transaktion, mit Sicherung davor (`DatabaseUpgrade`). Die der Basis stehen in einer Tabelle für sich (`base_migrations`, `MigrationTable`), unsere bleibt `schema_migrations`; die Basis läuft zuerst. Eine Tabelle der Baseline (`instance_settings`) trägt den Namen einer Tabelle der Basis und wird einmal in `app_instance_settings` umbenannt. Der Umzug darf keine Zeile
    verändern, nur Spalten und Tabellen anlegen.
 2. **Besitzer:** Eine SQL-Migration kann ihn nicht zuweisen, weil das Konto des Eigentümers erst im Einrichtungsassistenten der Basis entsteht. Darum:
-   `0008` legt `entities.owner_id uuid` (und gleiche Spalten an den Dateitabellen) **leer** an. **Leer heißt: gehört dem ersten Administrator.** Beim Anlegen
-   des ersten Kontos werden alle leeren Zeilen in **einer** Anweisung diesem Konto zugewiesen; der alte App-Token steht ab da für diese Person. Bis dahin
+   `0008` legt `entities.owner_id uuid` (und gleiche Spalten an den Dateitabellen) **leer** an. **Leer heißt: gehört dem ersten Administrator.** Beim ersten Zugriff
+   nach dem Anlegen des ersten Kontos (Start, Anmeldung einer Person, Zugriff mit dem App-Token; die Basis hat keinen Haken im Augenblick der Erstellung) werden alle leeren Zeilen in **einer** Anweisung diesem Konto
+   zugewiesen, ebenso die Dateien (`OwnerDirectory`); der alte App-Token steht ab da für diese Person. Bis dahin
    verhält sich alles wie heute. Neue Zeilen vor dem ersten Konto bleiben leer und werden mitgenommen. Die Spalte wird erst `not null`, wenn der Abgleich
    gegen alte Stände geprüft ist.
 3. **Der Primärschlüssel `(kind, id)` bleibt.** Die ids sind zufällige UUIDs der Geräte; Kollisionen zwischen Personen sind praktisch ausgeschlossen. Wer sie
@@ -153,11 +154,14 @@ Person. Die Namen sind ein Vorschlag, keine Seitenentwürfe. **Später:** Suche,
 **Wichtig für die Suche:** Der erkannte Text (OCR) liegt heute nur auf dem iPad (siehe `docs/PHASE5.md`, Punkt 5). Eine Suche im Web gibt es erst, wenn
 der Text mit synchronisiert wird. Das ist eine **additive** Erweiterung des Abgleichs (neues Feld oder neue `kind`), kein Umbau.
 
-### 5a. `/api/v1` ist eine eigene Tür
+### 5a. `/api/v1` ist eine eigene Tür (gebaut in Meilenstein 1)
 
-Der Wächter der Basis verlangt für alles unter `/api` eine Sitzung. `/api/v1/*` wird deshalb **einmal an einer Stelle** als öffentlicher Pfad mit eigener
-Prüfung (Bearer-Token) angemeldet. Dazu zwei Tests: (1) kein Weg unter `/api/v1` antwortet ohne Token; (2) der App-Token gilt **nie** unter `/api/web/v1`
-(und ein Sitzungs-Cookie nie unter `/api/v1`).
+Der Wächter der Basis verlangt für alles unter `/api` eine Sitzung und für Änderungen `X-Base: 1` und einen Origin. Seit Basis 0.3.2 kann eine App **eigene Türen** erklären (SEC-07,
+`BaseAppOptions.Doors`): `/api/v1` ist eine, die Prüfung ist der Instanz-Token (`V1Door.CheckAsync`), nur `/status` ist offen. Unter einer Tür liest die Basis nie das Cookie, setzt keine
+Identität und fragt weder nach Kopf noch nach Origin; das Präfix gilt ohne Rücksicht auf Groß- und Kleinschreibung. Der erste Entwurf (eine abgezweigte Pipeline vor der Basis, `MapWhen`) war
+nötig, bevor die Basis das konnte, und ist wieder weg. Tests: kein Weg unter `/api/v1` ohne Token (auch nicht in anderer Schreibung); der App-Token gilt nirgends sonst unter `/api`;
+ein Sitzungs-Cookie gilt nie unter `/api/v1` (`DoorsTests`, `ApiContractTests`). Bekannte Folgen: der Fehlerkörper bei 401 ist der der Basis, die Sicherheitsköpfe der Basis liegen auch auf
+diesen Antworten, und die JSON-Antworten behalten ihre `null`-Werte, weil die Basis sie sonst weglässt (siehe STATE.md, Abweichungen 2 bis 4).
 
 ## 6. KI über den Hub und die eigene Brücke
 

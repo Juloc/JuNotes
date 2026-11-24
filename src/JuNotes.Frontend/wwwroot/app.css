@@ -1,3 +1,7 @@
 /* The app's own styles. The look comes from /base/base.css; here stands only what is special to this app.
  * The colour of the app is this ONE variable (COLOR-01): an angle on the colour wheel, 0 to 360. */
 :root { --accent-hue: 75; }
+
+/* the tiles of the front page are whole links: no underline on their text */
+a.card { text-decoration: none; color: inherit; }
+a.card .card-title { color: inherit; }

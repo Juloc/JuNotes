@@ -19,7 +19,7 @@ namespace JuNotes.Backend.Tests
                 Assert.Equal(1, latest);
                 Assert.Equal(0, await database.CountAsync("app_instance_settings"));
                 Assert.Equal(0, await database.CountAsync("extra"));
-                Assert.Equal(2, await database.CountAsync("app_migrations"));
+                Assert.Equal(2, await database.CountAsync("schema_migrations"));
             }
         }
 
@@ -39,7 +39,7 @@ namespace JuNotes.Backend.Tests
                 await DatabaseUpgrade.RunAsync(data, Set(("0001_extra.sql", "create table extra (id int)")), baseline, CancellationToken.None);
 
                 Assert.Equal(1, await database.CountAsync("app_instance_settings"));
-                Assert.Equal(2, await database.CountAsync("app_migrations"));
+                Assert.Equal(2, await database.CountAsync("schema_migrations"));
             }
         }
 
@@ -55,7 +55,7 @@ namespace JuNotes.Backend.Tests
                 await Assert.ThrowsAsync<PostgresException>(() => DatabaseUpgrade.RunAsync(data, Set(("0001_ok.sql", "create table ok (id int)"), ("0002_bad.sql", "select * from missing")), baseline, CancellationToken.None));
 
                 await Assert.ThrowsAsync<PostgresException>(() => database.CountAsync("ok"));
-                Assert.Equal(1, await database.CountAsync("app_migrations"));
+                Assert.Equal(1, await database.CountAsync("schema_migrations"));
             }
         }
 

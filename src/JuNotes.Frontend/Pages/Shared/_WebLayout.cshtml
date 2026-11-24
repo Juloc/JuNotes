@@ -1,5 +1,5 @@
 @{
-    var title = ViewData["Title"] as string ?? "JuNotes";
+    var title = ViewData["Title"] as string ?? "Notes";
 }
 <!doctype html>
 <html lang="de">
@@ -10,18 +10,18 @@
     <meta name="theme-color" content="#f2f2f7" media="(prefers-color-scheme: light)" />
     <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-title" content="JuNotes" />
+    <meta name="apple-mobile-web-app-title" content="Notes" />
     <link rel="manifest" href="/manifest.webmanifest" />
     <link rel="icon" href="/icon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="/icon.svg" />
-    <title>@title · JuNotes</title>
+    <title>@title · Notes</title>
     <link rel="stylesheet" href="/legacy-web.css" />
 </head>
 <body>
     @if (User.Identity?.IsAuthenticated == true)
     {
         <header>
-            <strong><a href="/Notes">JuNotes</a></strong>
+            <strong><a href="/Notes">Notes</a></strong>
             <div class="right">
                 @if (User.IsInRole("admin"))
                 {

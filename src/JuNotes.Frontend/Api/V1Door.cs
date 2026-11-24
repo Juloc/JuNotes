@@ -15,12 +15,26 @@ using JuNotes.Integrations.Paperless;
 
 namespace JuNotes.Frontend.Api
 {
-    // /api/v1 is the contract with the iPad app and its own door: it is branched off before the middleware of the base, so the guard of the base (which wants a
-    // session and the header X-Base for every change under /api) never sees these requests, and only the instance token opens them. The token is checked first,
-    // before routing and body binding, so a caller without it learns nothing else. A session cookie is never read here, and the token is never read anywhere else.
+    // /api/v1 is the contract with the iPad app and an own door of the base (SEC-07, declared in BaseAppOptions.Doors): the guard of the base asks neither for its header
+    // nor for an origin, never reads a session cookie there and sets no identity, and lets a request through only when the check below says yes. The check is the
+    // instance token, and the token opens nothing else; a session opens nothing here. Only /status is open.
     public static class V1Door
     {
         public const string Prefix = "/api/v1";
+
+        // The largest body of a request at this door: what Kestrel allowed before (a scan or a PDF is at most 20 MB, a batch of changes less).
+        public const long MaxBodyBytes = 30_000_000;
+
+        public static ValueTask<bool> CheckAsync(HttpContext context)
+        {
+            if (context.Request.Path.StartsWithSegments(Prefix + "/status", StringComparison.OrdinalIgnoreCase))
+            {
+                return ValueTask.FromResult(true);
+            }
+
+            var access = context.RequestServices.GetRequiredService<SyncAccess>();
+            return ValueTask.FromResult(access.IsConfigured && access.IsAuthorized(context.Request.Headers.Authorization));
+        }
 
         // The answers are written as they always were: the options of the framework (camel case, its own escaping) with the nulls kept. The base leaves the nulls
         // out of its own answers, and the app, which has never heard of that, would no longer find them.
@@ -28,34 +42,10 @@ namespace JuNotes.Frontend.Api
 
         private static IResult Json<T>(T value) => Results.Json(value, _options);
 
-        public static void UseV1Door(this WebApplication app)
+        public static void MapV1(this WebApplication app)
         {
             _options = new JsonSerializerOptions(app.Services.GetRequiredService<IOptions<JsonOptions>>().Value.SerializerOptions) { DefaultIgnoreCondition = JsonIgnoreCondition.Never };
-            app.MapWhen(context => context.Request.Path.StartsWithSegments(Prefix), door =>
-            {
-                door.Use(async (context, next) =>
-                {
-                    if (!context.Request.Path.StartsWithSegments(Prefix + "/status"))
-                    {
-                        var access = context.RequestServices.GetRequiredService<SyncAccess>();
-                        if (!access.IsConfigured)
-                        {
-                            await Results.Problem("The API is not set up: set Sync:Token (environment variable Sync__Token).", statusCode: 503).ExecuteAsync(context);
-                            return;
-                        }
-
-                        if (!access.IsAuthorized(context.Request.Headers.Authorization))
-                        {
-                            await Results.Unauthorized().ExecuteAsync(context);
-                            return;
-                        }
-                    }
-
-                    await next();
-                });
-                door.UseRouting();
-                door.UseEndpoints(Map);
-            });
+            Map(app);
         }
 
         private static void Map(IEndpointRouteBuilder endpoints)

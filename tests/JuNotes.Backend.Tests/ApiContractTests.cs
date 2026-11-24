@@ -114,7 +114,8 @@ namespace JuNotes.Backend.Tests
                         var response = await client.SendAsync(request);
 
                         Assert.True(response.StatusCode == HttpStatusCode.Unauthorized, $"{method} {path} with {header?.Scheme ?? "no header"}: {(int)response.StatusCode}");
-                        Assert.Empty(await response.Content.ReadAsByteArrayAsync());
+                        // A deliberate difference from before the base (the answer was empty): the base writes its usual error body, which says nothing about the route.
+                        Assert.DoesNotContain("sync", await response.Content.ReadAsStringAsync(), StringComparison.OrdinalIgnoreCase);
                     }
                 }
             }
@@ -496,10 +497,9 @@ namespace JuNotes.Backend.Tests
                 resource => old.Single(migration => migration.Number.ToString(System.Globalization.CultureInfo.InvariantCulture) == resource).Sql());
             await DatabaseUpgrade.RunAsync(database.Data, oldSet, DatabaseUpgrade.ReadBaseline(assembly), CancellationToken.None);
 
-            // An older server called its two tables otherwise: the names the base also uses. Put them back, so the upgrade starts from a database as it really was.
-            foreach (var sql in new[] { "alter table app_migrations rename to schema_migrations", "alter table app_instance_settings rename to instance_settings" })
+            // An older server called its table of settings otherwise: the name the base also uses. Put it back, so the upgrade starts from a database as it really was.
+            await using (var rename = database.Data.CreateCommand("alter table app_instance_settings rename to instance_settings"))
             {
-                await using var rename = database.Data.CreateCommand(sql);
                 await rename.ExecuteNonQueryAsync();
             }
 
@@ -530,7 +530,7 @@ namespace JuNotes.Backend.Tests
             var api = Api(host);
 
             // Starting the host ran the rest of the migrations.
-            await using (var count = database.Data.CreateCommand("select max(number) from app_migrations"))
+            await using (var count = database.Data.CreateCommand("select max(number) from schema_migrations"))
             {
                 Assert.Equal(all.Latest, (int)(await count.ExecuteScalarAsync())!);
             }

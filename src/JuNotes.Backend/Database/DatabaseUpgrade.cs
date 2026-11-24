@@ -6,24 +6,13 @@ namespace JuNotes.Backend.Database
     // Brings an empty database to the baseline and every database to the newest migration, all pending migrations in one transaction.
     public static class DatabaseUpgrade
     {
-        // The base keeps its own migrations in a table called schema_migrations (id, checksum); an older server of ours kept its numbered ones in a table of the same
-        // name with other columns (number, name). Ours is renamed once, before the base starts, so the two sequences live side by side. Only the name changes: every
-        // row stays, nothing is rewritten, and renaming it back is the way back (the base's table is then dropped).
+        // One table of the baseline of an older server, instance_settings (unused, key and text value), has the name of a table of the base with other columns
+        // (key and json value). Ours is renamed once, before the base starts: only the name changes, every row stays, and renaming it back is the way back.
         public static async Task RenameLegacyTableAsync(NpgsqlDataSource dataSource, CancellationToken ct)
         {
             await using var connection = await dataSource.OpenConnectionAsync(ct);
             await using var transaction = await connection.BeginTransactionAsync(ct);
             await Execute(connection, transaction, "select pg_advisory_xact_lock(7481236)", ct);
-            var legacy = await Scalar(connection, transaction,
-                "select count(*) from information_schema.columns where table_schema = current_schema() and table_name = 'schema_migrations' and column_name = 'number'"
-                + " and to_regclass('app_migrations') is null", ct);
-            if (legacy > 0)
-            {
-                await Execute(connection, transaction, "alter table schema_migrations rename to app_migrations", ct);
-                await Execute(connection, transaction, "alter index if exists schema_migrations_pkey rename to app_migrations_pkey", ct);
-            }
-
-            // The same for the one table of the baseline that the base also has, under the same name with other columns. Ours is unused; it is only renamed.
             var settings = await Scalar(connection, transaction,
                 "select count(*) from information_schema.columns where table_schema = current_schema() and table_name = 'instance_settings' and column_name = 'value' and data_type = 'text'"
                 + " and to_regclass('app_instance_settings') is null", ct);
@@ -41,13 +30,13 @@ namespace JuNotes.Backend.Database
         {
             await RenameLegacyTableAsync(dataSource, ct);
             await using var connection = await dataSource.OpenConnectionAsync(ct);
-            await using var exists = new NpgsqlCommand("select to_regclass('app_migrations') is not null", connection);
+            await using var exists = new NpgsqlCommand("select to_regclass('schema_migrations') is not null", connection);
             if (!(bool)(await exists.ExecuteScalarAsync(ct))!)
             {
                 return 0;
             }
 
-            await using var current = new NpgsqlCommand("select coalesce(max(number), 0) from app_migrations", connection);
+            await using var current = new NpgsqlCommand("select coalesce(max(number), 0) from schema_migrations", connection);
             return Math.Max(0, migrations.Latest - Convert.ToInt32(await current.ExecuteScalarAsync(ct), System.Globalization.CultureInfo.InvariantCulture));
         }
 
@@ -59,13 +48,13 @@ namespace JuNotes.Backend.Database
 
             // One upgrade at a time, even with two hosts starting together.
             await Execute(connection, transaction, "select pg_advisory_xact_lock(7481236)", ct);
-            await Execute(connection, transaction, "create table if not exists app_migrations (number integer primary key, name text not null, applied_at timestamptz not null default now())", ct);
+            await Execute(connection, transaction, "create table if not exists schema_migrations (number integer primary key, name text not null, applied_at timestamptz not null default now())", ct);
 
-            var current = await Scalar(connection, transaction, "select coalesce(max(number), -1) from app_migrations", ct);
+            var current = await Scalar(connection, transaction, "select coalesce(max(number), -1) from schema_migrations", ct);
             if (current < 0)
             {
                 await Execute(connection, transaction, baseline, ct);
-                await Execute(connection, transaction, "insert into app_migrations (number, name) values (0, 'baseline')", ct);
+                await Execute(connection, transaction, "insert into schema_migrations (number, name) values (0, 'baseline')", ct);
                 current = 0;
             }
 
@@ -77,7 +66,7 @@ namespace JuNotes.Backend.Database
             foreach (var migration in migrations.Migrations.Where(item => item.Number > current))
             {
                 await Execute(connection, transaction, migration.Sql(), ct);
-                await using var record = new NpgsqlCommand("insert into app_migrations (number, name) values ($1, $2)", connection, transaction)
+                await using var record = new NpgsqlCommand("insert into schema_migrations (number, name) values ($1, $2)", connection, transaction)
                 {
                     Parameters = { new() { Value = migration.Number }, new() { Value = migration.Name } },
                 };

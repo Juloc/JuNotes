@@ -53,6 +53,10 @@ builder.AddBase(new BaseAppOptions("notes", "Notes", typeof(Program).Assembly)
         new AppRole("admin", new Localized("Administrator", "Administration")),
         new AppRole("member", new Localized("Member", "Mitglied")),
     ],
+    // Our own table of numbered migrations is called schema_migrations; the base keeps its own under another name and leaves ours alone (DATA-04).
+    MigrationTable = "base_migrations",
+    // The contract with the iPad app: the instance token, no session (SEC-07).
+    Doors = [new ApiDoor(V1Door.Prefix, V1Door.CheckAsync, V1Door.MaxBodyBytes)],
 });
 builder.Services.AddRazorPages(options =>
 {
@@ -75,8 +79,8 @@ var backend = typeof(MigrationSet).Assembly;
 var data = app.Services.GetRequiredService<NpgsqlDataSource>();
 var migrations = MigrationSet.FromAssembly(backend);
 
-// Two sequences of migrations live in the one database: ours (numbers, table app_migrations) and those of the base (table schema_migrations). Ours was called
-// schema_migrations before the base arrived and is renamed first. The base goes first, so that ours may point at its tables.
+// Two sequences of migrations live in the one database: ours (numbers, table schema_migrations) and those of the base (table base_migrations). One table of our
+// baseline has the name of a table of the base and is renamed first. The base goes first, so that ours may point at its tables.
 await DatabaseUpgrade.RenameLegacyTableAsync(data, stopping);
 var backups = app.Services.GetRequiredService<BackupService>();
 if (backups.Options.BeforeMigration && await AnythingToUpgradeAsync(data, migrations, stopping))
@@ -91,8 +95,6 @@ await DatabaseUpgrade.RunAsync(data, migrations, DatabaseUpgrade.ReadBaseline(ba
 await app.Services.GetRequiredService<AiProfileStore>().EnsureDefaultsAsync(stopping);
 await app.Services.GetRequiredService<OwnerDirectory>().EnsureClaimedAsync(stopping);
 
-// The contract with the iPad app is its own door and comes before everything of the base.
-app.UseV1Door();
 app.UseBase();
 // Until the web pages move to the base (milestone 2): the old pages style single elements with the style attribute (cover colours); only that, on these two folders.
 app.Use((context, next) =>
@@ -108,6 +110,7 @@ app.UseAuthentication();
 app.UseAuthorization();
 app.MapRazorPages();
 app.MapBase();
+app.MapV1();
 app.MapGet("/health/live", () => Results.Ok());
 app.MapGet("/health/ready", async (HealthService health, CancellationToken ct) => await health.IsReadyAsync(ct) ? Results.Ok() : Results.StatusCode(503));
 
@@ -122,18 +125,18 @@ static async Task<bool> AnythingToUpgradeAsync(NpgsqlDataSource data, MigrationS
         return true;
     }
 
-    await using var exists = data.CreateCommand("select to_regclass('app_migrations') is not null");
+    await using var exists = data.CreateCommand("select to_regclass('schema_migrations') is not null");
     if (!(bool)(await exists.ExecuteScalarAsync(ct))!)
     {
         return false;
     }
 
     var known = new HashSet<string>(StringComparer.Ordinal);
-    await using (var table = data.CreateCommand("select to_regclass('schema_migrations') is not null"))
+    await using (var table = data.CreateCommand("select to_regclass('base_migrations') is not null"))
     {
         if ((bool)(await table.ExecuteScalarAsync(ct))!)
         {
-            await using var ids = data.CreateCommand("select id from schema_migrations");
+            await using var ids = data.CreateCommand("select id from base_migrations");
             await using var reader = await ids.ExecuteReaderAsync(ct);
             while (await reader.ReadAsync(ct))
             {
