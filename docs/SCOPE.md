@@ -45,24 +45,32 @@ Jeder endet in etwas, das er aufmachen kann. Reihenfolge und Zuschnitt gegenübe
 
 ### 0. Aufräumen und Vorbedingungen *(neu)*
 
-- WebUntis-Client und Passwort-Einstellungen entfernen (Entscheidung offen, siehe oben).
-- Prüfen, ob der Code der Basis (.NET 10) in dieses Projekt (.NET 11) hineinpasst; sonst entscheidet der Orchestrator über die Zielversion.
+- WebUntis-Client und Passwort-Einstellungen entfernen: **Entscheidung beim Eigentümer**, bis dahin bleibt der Code unangetastet und inaktiv. Der Rest von
+  Meilenstein 0 hängt nicht daran.
+- Probe: Passt der Code der Basis (.NET 10, öffentlich, 0.3.1) unter .NET 11 hier? **Entschieden: `notes` bleibt auf net11, wenn die Probe grün ist.** Ist sie es
+  nicht, gehen die Fehler an den Orchestrator, bevor an der Kopie etwas geändert wird (Änderungen gehören in die Basis).
+- Die Basis ins Repository holen (`base/` samt `MANIFEST`, danach `check-app.sh` und `sync-base.sh`), siehe ARCHITECTURE.md 4a.
 - Den Abgleichvertrag mit der iPad-App als Test einfrieren (Golden-Tests auf `/api/v1`), damit jeder spätere Schritt beweisbar nichts bricht.
 - **Aufmachen kann er:** eine grüne Testliste, die den Vertrag der App beschreibt. Am laufenden System ändert sich nichts.
 
 ### 1. Anmeldung und Personen aus der Basis, neben dem App-Token
 
 - Konten, Sitzungen, Rollen, Einladungen aus der Basis; Anmeldung über den Hub oder eigenes Konto (Argon2id, TOTP).
-- **Zusätzlich:** jede Zeile in `entities` bekommt einen Besitzer (Migration). Alle heutigen Daten gehören dem Eigentümer. Das gehört in diesen Meilenstein
-  und nicht in den späteren, weil jede spätere Zeile sonst nachträglich umgeschrieben werden müsste.
-- Der heutige `Sync__Token` der App gilt weiter und steht für „Gerät des Eigentümers“. Die App merkt nichts.
+- **Zusätzlich:** jede Zeile in `entities` bekommt einen Besitzer. Die Migration legt die Spalte **leer** an (leer heißt: gehört dem ersten Administrator), weil das
+  Konto erst im Einrichtungsassistenten entsteht; beim Anlegen des ersten Kontos werden alle leeren Zeilen in einer Anweisung zugewiesen. Das gehört in
+  diesen Meilenstein und nicht in den späteren, weil jede spätere Zeile sonst nachträglich umgeschrieben werden müsste.
+- Der heutige `Sync__Token` der App gilt weiter und steht ab dem ersten Konto für diese Person. Die App merkt nichts. `/api/v1` bleibt eine eigene Tür mit
+  Bearer-Prüfung (ARCHITECTURE.md 5a).
+- **Schreibregeln mit Tests mit zwei Personen:** eine Zeile nur ihrer Besitzerin; das Ziel von `parent_id` gehört derselben Person; Dateien genauso.
 - Die heutigen Passwörter `ADMIN_PASSWORD` und `WEB_PASSWORD` fallen weg, sobald das eigene Konto da ist.
 - **Aufmachen kann er:** im Browser mit eigenem Konto oder über den Hub anmelden; die iPad-App synchronisiert unverändert weiter.
 
-### 2. Die Web-App im neuen Baukasten, mit denselben Funktionen wie heute
+### 2. Die Web-App als Seiten der Basis, mit denselben Funktionen wie heute
 
-- Lesen: Bibliothek, Heft, Seite, Scans, Cover. Dazu Noten, Karten, Stundenplan, Suche, wie es heute möglich ist.
+- Die Web-App ist JavaScript im Baukasten und spricht JSON. Meilenstein 2 baut daher **die lesenden Wege von `/api/web/v1`**: Bibliothek, Heft, Seite, Datei,
+  dazu Noten, Karten, Stundenplan. Eine Suche im Web erst, wenn der erkannte Text mit synchronisiert wird (nicht Teil von 2).
 - Heutige Admin-Seiten (Übersicht, Codex, Profile, Sicherungen) ziehen in den Baukasten um, noch ohne neue Funktionen.
+- **Die Razor-Seiten fallen am Ende von Meilenstein 2 weg.**
 - **Aufmachen kann er:** dieselbe Web-Ansicht wie heute, nur im neuen Aussehen und hinter der neuen Anmeldung.
 
 ### 3. Mehrere Personen und Teilen
@@ -70,7 +78,10 @@ Jeder endet in etwas, das er aufmachen kann. Reihenfolge und Zuschnitt gegenübe
 - Zweite und dritte Person mit eigenen Heften; jede sieht nur das Eigene. Einzelne Hefte freigeben (lesen; später bearbeiten).
 - Die iPad-App meldet sich mit einem **Gerätetoken je Person** an (aus der Basis) statt mit dem gemeinsamen Token. Das ist die einzige App-Änderung in
   diesem Plan, die der Server erzwingt; der alte Token bleibt bis dahin nutzbar.
-- **Aufmachen kann er:** ein zweites Konto anlegen, ein Heft teilen, und es erscheint dort, nicht bei der dritten Person.
+- **Offener Entwurfspunkt:** Wie kommt ein später freigegebenes Heft in den Abgleich der Empfängerin (ihr Merker liegt schon darüber), und wie erfährt sie vom
+  Entziehen? Vorschlag in zwei Stufen: **in diesem Meilenstein Freigaben nur im Web** (kein Merker nötig), die App der Empfängerin später durch Neustempeln des
+  Teilbaums. Einzelheiten in ARCHITECTURE.md 3a.
+- **Aufmachen kann er:** ein zweites Konto anlegen, ein Heft teilen, und es erscheint im Web dort, nicht bei der dritten Person.
 
 ### 4. Schule pro Person *(vorgezogen, damit Meilenstein 5 und 6 mit echten Daten laufen)*
 
@@ -84,9 +95,11 @@ Jeder endet in etwas, das er aufmachen kann. Reihenfolge und Zuschnitt gegenübe
 
 ### 6. KI über den Hub
 
-- Anbindung an den KI-Zugang des Hubs, der Schalter zwischen Hub und eigener Brücke, Grenzen pro Person und Tag, Abbruch, sichtbare Nutzung.
+- Anbindung an den KI-Zugang des Hubs. Der Schlüssel wird in der Verwaltung eingetragen (verschlüsselt in der Datenbank, nie zurückgegeben); der Modus ist Hub,
+  wenn Verbindung, Schlüssel und Schalter stimmen, sonst eigene Brücke; kein stiller Rückfall. Dazu Grenzen pro Person und Tag, Abbruch, sichtbare Nutzung.
 - **Aufmachen kann er:** ein Quiz oder Cover erzeugen und die Nutzung dazu sehen; mit Hub ohne jede Codex-Anmeldung im Server.
-- **Hängt am Hub:** Der Hub zählt heute pro App und Tag, nicht pro Person. Die Grenze pro Person muss `notes` selbst führen (siehe ARCHITECTURE.md).
+- **Entschieden:** Der Hub zählt pro App, nicht pro Person. `notes` zählt selbst pro Person; das Budget der App im Hub ist die äußere Schranke. Es wird nicht
+  damit geplant, dass der Hub die Person mitzählt.
 
 ### 7. iPhone-Layout
 
