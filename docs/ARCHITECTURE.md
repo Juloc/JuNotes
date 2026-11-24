@@ -65,8 +65,10 @@ Grundsatz: **Nur hinzufügen, nie umbauen.** Die App kennt die Form der Daten un
 
 4. **`seq` bleibt global.** Der Pull einer Person liefert nur ihre Zeilen (und freigegebene) mit `seq` über ihrem Merker. Lücken in der Folge gibt es **heute
    schon**: jede geschickte Zeile verbraucht eine Nummer, auch wenn nichts gespeichert wird, und eine Änderung verbraucht zwei (festgehalten in `ApiContractTests`).
-   Die App benutzt den Merker nur als „größer als“ (**ungeprüft:** ob sie irgendwo auf eine lückenlose Folge baut; gelesen habe ich nur `SyncEngine` und
-   `SQLiteStore.apply`).
+   **Gezielt nachgelesen (24.11.2026, `grep` über `JuNotesCore/Sources` und `App/Sources`):** Die App rechnet nirgends mit `seq`. Sie speichert genau eine Zahl, den
+   `cursor` aus der Antwort (`meta`-Tabelle, `SQLiteStore.apply`), und schickt sie beim nächsten `pull` als `since` zurück (`SyncEngine`). `SyncRecord.seq` wird gelesen
+   und nie benutzt, `PushResponse.seq` ebenso nicht; das `seq` des Postausgangs ist eine eigene lokale Zählung. Eine Besitzer-Filterung des Pulls (leere Antwort mit
+   `cursor` = `since`) ist für die App also unbedenklich, solange der Server den Merker nie zurücksetzt oder senkt.
 5. **Der bestehende App-Token** wird zum „Gerät des Eigentümers“: Der Server ordnet ihn bei jeder Anfrage der Person Eigentümer zu. Neue Token je Gerät
    und Person kommen mit Meilenstein 3 aus der Basis (Geräte-Modul). Der alte Token wird erst abgeschaltet, wenn die App ihn nicht mehr schickt, und das
    schaltet der Eigentümer von Hand.

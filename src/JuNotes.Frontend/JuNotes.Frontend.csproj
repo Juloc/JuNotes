@@ -3,5 +3,6 @@
     <InternalsVisibleTo Include="JuNotes.Backend.Tests" />
     <ProjectReference Include="../JuNotes.Backend/JuNotes.Backend.csproj" />
     <ProjectReference Include="../JuNotes.Workers/JuNotes.Workers.csproj" />
+    <ProjectReference Include="../../base/src/Base.Web/Base.Web.csproj" />
   </ItemGroup>
 </Project>

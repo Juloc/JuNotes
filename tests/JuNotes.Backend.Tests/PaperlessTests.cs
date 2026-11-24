@@ -113,7 +113,7 @@ namespace JuNotes.Backend.Tests
         {
             var database = await TestDatabase.CreateAsync();
             var fake = new FakeCodex("exit 0");
-            return (new AdminHost(database, AdminHost.Password, fake.Executable, null, configured ? ("http://127.0.0.1:1", "tok") : null), fake, database);
+            return (new AdminHost(database, fake.Executable, configured ? ("http://127.0.0.1:1", "tok") : null), fake, database);
         }
 
         private static HttpClient Api(AdminHost host)

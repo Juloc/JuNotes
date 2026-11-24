@@ -11,22 +11,18 @@ namespace JuNotes.Backend.Tests
     // The real host with a throwaway database, a fake codex program and an admin password.
     internal sealed class AdminHost : WebApplicationFactory<Program>
     {
-        public const string Password = "ein-langes-test-passwort";
+        public const string SetupCode = "test-setup-code";
 
         private readonly TestDatabase _database;
-        private readonly string? _password;
         private readonly string _codex;
-        private readonly string? _webPassword;
         private readonly (string Url, string Token)? _paperless;
 
         public string BackupDirectory { get; } = Path.Combine(Path.GetTempPath(), "junotes-admin-" + Guid.NewGuid().ToString("N"));
 
-        public AdminHost(TestDatabase database, string? password, string codex, string? webPassword = null, (string Url, string Token)? paperless = null)
+        public AdminHost(TestDatabase database, string codex, (string Url, string Token)? paperless = null)
         {
             _database = database;
-            _password = password;
             _codex = codex;
-            _webPassword = webPassword;
             _paperless = paperless;
         }
 
@@ -40,15 +36,10 @@ namespace JuNotes.Backend.Tests
             builder.UseSetting("Codex:Executable", _codex);
             builder.UseSetting("Codex:Home", Path.Combine(BackupDirectory, "codex"));
             builder.UseSetting("Assets:Directory", Path.Combine(BackupDirectory, "assets"));
-            if (_password is not null)
-            {
-                builder.UseSetting("Admin:Password", _password);
-            }
-
-            if (_webPassword is not null)
-            {
-                builder.UseSetting("Web:Password", _webPassword);
-            }
+            // The base: a fixed key and setup code (made up for the tests) and a folder of its own for the key file.
+            builder.UseSetting("BASE_SECRET_KEY", Convert.ToBase64String(new byte[32].Select((_, index) => (byte)(index + 1)).ToArray()));
+            builder.UseSetting("BASE_SETUP_CODE", SetupCode);
+            builder.UseSetting("BASE_DATA", Path.Combine(BackupDirectory, "base"));
 
             if (_paperless is { } paperless)
             {
@@ -58,6 +49,24 @@ namespace JuNotes.Backend.Tests
         }
 
         public HttpClient Browser() => CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false, HandleCookies = true });
+
+        // A person with a session of the base, made directly in the database (the sign-in itself, with its second factor, is tested in the base). The throwaway
+        // names and values exist only in the test database.
+        public async Task<HttpClient> SignedInAsync(string role = "admin")
+        {
+            var (_, client) = await SignedInPersonAsync(role);
+            return client;
+        }
+
+        public async Task<(Guid UserId, HttpClient Client)> SignedInPersonAsync(string role = "admin")
+        {
+            var users = Services.GetRequiredService<Base.Accounts.UserStore>();
+            var user = await users.CreateAsync(role + "-" + Guid.NewGuid().ToString("N")[..8], "not-a-hash", "TESTSECRET", confirmed: true, recoveryHashes: [], roles: [role], replacePending: false);
+            var token = await Services.GetRequiredService<Base.Accounts.SessionStore>().CreateAsync(user.Id, "127.0.0.1", "tests");
+            var client = Browser();
+            client.DefaultRequestHeaders.Add("Cookie", "notes_sid=" + token);
+            return (user.Id, client);
+        }
 
         protected override void Dispose(bool disposing)
         {
@@ -88,12 +97,6 @@ namespace JuNotes.Backend.Tests
         public static string PathOf(HttpResponseMessage response)
             => response.Headers.Location is { IsAbsoluteUri: true } absolute ? absolute.AbsolutePath : response.Headers.Location!.OriginalString.Split('?')[0];
 
-        public static async Task LoginAsync(HttpClient client)
-        {
-            var response = await PostAsync(client, "/Admin/Login", "/Admin/Login", new() { ["password"] = AdminHost.Password });
-            Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
-        }
-
         [GeneratedRegex("name=\"__RequestVerificationToken\"[^>]*value=\"(?<value>[^\"]+)\"", RegexOptions.None, matchTimeoutMilliseconds: 2000)]
         private static partial Regex TokenPattern();
     }
@@ -118,15 +121,15 @@ namespace JuNotes.Backend.Tests
             exit 0
             """;
 
-        private static async Task<(AdminHost Host, FakeCodex Fake, TestDatabase Database)> StartAsync(string? password = AdminHost.Password, string codex = SignedInCodex)
+        private static async Task<(AdminHost Host, FakeCodex Fake, TestDatabase Database)> StartAsync(string codex = SignedInCodex)
         {
             var database = await TestDatabase.CreateAsync();
             var fake = new FakeCodex(codex);
-            return (new AdminHost(database, password, fake.Executable), fake, database);
+            return (new AdminHost(database, fake.Executable), fake, database);
         }
 
         [RequiresDatabaseFact]
-        public async Task Without_a_login_the_admin_area_sends_you_to_the_login_page()
+        public async Task Without_a_session_the_admin_area_sends_you_to_the_front_door()
         {
             var (host, fake, database) = await StartAsync();
             await using (database) using (fake) using (host)
@@ -134,7 +137,57 @@ namespace JuNotes.Backend.Tests
                 var response = await host.Browser().GetAsync(new Uri("/Admin/Profiles", UriKind.Relative));
 
                 Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
-                Assert.Equal("/Admin/Login", Web.PathOf(response));
+                Assert.Equal("/", Web.PathOf(response));
+            }
+        }
+
+        [RequiresDatabaseFact]
+        public async Task A_member_reads_notes_but_does_not_open_the_admin_area_and_an_admin_opens_both()
+        {
+            var (host, fake, database) = await StartAsync();
+            await using (database) using (fake) using (host)
+            {
+                var member = await host.SignedInAsync("member");
+                var admin = await host.SignedInAsync();
+
+                Assert.Equal(HttpStatusCode.Forbidden, (await member.GetAsync(new Uri("/Admin", UriKind.Relative))).StatusCode);
+                Assert.Equal(HttpStatusCode.Forbidden, (await member.GetAsync(new Uri("/Admin/Codex", UriKind.Relative))).StatusCode);
+                Assert.Equal(HttpStatusCode.OK, (await member.GetAsync(new Uri("/Notes", UriKind.Relative))).StatusCode);
+                Assert.Equal(HttpStatusCode.OK, (await admin.GetAsync(new Uri("/Admin", UriKind.Relative))).StatusCode);
+                Assert.Equal(HttpStatusCode.OK, (await admin.GetAsync(new Uri("/Notes", UriKind.Relative))).StatusCode);
+            }
+        }
+
+        [RequiresDatabaseFact]
+        public async Task An_ended_session_or_an_unknown_cookie_opens_nothing()
+        {
+            var (host, fake, database) = await StartAsync();
+            await using (database) using (fake) using (host)
+            {
+                var client = host.Browser();
+                client.DefaultRequestHeaders.Add("Cookie", "notes_sid=not-a-session");
+
+                Assert.Equal(HttpStatusCode.Redirect, (await client.GetAsync(new Uri("/Admin", UriKind.Relative))).StatusCode);
+                Assert.Equal(HttpStatusCode.Redirect, (await client.GetAsync(new Uri("/Notes", UriKind.Relative))).StatusCode);
+            }
+        }
+
+        [RequiresDatabaseFact]
+        public async Task The_old_pages_get_only_the_one_relaxation_they_need_in_the_content_policy()
+        {
+            var (host, fake, database) = await StartAsync();
+            await using (database) using (fake) using (host)
+            {
+                var admin = await host.SignedInAsync();
+                var page = await admin.GetAsync(new Uri("/Notes", UriKind.Relative));
+                var front = await host.Browser().GetAsync(new Uri("/", UriKind.Relative));
+
+                var policy = Assert.Single(page.Headers.GetValues("Content-Security-Policy"));
+                Assert.StartsWith(Base.Web.SecurityHeaders.Csp, policy, StringComparison.Ordinal);
+                Assert.EndsWith("; style-src-attr 'unsafe-inline'", policy, StringComparison.Ordinal);
+                Assert.DoesNotContain("script-src 'self' 'unsafe", policy, StringComparison.Ordinal);
+                // Everywhere else the policy of the base stands as it is.
+                Assert.Equal(Base.Web.SecurityHeaders.Csp, Assert.Single(front.Headers.GetValues("Content-Security-Policy")));
             }
         }
 
@@ -152,120 +205,16 @@ namespace JuNotes.Backend.Tests
         }
 
         [RequiresDatabaseFact]
-        public async Task Without_a_configured_password_the_area_stays_closed_and_says_how_to_open_it()
-        {
-            var (host, fake, database) = await StartAsync(password: null);
-            await using (database) using (fake) using (host)
-            {
-                var client = host.Browser();
-
-                var page = await client.GetStringAsync(new Uri("/Admin/Login", UriKind.Relative));
-                Assert.Contains("Admin__Password", page, StringComparison.Ordinal);
-
-                // There is no form to log in with, and a post made by hand is refused as well.
-                Assert.DoesNotContain("<form", page, StringComparison.Ordinal);
-                Assert.Equal(HttpStatusCode.BadRequest, (await client.PostAsync(new Uri("/Admin/Login", UriKind.Relative), new FormUrlEncodedContent(new Dictionary<string, string> { ["password"] = "" }))).StatusCode);
-                Assert.Equal(HttpStatusCode.Redirect, (await client.GetAsync(new Uri("/Admin", UriKind.Relative))).StatusCode);
-            }
-        }
-
-        [RequiresDatabaseFact]
-        public async Task A_wrong_password_is_refused_and_the_right_one_opens_the_area()
-        {
-            var (host, fake, database) = await StartAsync();
-            await using (database) using (fake) using (host)
-            {
-                var client = host.Browser();
-
-                var wrong = await Web.PostAsync(client, "/Admin/Login", "/Admin/Login", new() { ["password"] = "falsch" });
-                Assert.Equal(HttpStatusCode.OK, wrong.StatusCode);
-                Assert.Contains("stimmt nicht", await wrong.Content.ReadAsStringAsync(), StringComparison.Ordinal);
-                Assert.Equal(HttpStatusCode.Redirect, (await client.GetAsync(new Uri("/Admin", UriKind.Relative))).StatusCode);
-
-                await Web.LoginAsync(client);
-                var overview = await client.GetAsync(new Uri("/Admin", UriKind.Relative));
-
-                Assert.Equal(HttpStatusCode.OK, overview.StatusCode);
-                Assert.Contains("Übersicht", await overview.Content.ReadAsStringAsync(), StringComparison.Ordinal);
-            }
-        }
-
-        [RequiresDatabaseFact]
-        public async Task The_cookie_cannot_be_read_by_scripts_and_is_strict()
-        {
-            var (host, fake, database) = await StartAsync();
-            await using (database) using (fake) using (host)
-            {
-                var client = host.Browser();
-                var token = await Web.TokenAsync(client, "/Admin/Login");
-
-                var response = await client.PostAsync(new Uri("/Admin/Login", UriKind.Relative), new FormUrlEncodedContent(new Dictionary<string, string> { ["password"] = AdminHost.Password, ["__RequestVerificationToken"] = token }));
-
-                var cookie = response.Headers.GetValues("Set-Cookie").Single(value => value.StartsWith("junotes-admin=", StringComparison.Ordinal));
-                Assert.Contains("httponly", cookie, StringComparison.OrdinalIgnoreCase);
-                Assert.Contains("samesite=strict", cookie, StringComparison.OrdinalIgnoreCase);
-            }
-        }
-
-        [RequiresDatabaseFact]
         public async Task A_post_without_the_anti_forgery_token_is_refused()
         {
             var (host, fake, database) = await StartAsync();
             await using (database) using (fake) using (host)
             {
-                var client = host.Browser();
+                var client = await host.SignedInAsync();
 
-                var response = await client.PostAsync(new Uri("/Admin/Login", UriKind.Relative), new FormUrlEncodedContent(new Dictionary<string, string> { ["password"] = AdminHost.Password }));
+                var response = await client.PostAsync(new Uri("/Admin/Codex?handler=Login", UriKind.Relative), new FormUrlEncodedContent(new Dictionary<string, string>()));
 
                 Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-            }
-        }
-
-        [RequiresDatabaseFact]
-        public async Task Five_wrong_tries_lock_the_door_even_for_the_right_password()
-        {
-            var (host, fake, database) = await StartAsync();
-            await using (database) using (fake) using (host)
-            {
-                var client = host.Browser();
-                for (var i = 0; i < AdminAccess.MaxFailures; i++)
-                {
-                    await Web.PostAsync(client, "/Admin/Login", "/Admin/Login", new() { ["password"] = "falsch" + i });
-                }
-
-                var response = await Web.PostAsync(client, "/Admin/Login", "/Admin/Login", new() { ["password"] = AdminHost.Password });
-
-                Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-                Assert.Contains("Zu viele Versuche", await response.Content.ReadAsStringAsync(), StringComparison.Ordinal);
-            }
-        }
-
-        [RequiresDatabaseFact]
-        public async Task After_logging_in_only_a_path_of_the_admin_area_can_be_the_next_page()
-        {
-            var (host, fake, database) = await StartAsync();
-            await using (database) using (fake) using (host)
-            {
-                var client = host.Browser();
-
-                var response = await Web.PostAsync(client, "/Admin/Login", "/Admin/Login", new() { ["password"] = AdminHost.Password, ["returnUrl"] = "https://evil.example/steal" });
-
-                Assert.Equal("/Admin", response.Headers.Location!.OriginalString);
-            }
-        }
-
-        [RequiresDatabaseFact]
-        public async Task Logging_out_closes_the_area_again()
-        {
-            var (host, fake, database) = await StartAsync();
-            await using (database) using (fake) using (host)
-            {
-                var client = host.Browser();
-                await Web.LoginAsync(client);
-
-                await Web.PostAsync(client, "/Admin", "/Admin/Logout", []);
-
-                Assert.Equal(HttpStatusCode.Redirect, (await client.GetAsync(new Uri("/Admin", UriKind.Relative))).StatusCode);
             }
         }
 
@@ -275,8 +224,7 @@ namespace JuNotes.Backend.Tests
             var (host, fake, database) = await StartAsync();
             await using (database) using (fake) using (host)
             {
-                var client = host.Browser();
-                await Web.LoginAsync(client);
+                var client = await host.SignedInAsync();
                 var store = host.Services.GetRequiredService<AiProfileStore>();
 
                 var saved = await Web.PostAsync(client, "/Admin/Profiles", "/Admin/Profiles?handler=Save", new() { ["key"] = "quiz", ["systemPrompt"] = "Frage nur nach Jahreszahlen.", ["difficulty"] = "schwer", ["tone"] = "sachlich" });
@@ -299,8 +247,7 @@ namespace JuNotes.Backend.Tests
             var (host, fake, database) = await StartAsync();
             await using (database) using (fake) using (host)
             {
-                var client = host.Browser();
-                await Web.LoginAsync(client);
+                var client = await host.SignedInAsync();
                 var settings = host.Services.GetRequiredService<AiSettingsStore>();
 
                 var saved = await Web.PostAsync(client, "/Admin/Codex", "/Admin/Codex?handler=Settings", new() { ["model"] = "mein-modell", ["effort"] = "high", ["dailyLimit"] = "25" });
@@ -328,8 +275,7 @@ namespace JuNotes.Backend.Tests
             var (host, fake, database) = await StartAsync();
             await using (database) using (fake) using (host)
             {
-                var client = host.Browser();
-                await Web.LoginAsync(client);
+                var client = await host.SignedInAsync();
 
                 await Web.PostAsync(client, "/Admin/Profiles", "/Admin/Profiles?handler=Save", new() { ["key"] = "quiz", ["systemPrompt"] = "   ", ["difficulty"] = "mittel", ["tone"] = "freundlich", ["enabled"] = "on" });
 
@@ -345,8 +291,7 @@ namespace JuNotes.Backend.Tests
             var (host, fake, database) = await StartAsync();
             await using (database) using (fake) using (host)
             {
-                var client = host.Browser();
-                await Web.LoginAsync(client);
+                var client = await host.SignedInAsync();
 
                 var page = await client.GetStringAsync(new Uri("/Admin", UriKind.Relative));
 
@@ -361,8 +306,7 @@ namespace JuNotes.Backend.Tests
             var (host, fake, database) = await StartAsync();
             await using (database) using (fake) using (host)
             {
-                var client = host.Browser();
-                await Web.LoginAsync(client);
+                var client = await host.SignedInAsync();
 
                 await Web.PostAsync(client, "/Admin/Backups", "/Admin/Backups?handler=Run", []);
 
@@ -379,8 +323,7 @@ namespace JuNotes.Backend.Tests
             var (host, fake, database) = await StartAsync(codex: SignedOutCodex);
             await using (database) using (fake) using (host)
             {
-                var client = host.Browser();
-                await Web.LoginAsync(client);
+                var client = await host.SignedInAsync();
                 Assert.Contains("Nicht angemeldet", await client.GetStringAsync(new Uri("/Admin/Codex", UriKind.Relative)), StringComparison.Ordinal);
 
                 await Web.PostAsync(client, "/Admin/Codex", "/Admin/Codex?handler=Login", []);
@@ -407,72 +350,5 @@ namespace JuNotes.Backend.Tests
                 Assert.Equal(HttpStatusCode.Unauthorized, (await client.GetAsync(new Uri("/api/v1/sync/pull", UriKind.Relative))).StatusCode);
             }
         }
-    }
-
-    public class AdminAccessTests
-    {
-        private sealed class Clock : TimeProvider
-        {
-            public DateTimeOffset Now { get; set; } = new(2026, 11, 19, 12, 0, 0, TimeSpan.Zero);
-
-            public override DateTimeOffset GetUtcNow() => Now;
-        }
-
-        [Fact]
-        public void The_lock_ends_after_ten_minutes()
-        {
-            var clock = new Clock();
-            var access = new AdminAccess(new AdminOptions { Password = "richtig" }, clock);
-            for (var i = 0; i < AdminAccess.MaxFailures; i++)
-            {
-                access.TryLogin("falsch", "1.2.3.4");
-            }
-
-            Assert.Equal(LoginResult.LockedOut, access.TryLogin("richtig", "1.2.3.4"));
-            clock.Now += AdminAccess.Window + TimeSpan.FromSeconds(1);
-
-            Assert.Equal(LoginResult.Accepted, access.TryLogin("richtig", "1.2.3.4"));
-        }
-
-        [Fact]
-        public void One_address_being_locked_out_does_not_lock_the_others()
-        {
-            var access = new AdminAccess(new AdminOptions { Password = "richtig" }, new Clock());
-            for (var i = 0; i < AdminAccess.MaxFailures; i++)
-            {
-                access.TryLogin("falsch", "1.2.3.4");
-            }
-
-            Assert.Equal(LoginResult.Accepted, access.TryLogin("richtig", "5.6.7.8"));
-        }
-
-        [Fact]
-        public void A_right_password_clears_the_failures()
-        {
-            var access = new AdminAccess(new AdminOptions { Password = "richtig" }, new Clock());
-            for (var round = 0; round < 3; round++)
-            {
-                access.TryLogin("falsch", "1.2.3.4");
-                access.TryLogin("falsch", "1.2.3.4");
-                Assert.Equal(LoginResult.Accepted, access.TryLogin("richtig", "1.2.3.4"));
-            }
-        }
-
-        [Theory]
-        [InlineData(null)]
-        [InlineData("")]
-        public void Without_a_password_nobody_gets_in(string? password)
-            => Assert.Equal(LoginResult.Disabled, new AdminAccess(new AdminOptions { Password = password }, new Clock()).TryLogin("", "1.2.3.4"));
-
-        [Theory]
-        [InlineData("/Admin/Profiles", "/Admin/Profiles")]
-        [InlineData("/admin", "/admin")]
-        [InlineData("https://evil.example", "/Admin")]
-        [InlineData("//evil.example/Admin", "/Admin")]
-        [InlineData("/Admin\\evil", "/Admin")]
-        [InlineData("/Other", "/Admin")]
-        [InlineData(null, "/Admin")]
-        public void The_next_page_is_always_one_of_the_admin_area(string? asked, string expected)
-            => Assert.Equal(expected, JuNotes.Frontend.Pages.Admin.LoginModel.SafeReturn(asked));
     }
 }

@@ -138,6 +138,11 @@ angefasst.** Das ist ein offener Betriebspunkt, kein Auftrag an diese Sitzung.
 - **Fehler** in `Profiles.OnPostResetAsync` (doppelter Aufruf), laut Basis-Plan bekannt, nicht behoben.
 - **Cookie** der Verwaltung ohne dauerhaften Schlüsselring: Sitzungen enden beim Neustart. Erledigt sich mit der Basis.
 
+## Hier nicht prüfbar
+
+- **Sechs Backup-Tests** (`BackupServiceTests`, `BackupMirrorIntegrationTests`, `AdminTests.A_manual_backup_is_written_and_listed`): Auf dieser Maschine liegt `pg_dump` in Version 17, der Testserver ist 18
+  („unpassende Serverversion“). Das ist die Umgebung. Sie bleiben, wie sie sind; in der CI (mit Version 18) laufen sie.
+
 ## Nicht geprüft (ehrlich)
 
 | Was | Stand |

@@ -25,7 +25,7 @@ namespace JuNotes.Backend.Tests
         {
             var database = await TestDatabase.CreateAsync();
             var fake = new FakeCodex("exit 0");
-            return (new AdminHost(database, AdminHost.Password, fake.Executable), database);
+            return (new AdminHost(database, fake.Executable), database);
         }
 
         private static HttpClient Api(AdminHost host)
@@ -496,6 +496,13 @@ namespace JuNotes.Backend.Tests
                 resource => old.Single(migration => migration.Number.ToString(System.Globalization.CultureInfo.InvariantCulture) == resource).Sql());
             await DatabaseUpgrade.RunAsync(database.Data, oldSet, DatabaseUpgrade.ReadBaseline(assembly), CancellationToken.None);
 
+            // An older server called its two tables otherwise: the names the base also uses. Put them back, so the upgrade starts from a database as it really was.
+            foreach (var sql in new[] { "alter table app_migrations rename to schema_migrations", "alter table app_instance_settings rename to instance_settings" })
+            {
+                await using var rename = database.Data.CreateCommand(sql);
+                await rename.ExecuteNonQueryAsync();
+            }
+
             var rows = new (string Kind, Guid Id, Guid? Parent, string? Payload, bool Deleted)[]
             {
                 ("subject", Subject, null, """{"name":"Mathe","color":"#0a84ff"}""", false),
@@ -519,11 +526,11 @@ namespace JuNotes.Backend.Tests
 
             var asset = Guid.NewGuid();
             var fake = new FakeCodex("exit 0");
-            using var host = new AdminHost(database, AdminHost.Password, fake.Executable);
+            using var host = new AdminHost(database, fake.Executable);
             var api = Api(host);
 
             // Starting the host ran the rest of the migrations.
-            await using (var count = database.Data.CreateCommand("select max(number) from schema_migrations"))
+            await using (var count = database.Data.CreateCommand("select max(number) from app_migrations"))
             {
                 Assert.Equal(all.Latest, (int)(await count.ExecuteScalarAsync())!);
             }

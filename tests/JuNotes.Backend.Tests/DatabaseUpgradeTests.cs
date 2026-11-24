@@ -17,9 +17,9 @@ namespace JuNotes.Backend.Tests
                 var latest = await DatabaseUpgrade.RunAsync(data, set, DatabaseUpgrade.ReadBaseline(typeof(MigrationSet).Assembly), CancellationToken.None);
 
                 Assert.Equal(1, latest);
-                Assert.Equal(0, await database.CountAsync("instance_settings"));
+                Assert.Equal(0, await database.CountAsync("app_instance_settings"));
                 Assert.Equal(0, await database.CountAsync("extra"));
-                Assert.Equal(2, await database.CountAsync("schema_migrations"));
+                Assert.Equal(2, await database.CountAsync("app_migrations"));
             }
         }
 
@@ -31,15 +31,15 @@ namespace JuNotes.Backend.Tests
             {
                 var baseline = DatabaseUpgrade.ReadBaseline(typeof(MigrationSet).Assembly);
                 await DatabaseUpgrade.RunAsync(data, Set(), baseline, CancellationToken.None);
-                await using (var insert = data.CreateCommand("insert into instance_settings (key, value) values ('a', 'b')"))
+                await using (var insert = data.CreateCommand("insert into app_instance_settings (key, value) values ('a', 'b')"))
                 {
                     await insert.ExecuteNonQueryAsync();
                 }
 
                 await DatabaseUpgrade.RunAsync(data, Set(("0001_extra.sql", "create table extra (id int)")), baseline, CancellationToken.None);
 
-                Assert.Equal(1, await database.CountAsync("instance_settings"));
-                Assert.Equal(2, await database.CountAsync("schema_migrations"));
+                Assert.Equal(1, await database.CountAsync("app_instance_settings"));
+                Assert.Equal(2, await database.CountAsync("app_migrations"));
             }
         }
 
@@ -55,7 +55,7 @@ namespace JuNotes.Backend.Tests
                 await Assert.ThrowsAsync<PostgresException>(() => DatabaseUpgrade.RunAsync(data, Set(("0001_ok.sql", "create table ok (id int)"), ("0002_bad.sql", "select * from missing")), baseline, CancellationToken.None));
 
                 await Assert.ThrowsAsync<PostgresException>(() => database.CountAsync("ok"));
-                Assert.Equal(1, await database.CountAsync("schema_migrations"));
+                Assert.Equal(1, await database.CountAsync("app_migrations"));
             }
         }
 

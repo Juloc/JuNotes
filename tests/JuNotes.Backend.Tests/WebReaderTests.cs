@@ -10,8 +10,7 @@ namespace JuNotes.Backend.Tests
 {
     public class WebReaderTests
     {
-        private const string ReaderPassword = "lese-passwort-fuer-die-tochter";
-        private static readonly Guid Subject = Guid.Parse("00000000-0000-0000-0000-0000000000a1");
+                private static readonly Guid Subject = Guid.Parse("00000000-0000-0000-0000-0000000000a1");
         private static readonly Guid Book = Guid.Parse("00000000-0000-0000-0000-0000000000b1");
         private static readonly Guid Board = Guid.Parse("00000000-0000-0000-0000-0000000000b3");
         private static readonly Guid Trashed = Guid.Parse("00000000-0000-0000-0000-0000000000b2");
@@ -20,11 +19,11 @@ namespace JuNotes.Backend.Tests
 
         private static SyncChange Entity(string kind, Guid id, Guid? parent, string json) => new(kind, id, parent, JsonElement.Parse(json), false);
 
-        private static async Task<(AdminHost Host, FakeCodex Fake, TestDatabase Database)> StartAsync(bool seed = false, string? readerPassword = ReaderPassword, string? adminPassword = AdminHost.Password)
+        private static async Task<(AdminHost Host, FakeCodex Fake, TestDatabase Database)> StartAsync(bool seed = false)
         {
             var database = await TestDatabase.CreateAsync();
             var fake = new FakeCodex("exit 0");
-            var host = new AdminHost(database, adminPassword, fake.Executable, readerPassword);
+            var host = new AdminHost(database, fake.Executable);
             if (seed)
             {
                 var pageA = Guid.Parse("00000000-0000-0000-0000-0000000000c1");
@@ -49,16 +48,10 @@ namespace JuNotes.Backend.Tests
             return (host, fake, database);
         }
 
-        private static async Task<HttpClient> ReaderAsync(AdminHost host, string password = ReaderPassword)
-        {
-            var client = host.Browser();
-            var response = await Web.PostAsync(client, "/Login", "/Login", new() { ["password"] = password });
-            Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
-            return client;
-        }
+        private static Task<HttpClient> ReaderAsync(AdminHost host) => host.SignedInAsync("member");
 
         [RequiresDatabaseFact]
-        public async Task The_front_door_leads_to_the_notes_and_from_there_to_the_login()
+        public async Task The_front_door_is_the_page_of_the_base_and_the_notes_need_a_session()
         {
             var (host, fake, database) = await StartAsync();
             await using (database) using (fake) using (host)
@@ -66,11 +59,12 @@ namespace JuNotes.Backend.Tests
                 var client = host.Browser();
 
                 var door = await client.GetAsync(new Uri("/", UriKind.Relative));
-                Assert.Equal("/Notes", door.Headers.Location!.OriginalString);
+                Assert.Equal(HttpStatusCode.OK, door.StatusCode);
+                Assert.Contains("/app.js", await door.Content.ReadAsStringAsync(), StringComparison.Ordinal);
                 var notes = await client.GetAsync(new Uri("/Notes", UriKind.Relative));
 
                 Assert.Equal(HttpStatusCode.Redirect, notes.StatusCode);
-                Assert.Equal("/Login", Web.PathOf(notes));
+                Assert.Equal("/", Web.PathOf(notes));
             }
         }
 
@@ -87,74 +81,25 @@ namespace JuNotes.Backend.Tests
                 var profiles = await client.GetAsync(new Uri("/Admin/Profiles", UriKind.Relative));
 
                 Assert.Equal(HttpStatusCode.OK, notes.StatusCode);
-                Assert.Equal(HttpStatusCode.Redirect, admin.StatusCode);
-                Assert.Equal("/Admin/Login", Web.PathOf(admin));
-                Assert.Equal(HttpStatusCode.Redirect, profiles.StatusCode);
+                Assert.Equal(HttpStatusCode.Forbidden, admin.StatusCode);
+                Assert.Equal(HttpStatusCode.Forbidden, profiles.StatusCode);
                 Assert.DoesNotContain("/Admin\"", await notes.Content.ReadAsStringAsync(), StringComparison.Ordinal);
             }
         }
 
         [RequiresDatabaseFact]
-        public async Task The_admin_password_on_the_same_page_opens_everything()
+        public async Task An_administrator_opens_everything()
         {
             var (host, fake, database) = await StartAsync();
             await using (database) using (fake) using (host)
             {
-                var client = await ReaderAsync(host, AdminHost.Password);
+                var client = await host.SignedInAsync();
 
                 var notes = await client.GetAsync(new Uri("/Notes", UriKind.Relative));
 
                 Assert.Equal(HttpStatusCode.OK, notes.StatusCode);
                 Assert.Contains("href=\"/Admin\"", await notes.Content.ReadAsStringAsync(), StringComparison.Ordinal);
                 Assert.Equal(HttpStatusCode.OK, (await client.GetAsync(new Uri("/Admin", UriKind.Relative))).StatusCode);
-            }
-        }
-
-        [RequiresDatabaseFact]
-        public async Task A_wrong_password_is_refused_and_five_of_them_lock_the_door()
-        {
-            var (host, fake, database) = await StartAsync();
-            await using (database) using (fake) using (host)
-            {
-                var client = host.Browser();
-                var first = await Web.PostAsync(client, "/Login", "/Login", new() { ["password"] = "falsch" });
-                Assert.Contains("stimmt nicht", await first.Content.ReadAsStringAsync(), StringComparison.Ordinal);
-                Assert.Equal(HttpStatusCode.Redirect, (await client.GetAsync(new Uri("/Notes", UriKind.Relative))).StatusCode);
-
-                for (var i = 0; i < AdminAccess.MaxFailures; i++)
-                {
-                    await Web.PostAsync(client, "/Login", "/Login", new() { ["password"] = "falsch" + i });
-                }
-
-                var locked = await Web.PostAsync(client, "/Login", "/Login", new() { ["password"] = ReaderPassword });
-                Assert.Contains("Zu viele Versuche", await locked.Content.ReadAsStringAsync(), StringComparison.Ordinal);
-            }
-        }
-
-        [RequiresDatabaseFact]
-        public async Task Without_any_password_the_web_side_stays_off_and_says_how_to_turn_it_on()
-        {
-            var (host, fake, database) = await StartAsync(readerPassword: null, adminPassword: null);
-            await using (database) using (fake) using (host)
-            {
-                var page = await host.Browser().GetStringAsync(new Uri("/Login", UriKind.Relative));
-
-                Assert.Contains("Web__Password", page, StringComparison.Ordinal);
-                Assert.DoesNotContain("<form", page, StringComparison.Ordinal);
-            }
-        }
-
-        [RequiresDatabaseFact]
-        public async Task After_the_login_only_a_page_of_the_web_app_is_the_next_page()
-        {
-            var (host, fake, database) = await StartAsync();
-            await using (database) using (fake) using (host)
-            {
-                var client = host.Browser();
-
-                var response = await Web.PostAsync(client, "/Login", "/Login", new() { ["password"] = ReaderPassword, ["returnUrl"] = "https://evil.example" });
-
-                Assert.Equal("/Notes", response.Headers.Location!.OriginalString);
             }
         }
 
@@ -269,8 +214,8 @@ namespace JuNotes.Backend.Tests
 
                 Assert.Equal(HttpStatusCode.OK, manifest.StatusCode);
                 using var document = JsonDocument.Parse(await manifest.Content.ReadAsStringAsync());
-                Assert.Equal("JuNotes", document.RootElement.GetProperty("name").GetString());
-                Assert.Equal("/Notes", document.RootElement.GetProperty("start_url").GetString());
+                Assert.Equal("Notes", document.RootElement.GetProperty("name").GetString());
+                Assert.Equal("/", document.RootElement.GetProperty("start_url").GetString());
                 Assert.Equal(HttpStatusCode.OK, icon.StatusCode);
             }
         }
@@ -283,25 +228,14 @@ namespace JuNotes.Backend.Tests
             {
                 var client = await ReaderAsync(host);
 
-                await Web.PostAsync(client, "/Notes", "/Notes/Logout", []);
+                Assert.Equal(HttpStatusCode.OK, (await client.GetAsync(new Uri("/Notes", UriKind.Relative))).StatusCode);
+                using var logout = new HttpRequestMessage(HttpMethod.Post, new Uri("/api/auth/logout", UriKind.Relative));
+                logout.Headers.Add("X-Base", "1");
+                logout.Headers.Add("Origin", "http://localhost");
+                Assert.True((await client.SendAsync(logout)).IsSuccessStatusCode);
 
                 Assert.Equal(HttpStatusCode.Redirect, (await client.GetAsync(new Uri("/Notes", UriKind.Relative))).StatusCode);
             }
         }
-    }
-
-    public class ReaderLoginTests
-    {
-        [Theory]
-        [InlineData("/Notes", "/Notes")]
-        [InlineData("/Notes/00000000-0000-0000-0000-000000000001", "/Notes/00000000-0000-0000-0000-000000000001")]
-        [InlineData("/Admin", "/Admin")]
-        [InlineData("https://evil.example", "/Notes")]
-        [InlineData("//evil.example/Notes", "/Notes")]
-        [InlineData("/Notes\\evil", "/Notes")]
-        [InlineData("/Other", "/Notes")]
-        [InlineData(null, "/Notes")]
-        public void The_next_page_is_always_one_of_this_web_app(string? asked, string expected)
-            => Assert.Equal(expected, JuNotes.Frontend.Pages.ReaderLoginModel.SafeReturn(asked));
     }
 }

@@ -35,7 +35,7 @@ namespace JuNotes.Backend.Tests
         public async Task A_backup_is_a_restorable_dump_with_the_data_in_it()
         {
             await using var database = await TestDatabase.CreateCurrentAsync();
-            await using (var insert = database.Data.CreateCommand("insert into instance_settings (key, value) values ('hello', 'world')"))
+            await using (var insert = database.Data.CreateCommand("insert into app_instance_settings (key, value) values ('hello', 'world')"))
             {
                 await insert.ExecuteNonQueryAsync();
             }
@@ -53,7 +53,7 @@ namespace JuNotes.Backend.Tests
             var text = await listing.StandardOutput.ReadToEndAsync();
             await listing.WaitForExitAsync();
             Assert.Equal(0, listing.ExitCode);
-            Assert.Contains("instance_settings", text);
+            Assert.Contains("app_instance_settings", text);
             Assert.Contains("entities", text);
         }
 

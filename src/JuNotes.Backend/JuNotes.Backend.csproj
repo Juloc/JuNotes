@@ -7,6 +7,6 @@
     <EmbeddedResource Include="../../database/migrations/*.sql" LogicalName="JuNotes.Database.Migrations.%(Filename)%(Extension)" />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="Npgsql" Version="10.0.3" />
+    <PackageReference Include="Npgsql" />
   </ItemGroup>
 </Project>

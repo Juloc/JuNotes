@@ -1,6 +1,7 @@
 FROM mcr.microsoft.com/dotnet/sdk:11.0 AS build
 WORKDIR /src
-COPY global.json Directory.Build.props ./
+COPY global.json Directory.Build.props Directory.Packages.props ./
+COPY base/ base/
 COPY src/ src/
 COPY database/ database/
 RUN dotnet publish src/JuNotes.Frontend/JuNotes.Frontend.csproj -c Release -o /app
