@@ -214,28 +214,33 @@ gefahren; die Skripte der Basis laufen über die normale Verbindung (kleine neue
 
 **Offene Frage des Orchestrators an den Eigentümer** (nichts gebaut): Die Zuweisung gibt alle heutigen Hefte der Person, die die Einrichtung abschließt; der Besitzer ändert sich später nicht mehr.
 
-## Sicherheitsprüfung 2: Behebungen von Meilenstein 1 und Meilenstein 2 (Befunde vom 25.11.2026, Stand)
+## Sicherheitsprüfung 2: Behebungen von Meilenstein 1 und Meilenstein 2 (Befunde vom 25.11.2026, **behoben**)
 
 Ergebnis der Prüfung: kein kritischer oder hoher Befund, kein Weg, auf dem ein Mitglied oder jemand ohne Zugang an Hefte, Seiten, Striche, Scans, Noten, Karten oder die Verwaltung kommt; die Behebungen aus der ersten Prüfung halten.
-**Bauen der Punkte wartet auf das Startzeichen des Orchestrators** (je Punkt ein Commit und, wo möglich, ein Test). Text ist erledigt.
+Alle Punkte sind nach dem Startzeichen des Orchestrators behoben, je Punkt ein Commit und, wo möglich, ein Test. Stand: 384 Tests, 379 grün (die 5 roten sind die Backup-Tests, die `pg_dump` 18 brauchen).
 
-| Nr. | Befund | Vorgesehene Behebung | Stand |
-|---|---|---|---|
-| 1 | Falsche Token spülen das Sicherheitsprotokoll leer (`Keep = 2000`, eine Zeile je gesperrter Minute) | höchstens eine Zeile je Adresse und Stunde oder eine Sammelzeile je Stunde mit Anzahl | offen |
-| 2 | Die Sperre weist auch das richtige Token ab (Sperre vor der Token-Prüfung) | **erst das Token prüfen, ein richtiges geht immer durch**; gezählt und abgewiesen werden nur falsche; `_locked` aufräumen; Test „das richtige Token geht trotz Sperre durch“ | offen |
-| 3 | Das Einsetzen des SVG ist eine Verbotsliste (`pages/util.js`) | **Erlaubnisliste** genau dessen, was `PageRenderer` ausgibt (`href` nur an `image` auf `^/api/web/v1/assets/<guid>$`, `style` nur am einen `div` mit vier Eigenschaften); Test, dass jedes genannte Ding wegfällt | offen |
-| 4 | Zeilen, die während der ersten Zuweisung gepusht werden, bleiben bis zum Neustart ohne Besitzer | Zuweisung unter derselben Sperre wie der Push, oder ein Push mit Besitzer übernimmt besitzerlose Zeilen seines Stapels | offen |
-| 5 | Die Schlüsseldatei liegt beim Sichern kurz im Klartext unter `/tmp` | direkt aus der Schlüsseldatei verschlüsseln, keine Klartextkopie | offen |
-| 6 | Ein verformter Inhalt (kein Objekt) macht alle Listen seiner Art für den Besitzer kaputt (500) | beim Prüfen ablehnen, beim Lesen überspringen; wichtig vor den Freigaben | offen |
-| 7 | Die Zuweisung hängt an der auslösenden Anfrage (bricht ab, wenn der Aufrufer aufgibt) | mit dem Token des Programmendes laufen lassen | offen |
-| 8 | Abmelden über den Hub: Inhalt bleibt im Vor-und-zurück-Speicher; Suchbegriffe im Verlauf | Inhalt vor dem Weggehen leeren, bei `pageshow` mit `persisted` neu laden, beim Abmelden die Adresse auf `#/` setzen | offen (unbestätigt) |
-| 9 | Der Codex-Prozess erbt die ganze Umgebung des Servers und läuft als derselbe Benutzer wie Schlüsseldatei, Sicherungen und Dateien | Umgebung leeren, nur `PATH`, `HOME`, `CODEX_HOME` setzen. **Offener Punkt:** Ob die Sandbox von Codex das Lesen dieser Dateien verhindert, ist **unbelegt**; vor dem Zugang der Mitglieder zur KI zu klären | offen |
-| 10 | Codex-Anmeldeprozesse werden nach 20 s ohne Code, bei zwei gleichzeitigen Anmeldungen oder nach einer Zeitüberschreitung nicht beendet; die KI-Seite fragt alle 5 s mit je zwei Prozessen ab | beenden; seltener abfragen und nur, solange die Seite sichtbar ist | offen |
-| 11 | Der ungefilterte `LibraryReader` steht im DI | nur ein Typ, der ausschließlich `Of(person)` kennt (Code) | offen (Code) |
-| 11 | Der Test für die Admin-Rolle benutzt eine handgeschriebene Wegliste | die Liste der Endpunkte selbst nehmen (Code) | offen (Code) |
-| 11 | STATE.md und ARCHITECTURE.md nannten gelöschte Tests und überholte Aussagen | berichtigt (Commit `4d07e35`) | **erledigt** |
-| 11 | Die Bilder `docs/screenshots/web-*.png` zeigen noch den Menüpunkt „Stundenplan“ | neu aufnehmen, wenn die App das nächste Mal läuft | offen |
-| 11 | Seitenweises Lesen: ein unbekannter Cursor beginnt von vorn, eine zwischen zwei Seiten gelöschte Zeile lässt Zeilen wiederholen | Cursor als Wert (Sortierschlüssel) statt id, oder die Oberfläche entdoppelt | offen |
+| Nr. | Befund | Behebung | Commit | Test |
+|---|---|---|---|---|
+| 1 | Falsche Token spülen das Sicherheitsprotokoll leer | höchstens eine Zeile je Adresse und Stunde (`TokenBrake`), Sperren und Zeilen werden stündlich vergessen | `ad4d6c1` | `SecurityFindingsTests.The_brake_writes_at_most_one_line_an_hour_…` |
+| 2 | Die Sperre wies auch das richtige Token ab | **erst das Token prüfen, ein richtiges geht immer durch**; gezählt werden nur falsche; die Sperre ist nur noch eine Bremse für falsche | `ad4d6c1` | `…A_right_token_gets_through_from_an_address_that_sent_many_wrong_ones_…`, `…A_lock_hits_the_one_address_and_no_other` |
+| 3 | Das Einsetzen des SVG war eine Verbotsliste | **Erlaubnisliste** auf dem Server (`SvgAllowList`: Elemente, Attribute, Muster je Wert, `href` nur an `image` auf `/api/web/v1/assets/<guid>`, vier CSS-Eigenschaften) und dieselbe Liste in der Seite (`pages/util.js`, neu aufgebaut aus neuen Knoten) | `bc2e3f0` | `SvgAllowListTests` (alles, was der Renderer schreibt, bleibt für alle 11 Papiere; jedes genannte Gefährliche fällt weg; die Listen der Seite sind die des Servers) |
+| 4 | Zeilen während der ersten Zuweisung blieben ohne Besitzer | Ein Push der Person hinter dem App-Token übernimmt besitzerlose Zeilen seines Stapels (und der genannten Eltern), unter der Sperre des Push; kein anderer darf das | `ef96e63` | `SecurityFindingsTests.A_push_of_a_row_that_nobody_owns_yet_…` |
+| 5 | Die Schlüsseldatei lag beim Sichern kurz im Klartext in `/tmp` | direkt aus der Schlüsseldatei verschlüsseln; die verschlüsselte Zwischendatei liegt im temporären Ordner und wird nach dem Senden gelöscht | `3692a0c` | `BackupKeyTests.The_key_is_encrypted_straight_from_its_file_…` (kein Klartext in `/tmp` und im Schlüsselordner während des Sendens) |
+| 6 | Ein Inhalt, der kein Objekt ist, machte alle Listen kaputt | beim Prüfen abgelehnt (400), beim Lesen übersprungen | `6174ca4` | `WebApiTests.A_payload_that_is_not_an_object_is_refused_…` |
+| 7 | Die Zuweisung hing an der Anfrage | läuft mit dem Token des Programmendes | `ef96e63` | `SecurityFindingsTests.The_claim_finishes_although_the_request_…` |
+| 8 | Abmelden über den Hub ließ Inhalt im Vor-und-zurück-Speicher | Inhalt vor dem Weggehen leeren, Adresse auf die Seite ohne Suchbegriff, bei `pageshow` mit `persisted` neu laden | `e706d7f` | `WebPagesTests.Signing_out_empties_the_page_…` (als Text; im Browser nicht nachgestellt: unbestätigt wie der Befund) |
+| 9 | Der Codex-Prozess erbte die ganze Umgebung | Umgebung leeren, nur `PATH`, `HOME`, `CODEX_HOME` | `dc4ba33` | `CodexSafetyTests.The_environment_of_codex_is_…`, `…The_running_program_really_does_not_see_…` |
+| 10 | Codex-Anmeldeprozesse blieben stehen; die KI-Seite fragte alle 5 s | nach 20 s ohne Code, bei zwei gleichzeitigen Anmeldungen und nach einer Zeitüberschreitung wird beendet; die Seite fragt alle 15 s und nur, solange sie vorne ist | `dc4ba33` | `CodexSafetyTests.A_login_that_shows_no_code_in_time_is_ended`, `…Two_logins_at_once_…`, `…A_command_that_runs_past_its_time_…` |
+| 11 | Der ungefilterte `LibraryReader` stand im DI | nur `Libraries.Of(person)` im DI, der Konstruktor von `LibraryReader` ist intern | `70eeedb` | `WebApiTests.There_is_no_reader_of_everybodys_notes_to_ask_for` |
+| 11 | Der Test für die Admin-Rolle benutzte eine handgeschriebene Wegliste | nimmt die Endpunkte des Servers selbst (und prüft zusätzlich, dass jeder Weg der Web-Schnittstelle ohne Sitzung 401 gibt) | `70eeedb` | `AdminApiTests.Only_an_administrator_gets_in_at_any_path` |
+| 11 | Seitenweises Lesen: unbekannter Cursor von vorn, gelöschte Zeile wiederholt Zeilen | ein unbekannter oder veralteter Cursor ist ein Fehler (`cursor.stale`), die Seite fragt einmal von vorn und entdoppelt | `70eeedb` | `WebApiTests.Lists_come_page_by_page_…` |
+| 11 | STATE.md und ARCHITECTURE.md nannten gelöschte Tests und Überholtes | berichtigt | `4d07e35` | – |
+| 11 | Bilder zeigten den Menüpunkt „Stundenplan“ | neu aufgenommen (`docs/screenshots/web-*.png`: 12 breit, 4 Telefon) | siehe Verlauf | – |
+
+**Offen aus dieser Prüfung (nicht behoben, benannt):**
+- Ob die Sandbox von Codex das Lesen der Schlüsseldatei, der Sicherungen und der Dateien verhindert, ist **unbelegt** (Befund 9); die Umgebung ist jetzt leer, der Prozess läuft aber weiter als derselbe Benutzer. **Vor dem Zugang der Mitglieder zur KI zu klären**, am besten mit einem eigenen Benutzer oder einer Prüfung der Sandbox.
+- Der Wächter `owner_id is not distinct from excluded.owner_id` im `ON CONFLICT` ist weiter nicht einzeln getestet.
+- Die Bilder sind nur hell (der Headless-Browser ignoriert hier die Einstellung für dunkel).
 
 ## Für das Einspielen (Meilenstein 1 auf die laufende Installation)
 
