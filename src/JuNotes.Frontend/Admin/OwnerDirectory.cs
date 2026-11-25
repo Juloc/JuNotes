@@ -32,7 +32,7 @@ namespace JuNotes.Frontend.Admin
     // (a line in app_instance_settings, key token_owner) and read from there; it is never chosen again, also not when that person is demoted, blocked or deleted: then the token
     // opens nothing (401), because the iPad would otherwise write as somebody else. Rows and files that belong to nobody yet (everything made before the first account existed)
     // are given to that person once, in one statement on a connection without a time limit.
-    public sealed partial class OwnerDirectory(NpgsqlDataSource data, MaintenanceData maintenance, AssetService assets, ILogger<OwnerDirectory> log) : IDisposable
+    public sealed partial class OwnerDirectory(NpgsqlDataSource data, MaintenanceData maintenance, AssetService assets, IHostApplicationLifetime lifetime, ILogger<OwnerDirectory> log) : IDisposable
     {
         private const string Key = "token_owner";
         private readonly SemaphoreSlim _gate = new(1, 1);
@@ -76,7 +76,7 @@ namespace JuNotes.Frontend.Admin
                 return new TokenOwner(TokenState.Refused);
             }
 
-            var owner = new SyncOwner(pinned.Value, reader.GetString(0), "app-token");
+            var owner = new SyncOwner(pinned.Value, reader.GetString(0), "app-token", AdoptsUnowned: true);
             await reader.DisposeAsync();
             return await ClaimAsync(owner.Id, ct) ? new TokenOwner(TokenState.Person, owner) : new TokenOwner(TokenState.Pending);
         }
@@ -141,8 +141,9 @@ namespace JuNotes.Frontend.Admin
 
                 try
                 {
-                    await SyncService.ClaimAsync(owner, maintenance.Source, ct);
-                    await assets.ClaimFilesAsync(owner, maintenance.Source, ct);
+                    // It runs until it is done or the program ends, not until the request that happened to start it gives up.
+                    await SyncService.ClaimAsync(owner, maintenance.Source, lifetime.ApplicationStopping);
+                    await assets.ClaimFilesAsync(owner, maintenance.Source, lifetime.ApplicationStopping);
                     _claimed = true;
                     return true;
                 }

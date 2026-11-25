@@ -32,6 +32,17 @@ namespace JuNotes.Backend.Service
             var skipped = new HashSet<int>();
             if (owner is { } person)
             {
+                if (person.AdoptsUnowned)
+                {
+                    // Under the lock of this push: rows of this batch (and the parents it names) that nobody owns yet become the person's, so a push that meets the first claim
+                    // half done neither loses its change nor leaves the row without an owner until the next start.
+                    var ids = request.Changes.Select(change => change.Id).Concat(request.Changes.Where(change => change.ParentId is not null).Select(change => change.ParentId!.Value)).Distinct().ToArray();
+                    await using var adopt = new NpgsqlCommand("update entities set owner_id = $1 where owner_id is null and id = any($2::uuid[])", connection, transaction);
+                    adopt.Parameters.Add(new NpgsqlParameter { Value = person.Id });
+                    adopt.Parameters.Add(new NpgsqlParameter { Value = ids, NpgsqlDbType = NpgsqlDbType.Array | NpgsqlDbType.Uuid });
+                    await adopt.ExecuteNonQueryAsync(ct);
+                }
+
                 var foreignRows = await ForeignAsync(connection, transaction, request.Changes, person.Id, ct);
                 var foreignParents = await ForeignParentsAsync(connection, transaction, request.Changes, person.Id, ct);
                 var rowCount = 0;

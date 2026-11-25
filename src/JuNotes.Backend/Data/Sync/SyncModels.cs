@@ -28,8 +28,10 @@ namespace JuNotes.Backend.Data.Sync
 
     public sealed record PullResponse(IReadOnlyList<SyncRecord> Changes, long Cursor, bool More);
 
-    // Who is writing: the person the instance token stands for, as a name for the security log, and the way they came in.
-    public sealed record SyncOwner(Guid Id, string Name, string Device);
+    // Who is writing: the person the instance token stands for, as a name for the security log, and the way they came in. AdoptsUnowned is true only for the person the
+    // app token stands for: rows that nobody owns yet (made before the first account, or pushed while the first claim runs) are theirs by definition, and a push of such a
+    // row takes it. Nobody else may.
+    public sealed record SyncOwner(Guid Id, string Name, string Device, bool AdoptsUnowned = false);
 
     public static class SecurityRules
     {

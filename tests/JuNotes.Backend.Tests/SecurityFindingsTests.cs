@@ -220,6 +220,69 @@ namespace JuNotes.Backend.Tests
             }
         }
 
+        // Review 2, point 4: a push that meets rows nobody owns yet (the first claim is running) takes them, and only for the person the app token stands for.
+        [RequiresDatabaseFact]
+        public async Task A_push_of_a_row_that_nobody_owns_yet_takes_it_for_the_app_person_and_nobody_else_may()
+        {
+            var (host, database, fake) = await StartAsync();
+            await using (database)
+            using (fake)
+            using (host)
+            {
+                var (a, _) = await host.SignedInPersonAsync();
+                var (b, _) = await host.SignedInPersonAsync("member");
+                var sync = host.Services.GetRequiredService<SyncService>();
+                var unowned = Guid.NewGuid();
+                var child = Guid.NewGuid();
+                await using (var insert = database.Data.CreateCommand($"insert into entities (kind, id, parent_id, payload, deleted, seq, owner_id) values ('subject', '{unowned}', null, '{{\"name\":\"alt\"}}', false, nextval('change_seq'), null)"))
+                {
+                    await insert.ExecuteNonQueryAsync();
+                }
+
+                SyncChange Row(string kind, Guid id, Guid? parent, string name) => new(kind, id, parent, System.Text.Json.JsonElement.Parse($$"""{"name":"{{name}}"}"""), false);
+
+                // A member (who adopts nothing) is turned away: the row is not theirs.
+                var refused = await sync.PushAsync(new PushRequest([Row("subject", unowned, null, "geklaut")]), new SyncOwner(b, "bob", "test"), null, default);
+                Assert.Equal(0, refused.Accepted);
+                Assert.Equal(string.Empty, await ScalarAsync(database, $"select coalesce(owner_id::text, '') from entities where id = '{unowned}'"));
+
+                // The app person takes it, and a child under it as well.
+                var taken = await sync.PushAsync(new PushRequest([Row("subject", unowned, null, "neu"), Row("notebook", child, unowned, "Heft")]), new SyncOwner(a, "ada", "app-token", AdoptsUnowned: true), null, default);
+                Assert.Equal(2, taken.Accepted);
+                Assert.Equal(a.ToString(), await ScalarAsync(database, $"select owner_id from entities where id = '{unowned}'"));
+                Assert.Contains("neu", await ScalarAsync(database, $"select payload::text from entities where id = '{unowned}'") ?? string.Empty, StringComparison.Ordinal);
+            }
+        }
+
+        // Review 2, point 7: the claim goes on when the request that started it gives up.
+        [RequiresDatabaseFact]
+        public async Task The_claim_finishes_although_the_request_that_started_it_is_given_up()
+        {
+            var (host, database, fake) = await StartAsync();
+            await using (database)
+            using (fake)
+            using (host)
+            {
+                using var app = Token(host);
+                Assert.Equal(HttpStatusCode.OK, (await app.PostAsync(Url("/api/v1/sync/push"), Push(Guid.NewGuid(), "alt"))).StatusCode);
+                // A slow claim: every update of entities takes a moment.
+                foreach (var sql in new[] { "create function slow() returns trigger language plpgsql as $$ begin perform pg_sleep(1.0); return new; end $$", "create trigger slow_update before update on entities for each row execute function slow()" })
+                {
+                    await using var command = database.Data.CreateCommand(sql);
+                    await command.ExecuteNonQueryAsync();
+                }
+
+                var (_, _) = await host.SignedInPersonAsync();
+                var owners = host.Services.GetRequiredService<OwnerDirectory>();
+                using var giveUp = new CancellationTokenSource(TimeSpan.FromMilliseconds(250));
+
+                var owner = await owners.TokenOwnerAsync(giveUp.Token);
+
+                Assert.Equal(TokenState.Person, owner.State);
+                Assert.Equal("0", await ScalarAsync(database, "select count(*) from entities where owner_id is null"));
+            }
+        }
+
         // 8, review 2 (1 and 2): wrong tokens are counted and written down once an hour at most, and a right token always gets through, also from an address that has been
         // sending wrong ones (a shared address, or the address of a proxy).
         [RequiresDatabaseFact]
