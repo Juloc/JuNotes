@@ -77,7 +77,8 @@ namespace JuNotes.Frontend.Api
                 }
 
                 var template = page.ContentType == "drawing" ? page.Template ?? notebook.Template : "blank";
-                var svg = PageRenderer.Svg(notebook.Type, template, await mine.StrokesAsync(id, ctx.RequestAborted), await mine.ObjectsAsync(id, ctx.RequestAborted), Prefix + "/assets/");
+                // Only what the renderer writes gets out: the picture goes through the allow list before it leaves the server.
+                var svg = SvgAllowList.Clean(PageRenderer.Svg(notebook.Type, template, await mine.StrokesAsync(id, ctx.RequestAborted), await mine.ObjectsAsync(id, ctx.RequestAborted), Prefix + "/assets/"));
                 return Results.Ok(new PageView(Page(page), notebook.Type, svg));
             });
 

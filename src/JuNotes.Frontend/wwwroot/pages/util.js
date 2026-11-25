@@ -46,31 +46,67 @@ export function dotEl(color) {
   return el;
 }
 
+// What the picture of a page may contain: the elements and attributes the server writes (SvgAllowList.cs; a test keeps these lists the same as the server's).
+const ELEMENTS = {
+  svg: ['viewBox', 'preserveAspectRatio'],
+  g: ['class', 'stroke-width', 'fill', 'stroke-linecap', 'stroke-linejoin', 'transform'],
+  rect: ['x', 'y', 'width', 'height', 'rx', 'fill', 'fill-opacity', 'stroke', 'stroke-width'],
+  line: ['x1', 'y1', 'x2', 'y2', 'stroke', 'stroke-width'],
+  circle: ['cx', 'cy', 'r', 'fill', 'stroke'],
+  path: ['d', 'stroke', 'stroke-width', 'stroke-opacity'],
+  text: ['x', 'y', 'font-size', 'font-weight', 'text-anchor', 'dominant-baseline', 'fill', 'stroke'],
+  image: ['href', 'x', 'y', 'width', 'height', 'preserveAspectRatio'],
+  foreignObject: ['x', 'y', 'width', 'height'],
+  div: ['style'],
+};
+const STYLE_PROPERTIES = ['font', 'color', 'white-space', 'overflow-wrap'];
+const SVG_NS = 'http://www.w3.org/2000/svg';
+const XHTML_NS = 'http://www.w3.org/1999/xhtml';
+const ASSET = new RegExp(`^${API.replaceAll('/', '\\/')}\\/assets\\/[0-9a-fA-F-]{36}$`);
+const risky = (value) => /url\(|javascript:|expression\(|@import/i.test(value);
+
+// The style attribute would be ignored by the content policy; the few properties the text box uses are set through the object model instead.
+function applyStyle(el, css) {
+  for (const declaration of css.split(';')) {
+    const i = declaration.indexOf(':');
+    if (i <= 0) continue;
+    const property = declaration.slice(0, i).trim().toLowerCase();
+    const value = declaration.slice(i + 1).trim();
+    if (STYLE_PROPERTIES.includes(property) && !risky(value)) el.style.setProperty(property, value);
+  }
+}
+
+/** A copy of the element made of allowed parts only: new nodes, never the parsed ones. */
+function copy(source, inForeignObject) {
+  const name = source.localName;
+  const isDiv = inForeignObject && source.namespaceURI === XHTML_NS && name === 'div';
+  if (!isDiv && (source.namespaceURI !== SVG_NS || !Object.hasOwn(ELEMENTS, name) || name === 'div')) return null;
+  const el = document.createElementNS(isDiv ? XHTML_NS : SVG_NS, name);
+  for (const attr of source.attributes) {
+    if (attr.namespaceURI || !ELEMENTS[name].includes(attr.localName)) continue;
+    if (attr.localName === 'href') { if (name === 'image' && ASSET.test(attr.value)) el.setAttribute('href', attr.value); continue; }
+    if (attr.localName === 'style') { applyStyle(el, attr.value); continue; }
+    if (!risky(attr.value)) el.setAttribute(attr.localName, attr.value);
+  }
+  for (const child of source.childNodes) {
+    if (child.nodeType === Node.ELEMENT_NODE) {
+      // text holds only text; a foreignObject only the one div
+      if (name !== 'text' && !isDiv) { const made = copy(child, name === 'foreignObject'); if (made) el.append(made); }
+    } else if (child.nodeType === Node.TEXT_NODE && (name === 'text' || isDiv)) el.append(document.createTextNode(child.nodeValue));
+  }
+  return el;
+}
+
 /**
- * The picture of a page as the server drew it (paper, objects, strokes). It is parsed as SVG and put in as nodes, never as markup; scripts, event handlers and foreign
- * links are dropped, and style attributes (which the content policy would ignore) are applied through the object model.
+ * The picture of a page as the server drew it (paper, objects, strokes). The server has already let only its own elements through; here it is parsed as SVG and built
+ * again from an allow list (elements, attributes, the one file path, four CSS properties), as new nodes and never as markup. Nothing else gets in.
  */
 export function pictureEl(markup) {
   const doc = new DOMParser().parseFromString(markup, 'image/svg+xml');
   const root = doc.documentElement;
-  if (!root || root.localName !== 'svg' || doc.querySelector('parsererror')) return null;
-  for (const el of root.querySelectorAll('script, iframe, object, embed')) el.remove();
-  const node = document.importNode(root, true);
-  for (const el of [node, ...node.querySelectorAll('*')]) {
-    for (const attr of [...el.attributes]) {
-      const name = attr.name.toLowerCase();
-      if (name.startsWith('on')) el.removeAttribute(attr.name);
-      else if ((name === 'href' || name === 'xlink:href') && !attr.value.startsWith(`${API}/assets/`)) el.removeAttribute(attr.name);
-    }
-    const css = el.getAttribute('style');
-    if (css !== null) {
-      el.removeAttribute('style');
-      for (const declaration of css.split(';')) {
-        const i = declaration.indexOf(':');
-        if (i > 0) el.style.setProperty(declaration.slice(0, i).trim(), declaration.slice(i + 1).trim());
-      }
-    }
-  }
+  if (!root || doc.querySelector('parsererror')) return null;
+  const node = copy(root, false);
+  if (!node || node.localName !== 'svg') return null;
   node.classList.add('picture');
   return node;
 }
