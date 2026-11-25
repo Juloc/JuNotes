@@ -209,7 +209,7 @@ Entwurf: ARCHITECTURE 10.1 („Ablösen des alten Tokens“, „Verwaltung der G
 
 **Abweichung vom Entwurf, mit Grund:** 10.1 sagt „der Administrator sieht je Person nur die **Anzahl** und kann **ein Gerät** widerrufen“. Ohne Namen lässt sich ein einzelnes Gerät nicht wählen, und der Orchestrator wollte „nur die Anzahl“; gebaut ist deshalb „**alle Geräte einer Person widerrufen**“ (ein verlorenes iPad: die Person koppelt die übrigen neu). Ein Widerruf einzelner Geräte durch den Administrator gibt es nicht; die Person selbst kann einzelne entfernen (3a).
 
-**Tests:** `DevicesAdminTests` (9). **Gesamtlauf nach 3d: 429 Tests, 424 grün (nach den Behebungen der Prüfung und der Bedingung für das Abschalten: 435 Tests, siehe unten); rot sind dieselben fünf Backup-Tests (`pg_dump` 17 gegen Server 18).** Der Testhost kann den gemeinsamen Token aus der Umgebung weglassen (`AdminHost.SharedToken`); `TestSecondFactor` liefert Codes des zweiten Faktors unabhängig vom Zeitschritt. Geprüft, dass sie beißen: ohne die Prüfung des Schalters in der Tür und ohne den frischen Code schlagen drei Tests fehl.
+**Tests:** `DevicesAdminTests` (9). **Gesamtlauf nach 3d: 429 Tests, 424 grün (nach den Behebungen der Prüfung und der Bedingung für das Abschalten: 435 Tests, 430 grün, rot dieselben fünf Backup-Tests); rot sind dieselben fünf Backup-Tests (`pg_dump` 17 gegen Server 18).** Der Testhost kann den gemeinsamen Token aus der Umgebung weglassen (`AdminHost.SharedToken`); `TestSecondFactor` liefert Codes des zweiten Faktors unabhängig vom Zeitschritt. Geprüft, dass sie beißen: ohne die Prüfung des Schalters in der Tür und ohne den frischen Code schlagen drei Tests fehl.
 
 ### Für die Sicherheitsprüfung (3d)
 
