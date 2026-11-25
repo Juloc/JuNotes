@@ -312,6 +312,12 @@ Wie in 3a entschieden: Freigaben gelten im Web, nicht im Abgleich; die App der E
 - **Fall A:** Es gehört der Person, die die Einrichtung abschließt. Nichts weiter nötig; Meilenstein 3 kann nach dem Einspielen kommen.
 - **Fall B:** Es gehört einer anderen Person. Dann gibt es zwei Wege: B1, **diese Person schließt die Einrichtung ab** (sie wird die erste Administratorin; der Eigentümer lädt sich selbst danach ein und wird Administrator): das ist **ohne** Neues machbar und mein Vorschlag, wenn es passt. B2, der Eigentümer schließt ab und übergibt später: braucht die geführte Übergabe aus diesem Abschnitt **vor** dem Einspielen.
 
+### 10.4a Entscheidungen des Orchestrators zum Entwurf (25.11.2026)
+
+1. **Namensliste beim Teilen:** Jede Person darf im Teilen-Dialog die **Anzeigenamen** der anderen Personen dieser Installation sehen (eine Familie), sonst nichts über sie. Ein eigener, schmaler Weg in notes (`GET /api/web/v1/people`) liefert nur **Name und id**; die Verwaltungsliste der Basis bleibt dem Administrator.
+2. **Gerätetoken** zuerst in notes, wie vorgeschlagen. **Auf der Liste für die Basis:** der Haken `BeforeDeletePerson` und ein Geräte-Modul. Die eigene Prüfung vor dem Löschen einer Person ist bis dahin in Ordnung, **wenn sie an einer Stelle sitzt** und ein Test zeigt, dass **kein Weg an ihr vorbei** eine Person mit Heften löscht (auch nicht ein anderer Weg der Basis, der die Person entfernt; beim Bau alle Wege der Basis lesen, die `users` verändern, und den Test darüber legen).
+3. **Fall A, B1 oder B2** beim Einspielen hängt an der Antwort des Eigentümers. **B1** (die Person, der die Hefte gehören, schließt die Einrichtung ab) ist der Vorschlag beider Seiten, falls es Fall B ist. **„Person hinter dem alten Token ändern“ wird nur gebaut, wenn der Eigentümer B2 will.**
+
 ### 10.5 Scheiben und Reihenfolge
 
 3a Gerätetoken und Kopplung (Server mit Tests; der Entwurf der App-Änderung getrennt) · 3b Löschprüfung und Übergabe (ohne die Umstellung des Tokens zuerst als Vorschau) und die Umstellung · 3c Freigaben im Web · 3d Verwaltung der Geräte, Abschalten des gemeinsamen Tokens. Jede Scheibe lauffähig, mit Tests mit mehreren Personen, STATE.md am Ende.
