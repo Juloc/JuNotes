@@ -72,7 +72,7 @@ Jeder endet in etwas, das er aufmachen kann. Reihenfolge und Zuschnitt gegenübe
 - Die heutigen Passwörter `ADMIN_PASSWORD` und `WEB_PASSWORD` fallen weg, sobald das eigene Konto da ist.
 - **Aufmachen kann er:** im Browser mit eigenem Konto oder über den Hub anmelden; die iPad-App synchronisiert unverändert weiter.
 
-### 2. Die Web-App als Seiten der Basis, mit denselben Funktionen wie heute
+### 2. Die Web-App als Seiten der Basis, mit denselben Funktionen wie heute *(gebaut, 25.11.2026; Stand in STATE.md)*
 
 - Die Web-App ist JavaScript im Baukasten und spricht JSON. Meilenstein 2 baut daher **die lesenden Wege von `/api/web/v1`**: Bibliothek, Heft, Seite, Datei,
   dazu Noten, Karten, Stundenplan. Eine Suche im Web erst, wenn der erkannte Text mit synchronisiert wird (nicht Teil von 2).

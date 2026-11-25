@@ -34,10 +34,6 @@ namespace JuNotes.Backend.Tests
                     Assert.True(response.StatusCode == HttpStatusCode.Unauthorized, $"{path}: {(int)response.StatusCode}");
                 }
 
-                foreach (var page in new[] { "/Notes", "/Admin", "/Admin/Codex" })
-                {
-                    Assert.Equal(HttpStatusCode.Redirect, (await client.GetAsync(Url(page))).StatusCode);
-                }
             }
         }
 
@@ -144,7 +140,7 @@ namespace JuNotes.Backend.Tests
             }
         }
 
-        // 1: what the service worker may keep, and that private pages say "no-store".
+        // 1: what the service worker may keep, and that what the web API gives is never kept.
         [Fact]
         public async Task The_service_worker_names_only_the_static_shell_and_its_cache_has_a_new_name()
         {
@@ -162,7 +158,7 @@ namespace JuNotes.Backend.Tests
         }
 
         [RequiresDatabaseFact]
-        public async Task Private_pages_and_scans_are_never_kept_by_a_browser_or_a_proxy()
+        public async Task What_the_web_api_gives_is_never_kept_by_a_browser_or_a_proxy_and_the_policy_is_the_one_of_the_base_everywhere()
         {
             var (host, database) = await StartAsync();
             await using (database)
@@ -175,12 +171,22 @@ namespace JuNotes.Backend.Tests
                 await sync.PushAsync(new JuNotes.Backend.Data.Sync.PushRequest([new("notebook", notebook, null, JsonElement.Parse("""{"title":"x","type":"pages","template":"blank"}"""), false)]), new JuNotes.Backend.Data.Sync.SyncOwner(person, "p", "test"), null, default);
                 await Microsoft.Extensions.DependencyInjection.ServiceProviderServiceExtensions.GetRequiredService<JuNotes.Backend.Assets.AssetService>(host.Services).SaveAsync(asset, new MemoryStream([0xFF, 0xD8, 0xFF, 0xE0, 0, 16, (byte)'J', (byte)'F', (byte)'I', (byte)'F', 0, 1, 1, 0, 0, 1, 0, 1]), person, default);
 
-                foreach (var path in new[] { "/Notes", $"/Notes/{notebook}", $"/Notes/Asset/{asset}", "/Admin", "/Admin/Codex", "/Admin/Backups" })
+                foreach (var path in new[] { "/api/web/v1/folders", $"/api/web/v1/notebooks/{notebook}", $"/api/web/v1/assets/{asset}", "/api/web/v1/admin/overview", "/api/web/v1/admin/backups" })
                 {
                     var response = await client.GetAsync(Url(path));
+                    // the administration answers 200 for an administrator
                     Assert.Equal(HttpStatusCode.OK, response.StatusCode);
                     Assert.Contains("no-store", response.Headers.CacheControl?.ToString(), StringComparison.Ordinal);
+                    Assert.Equal(Base.Web.SecurityHeaders.Csp, Assert.Single(response.Headers.GetValues("Content-Security-Policy")));
                 }
+
+                // The old addresses lead to the new pages and keep no relaxation of the policy alive.
+                var old = await client.GetAsync(Url("/Notes"));
+                Assert.Equal(HttpStatusCode.Redirect, old.StatusCode);
+                Assert.Equal("/#/", old.Headers.Location?.OriginalString);
+                Assert.Equal("/#/admin/codex", (await client.GetAsync(Url("/Admin/Codex"))).Headers.Location?.OriginalString);
+                Assert.Equal($"/#/notebook/{notebook}", (await client.GetAsync(Url($"/Notes/{notebook}"))).Headers.Location?.OriginalString);
+                Assert.DoesNotContain("unsafe-inline", Assert.Single((await client.GetAsync(Url("/"))).Headers.GetValues("Content-Security-Policy")), StringComparison.Ordinal);
             }
         }
     }

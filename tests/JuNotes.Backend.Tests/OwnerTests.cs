@@ -225,7 +225,7 @@ namespace JuNotes.Backend.Tests
                 // The first account: the next thing that touches the server gives everything to it, a second person gets nothing.
                 var (first, firstClient) = await host.SignedInPersonAsync();
                 var (second, secondClient) = await host.SignedInPersonAsync("member");
-                Assert.Equal(HttpStatusCode.OK, (await firstClient.GetAsync(Url("/Notes"))).StatusCode);
+                Assert.Equal(HttpStatusCode.OK, (await firstClient.GetAsync(Url("/api/web/v1/folders"))).StatusCode);
 
                 await using (var owned = database.Data.CreateCommand("select owner_id from entities where id = '20000000-0000-0000-0000-000000000011'"))
                 {
@@ -238,8 +238,8 @@ namespace JuNotes.Backend.Tests
                 }
 
                 Assert.Empty((await host.Services.GetRequiredService<SyncService>().PullAsync(0, 500, second, default)).Changes);
-                Assert.Equal(HttpStatusCode.NotFound, (await secondClient.GetAsync(Url($"/Notes/Asset/{Scan}"))).StatusCode);
-                Assert.Equal(HttpStatusCode.OK, (await firstClient.GetAsync(Url($"/Notes/Asset/{Scan}"))).StatusCode);
+                Assert.Equal(HttpStatusCode.NotFound, (await secondClient.GetAsync(Url($"/api/web/v1/assets/{Scan}"))).StatusCode);
+                Assert.Equal(HttpStatusCode.OK, (await firstClient.GetAsync(Url($"/api/web/v1/assets/{Scan}"))).StatusCode);
 
                 // And from now on the token of the app is the first administrator, also when more administrators come.
                 var (_, _) = await host.SignedInPersonAsync();
@@ -258,7 +258,7 @@ namespace JuNotes.Backend.Tests
             try
             {
                 // Make the first person the one the token stands for, then give the second person a row and let the token try to overwrite it.
-                Assert.Equal(HttpStatusCode.OK, (await scene.AClient.GetAsync(Url("/Notes"))).StatusCode);
+                Assert.Equal(HttpStatusCode.OK, (await scene.AClient.GetAsync(Url("/api/web/v1/folders"))).StatusCode);
                 var foreign = Guid.NewGuid();
                 await scene.Sync.PushAsync(Batch(Row("subject", foreign, null, """{"name":"Geheim"}""")), scene.AsB, null, default);
                 var before = await scene.SnapshotAsync("subject", foreign);
@@ -298,7 +298,7 @@ namespace JuNotes.Backend.Tests
         }
 
         [RequiresDatabaseFact]
-        public async Task The_notebooks_of_the_reader_are_only_their_own_and_a_foreign_notebook_or_scan_is_a_404()
+        public async Task The_notebooks_of_the_web_are_only_the_persons_own_and_a_foreign_notebook_or_scan_is_a_404()
         {
             var scene = await StartAsync();
             try
@@ -308,14 +308,14 @@ namespace JuNotes.Backend.Tests
                     Row("page", Page, Notebook, """{"sort":"b"}""")), scene.AsA, null, default);
                 await scene.Assets.SaveAsync(Scan, new MemoryStream(Jpeg), scene.A, default);
 
-                var aList = await scene.AClient.GetStringAsync(Url("/Notes"));
-                var bList = await scene.BClient.GetStringAsync(Url("/Notes"));
+                var aList = await scene.AClient.GetStringAsync(Url("/api/web/v1/notebooks"));
+                var bList = await scene.BClient.GetStringAsync(Url("/api/web/v1/notebooks"));
 
                 Assert.Contains("Nur fuer A", aList, StringComparison.Ordinal);
                 Assert.DoesNotContain("Nur fuer A", bList, StringComparison.Ordinal);
-                Assert.Equal(HttpStatusCode.OK, (await scene.AClient.GetAsync(Url($"/Notes/{Notebook}"))).StatusCode);
-                Assert.Equal(HttpStatusCode.NotFound, (await scene.BClient.GetAsync(Url($"/Notes/{Notebook}"))).StatusCode);
-                Assert.Equal(HttpStatusCode.NotFound, (await scene.BClient.GetAsync(Url($"/Notes/Asset/{Scan}"))).StatusCode);
+                Assert.Equal(HttpStatusCode.OK, (await scene.AClient.GetAsync(Url($"/api/web/v1/notebooks/{Notebook}"))).StatusCode);
+                Assert.Equal(HttpStatusCode.NotFound, (await scene.BClient.GetAsync(Url($"/api/web/v1/notebooks/{Notebook}"))).StatusCode);
+                Assert.Equal(HttpStatusCode.NotFound, (await scene.BClient.GetAsync(Url($"/api/web/v1/assets/{Scan}"))).StatusCode);
             }
             finally
             {

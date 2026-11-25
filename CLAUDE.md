@@ -17,10 +17,11 @@ Built on the shared base of the app family. base version: **0.3.4** (the copy in
 
 | Where | What |
 |---|---|
-| `src/JuNotes.Frontend/Program.cs` | Start: `AddBase`, migrations (base first, then ours), `UseBase`, the pages, `MapBase`, `MapV1`. |
+| `src/JuNotes.Frontend/Program.cs` | Start: `AddBase`, migrations (base first, then ours), `UseBase`, `MapBase`, the old addresses (redirects), `MapV1`, `MapWebApi`, `MapAdminApi`. |
 | `src/JuNotes.Frontend/Api/V1Door.cs` | The contract with the iPad app (`/api/v1`): the check and the endpoints. |
-| `src/JuNotes.Frontend/Admin/` | The session of the base for the old pages, the owner directory, the security log. |
-| `src/JuNotes.Frontend/Pages/`, `wwwroot/` | The old Razor pages (until milestone 2) and the front page and PWA files in the toolkit of the base. |
+| `src/JuNotes.Frontend/Api/` | `V1Door.cs` (the contract with the iPad app, `/api/v1`), `WebApi.cs` (reading paths of the web app), `AdminApi.cs` (administration, role admin). |
+| `src/JuNotes.Frontend/Admin/` | The owner directory (who the app token stands for, the claim), the token brake, the security log, the Codex sign-in session. |
+| `src/JuNotes.Frontend/wwwroot/` | The web app in the toolkit of the base: `app.js`, `pages/` (library, study, administration), `i18n/`, `app.css` (one colour variable), the service worker and PWA files. |
 | `src/JuNotes.Backend/` | Sync, assets, library reader, backups, school import, AI helpers, migrations runner. |
 | `database/` | `Schema.sql` (baseline) and `migrations/NNNN_name.sql` (numbered, never edited once released). |
 | `base/` | The copy of the base. |

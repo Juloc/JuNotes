@@ -23,7 +23,7 @@ auf die gemeinsame Basis um (Entscheidungen vom 24.11.2026 in SCOPE.md).
 
 ## Nächster Schritt
 
-**Meilenstein 1 ist fertig** (1a, 1b, 1c; lokal committet, nichts gepusht, kein Release). Der Orchestrator prüft, die Sicherheitsprüfung (eigene Sitzung) liest 1a und 1b vor dem Einspielen
+**Meilenstein 1 und 2 sind fertig** (1a, 1b, 1c; lokal committet, nichts gepusht, kein Release). Der Orchestrator prüft, die Sicherheitsprüfung (eigene Sitzung) liest 1a und 1b vor dem Einspielen
 (Liste unten). Meilenstein 2 beginnt erst mit seinem Startzeichen. Das Einspielen auf die laufende Installation ist seine Sache, mit Sicherung davor und dem Ja des Eigentümers.
 
 - **1a Basis eingehängt** (`base/` jetzt **0.3.4**, byteweise wie im Manifest): Konten, Sitzungen, Einrichtungsassistent, Rollen `admin` und `member`, Hub-Anmeldung, `/api/about`, `/api/health`, Einstellungen.
@@ -83,6 +83,18 @@ als SVG vom Server und wird als **Knoten** eingesetzt (nie als Markup): Skripte,
 Daten und werden ebenso über das Objektmodell gesetzt; `app.css` hat die eine Farbvariable (Akzent 75) und sonst nur Form. Der Service Worker nimmt `/pages/` in die statische Hülle auf (`notes-v3`).
 Geprüft im Browser mit Testdaten: Bibliothek, Ordner, Heft, Seite (mit Strichen, Objekt, Lösung, Ergänzungen), Whiteboard, Scan, Noten, Karten, Stundenplan, Suche, bei breit und 390 px, hell und dunkel (das Blatt bleibt hell). Tests: `WebPagesTests` (Texte vollständig und gleich in beiden Sprachen,
 keine Markup-Erzeugung, keine eigene Farbe). **Fehlt dem Baukasten etwas, das auch andere Apps brauchen würden?** Zwei Kleinigkeiten, die ich hier gelöst habe und nenne: ein Kachelraster mit Titelbild (hier `.cover` und `.tile.notebook`) und ein Abschnittstitel (`.section-title`).
+
+### Scheibe 2c und 2d: die Verwaltung im Baukasten, keine Razor-Seite mehr (25.11.2026)
+
+- **Verwaltung als JSON** (`/api/web/v1/admin/...`, `RequireRole("admin")`, Wächter der Basis): `overview`, `school/import`, `codex` (Status, wartender Code, Einstellungen, Nutzung), `codex/login|cancel|logout`, `codex/settings`, `profiles` (lesen, ändern, zurücksetzen), `backups` (lesen, von Hand sichern). Test: `AdminApiTests` (ohne Sitzung 401, als `member` 403 an jedem Weg;
+  Einstellungen und Profile speichern und ablehnen; die Anmeldung mit Gerätecode und Abbrechen; Sicherung von Hand mit einem Ersatz für `pg_dump`; Hinweis zum Schlüssel).
+- **Seiten:** `pages/admin.js` (Überblick, KI-Verbindung mit Anmeldung per Gerätecode und Nachsehen alle 5 Sekunden, KI-Profile, Sicherungen), eine `capsule` als Unterleiste. Im Menü „Verwaltung“ nur für `admin`.
+- **Razor ist weg:** `Pages/`, die Sitzungsprüfung für Razor, `AdminFormat`, die alten Stile und das alte Skript sind gelöscht, ebenso `AddRazorPages`, `UseAuthentication/Authorization` und die gelockerte Richtlinie (`style-src-attr 'unsafe-inline'`). **Überall gilt jetzt die Richtlinie der Basis unverändert** (Test:
+  `DoorsTests.What_the_web_api_gives_is_never_kept_…`). Die alten Adressen leiten um: `/Notes` nach `/#/`, `/Notes/{id}` nach `/#/notebook/{id}`, `/Admin` nach `/#/admin`, `/Admin/Codex|Profiles|Backups` nach `/#/admin/…` (ohne Sitzung zeigt die Startseite die Anmeldung). `/Notes/Asset/{id}` gibt es nicht mehr.
+- **Tests:** 326, davon **321 grün**; die 5 roten sind Backup-Tests, die das `pg_dump` der Version 18 brauchen (siehe oben). Weggefallen sind die Tests der Razor-Seiten (`AdminTests`, `WebReaderTests`); ihre Fälle stehen als `AdminApiTests`, `WebApiTests`, `OwnerTests`, `DoorsTests`. `AdminHost` steht jetzt in `AdminHost.cs`.
+- **Bilder** in `docs/screenshots/` (`web-*.png`, headless Chromium gegen den Server mit Testdaten): breit (1280 × 800) Bibliothek, Ordner, Heft, Seite, Whiteboard, Noten, Karten, Stundenplan, Suche, Verwaltung, KI-Verbindung, KI-Profile, Sicherungen; Telefon (390 × 844) Bibliothek, Seite, Noten, Stundenplan, Verwaltung. Das dunkle Aussehen habe ich **im Browserfenster** gesehen (Telefon und breit, auch das Blatt bleibt hell), aber **nicht als Datei festgehalten**: Der Headless-Browser ignoriert hier die Einstellung für dunkel.
+- **Nicht geprüft:** die Anmeldung über den Hub, der echte Abgleich mit dem iPad, HTTPS; „Jetzt abrufen“ der Schule und die echte Codex-Anmeldung (nur gegen Ersatzprogramme); die Sicherung mit dem echten `pg_dump`.
+- **Was dem Baukasten fehlt und ich hier gelöst habe** (zur Prüfung, ob es in die Basis gehört): ein Kachelraster mit Titelbild (`.cover`, `.tile.notebook`), ein Abschnittstitel (`.section-title`), eine Seitenansicht (`.sheet`, nur `notes`), eine Codeanzeige (`.code`).
 
 ## Entscheidungen, die schon gefallen sind
 

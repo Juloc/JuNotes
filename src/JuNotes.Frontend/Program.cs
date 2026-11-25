@@ -58,15 +58,7 @@ builder.AddBase(new BaseAppOptions("notes", "Notes", typeof(Program).Assembly)
     // The contract with the iPad app: the instance token, no session (SEC-07).
     Doors = [new ApiDoor(V1Door.Prefix, V1Door.CheckAsync, V1Door.MaxBodyBytes)],
 });
-builder.Services.AddRazorPages(options =>
-{
-    // The net under everything: a page nobody thought of is not open either.
-    options.Conventions.AuthorizeFolder("/");
-    // Until the web pages move to the base (milestone 2): behind the session of the base, one policy per folder, nothing open.
-    options.Conventions.AuthorizeFolder("/Admin", AdminSetup.AdminPolicy);
-    options.Conventions.AuthorizeFolder("/Notes", AdminSetup.ReaderPolicy);
-});
-builder.Services.AddJuNotesSignIn();
+builder.Services.AddSingleton<CodexLoginSession>();
 // A connection of its own without a time limit for what may take long on a big table (the schema upgrade and the giving of old rows to their owner).
 var maintenanceConnection = new NpgsqlConnectionStringBuilder(builder.Configuration.GetConnectionString("JuNotes")) { CommandTimeout = 0, ApplicationName = "notes-maintenance", MaxPoolSize = 2 };
 var maintenance = new MaintenanceData(Base.Data.Database.Create(maintenanceConnection.ConnectionString, builder.Configuration["BASE_DB_PASSWORD_FILE"]));
@@ -104,21 +96,21 @@ await app.Services.GetRequiredService<AiProfileStore>().EnsureDefaultsAsync(stop
 await app.Services.GetRequiredService<OwnerDirectory>().EnsureClaimedAsync(stopping);
 
 app.UseBase();
-// Until the web pages move to the base (milestone 2): the old pages style single elements with the style attribute (cover colours); only that, on these two folders.
-app.Use((context, next) =>
+// The addresses of the old pages lead to the new ones, so bookmarks keep working.
+var oldAddresses = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
 {
-    if (context.Request.Path.StartsWithSegments("/Notes", StringComparison.OrdinalIgnoreCase) || context.Request.Path.StartsWithSegments("/Admin", StringComparison.OrdinalIgnoreCase))
-    {
-        context.Response.Headers.ContentSecurityPolicy = SecurityHeaders.Csp + "; style-src-attr 'unsafe-inline'";
-        // Whatever these pages show belongs to the person signed in: no browser or proxy keeps it (the service worker keeps only the static shell, SEC-08).
-        context.Response.Headers.CacheControl = "no-store";
-    }
+    ["/Notes"] = "/#/",
+    ["/Admin"] = "/#/admin",
+    ["/Admin/Codex"] = "/#/admin/codex",
+    ["/Admin/Profiles"] = "/#/admin/profiles",
+    ["/Admin/Backups"] = "/#/admin/backups",
+};
+foreach (var (from, to) in oldAddresses)
+{
+    app.MapGet(from, () => Results.Redirect(to));
+}
 
-    return next();
-});
-app.UseAuthentication();
-app.UseAuthorization();
-app.MapRazorPages();
+app.MapGet("/Notes/{id:guid}", (Guid id) => Results.Redirect($"/#/notebook/{id}"));
 app.MapBase();
 app.MapV1();
 app.MapWebApi();

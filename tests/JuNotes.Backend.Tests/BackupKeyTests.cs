@@ -1,11 +1,10 @@
 using System.Diagnostics;
 using JuNotes.Backend.Backup;
-using JuNotes.Frontend.Admin;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace JuNotes.Backend.Tests
 {
-    // The key of the server (the file of the base) goes with a copy only when the copy is encrypted, and the page says where it is kept. A stand-in for pg_dump
+    // The key of the server (the file of the base) goes with a copy only when the copy is encrypted, (what the page says about it is tested in AdminApiTests). A stand-in for pg_dump
     // (a script that writes a small file) is used, so these run where the real pg_dump is of another version.
     public sealed class BackupKeyTests : IDisposable
     {
@@ -75,29 +74,6 @@ namespace JuNotes.Backend.Tests
             var old = BackupMirror.Obsolete(names, keep: 1);
 
             Assert.Equal(["junotes-20260101T000000Z-auto.dump.enc", "junotes-20260101T000000Z-auto.key.enc"], old.Order());
-        }
-
-        [RequiresDatabaseFact]
-        public async Task The_backup_page_says_where_the_key_is_kept_and_warns_when_it_is_in_no_backup()
-        {
-            var database = await TestDatabase.CreateAsync();
-            var fake = new FakeCodex("exit 0");
-            await using (database)
-            using (fake)
-            using (var host = new AdminHost(database, fake.Executable))
-            {
-                var admin = await host.SignedInAsync();
-
-                // The key comes from a setting here (as in the tests): nothing to keep.
-                Assert.Contains("nicht aus einer Datei", await admin.GetStringAsync(new Uri("/Admin/Backups", UriKind.Relative)), StringComparison.Ordinal);
-
-                // A key file and no encrypted copy anywhere: the page warns.
-                var key = Path.Combine(host.BackupDirectory, "base", "secret.key");
-                Directory.CreateDirectory(Path.GetDirectoryName(key)!);
-                await File.WriteAllTextAsync(key, "x");
-                var page = await admin.GetStringAsync(new Uri("/Admin/Backups", UriKind.Relative));
-                Assert.Contains("ist in <strong>keiner</strong> Sicherung", page, StringComparison.Ordinal);
-            }
         }
     }
 }
