@@ -3,11 +3,13 @@
  * cover come from the person's data and are set in the script, not here. */
 :root { --accent-hue: 75; }
 
+/* geht in die Basis (Abschnittstitel; der Orchestrator nimmt es mit) */
 .section-title { font: 700 var(--text-m)/1.4 var(--font); }
 .chips { display: flex; flex-wrap: wrap; gap: var(--s2); }
 .pre { white-space: pre-wrap; overflow-wrap: anywhere; }
 .cluster.between { justify-content: space-between; }
 
+/* geht in die Basis (Kachelraster mit Titelbild: .cover, .tile.notebook; der Orchestrator nimmt es mit) */
 /* the front of a notebook; its colours are set by the script, this is the shape and the colour it has without data */
 .cover { position: relative; display: grid; place-items: center; width: 100%; aspect-ratio: 3 / 4; border-radius: var(--r-s); background: var(--accent-soft); overflow: hidden; }
 .cover.small { width: 96px; }
@@ -29,5 +31,6 @@
 .board .layer .picture { width: 3000px; height: 2000px; }
 details.card > summary { cursor: pointer; font-weight: 600; }
 
+/* geht in die Basis (Codeanzeige; der Orchestrator nimmt es mit) */
 /* the code of a device sign-in, large and readable */
 .code { font: 700 var(--text-xl)/1.2 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .08em; padding: var(--s3) var(--s4); background: var(--surface-2); border-radius: var(--r-m); width: max-content; max-width: 100%; }

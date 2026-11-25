@@ -236,6 +236,81 @@ Entscheidung des Eigentümers (24.11.2026): **eigene Anmeldung für den Stundenp
   selbst zu prüfen (sie tippt, nicht wir). Bis dahin wird nichts gegen den echten Dienst probiert. Beide Wege nutzen eine Schnittstelle, die Untis nicht öffentlich beschreibt: Das sollte der Eigentümer wissen, und im Zweifel fragt man bei Untis oder der Schule nach, ob die Nutzung
   für das eigene Konto in Ordnung ist. Kann A nicht bestätigt werden, gilt B nur mit der Regel „nachweislich nicht anders“, und der Eigentümer entscheidet.
 
+## 10. Meilenstein 3: Personen, Geräte, Freigaben (Entwurf, nichts gebaut)
+
+Stand 25.11.2026, Text für den Orchestrator. Grundlage ist, was gebaut und gelesen ist: die Basis hat **kein** Modul für Gerätetoken (nur Sitzungen im Browser, Einladungen und das Hub-Konto), der App-Token ist der eine
+Instanz-Token (festgeschrieben auf den ersten Administrator), `owner_id` hat keinen Fremdschlüssel, und die App löscht beim Löschen einer Zeile deren Kinder nicht mit (3a).
+
+### 10.1 Gerätetoken je Person
+
+**Ziel:** Das iPad schreibt als die Person, der es gehört, und in das Gerät wird nie ein Passwort getippt. Der gemeinsame Token wird abgelöst.
+
+**Kopplung (einmal je Gerät):**
+1. Die Person ist im Browser angemeldet (mit zweitem Faktor) und wählt in ihren Einstellungen „Gerät koppeln“. Der Server macht einen **Kopplungscode**: 10 Zeichen aus dem Alphabet der Basis (Base32, 50 Bit), 10 Minuten gültig, **einmal** benutzbar, nur als SHA-256 gespeichert. Angezeigt als Text und als QR-Code (Adresse des Servers und Code; die Basis hat `qr.js`).
+2. Auf dem iPad gibt die Person den Code ein oder scannt den QR-Code (die Kamera für Scans ist schon in der App). Die App ruft `POST /api/v1/pair` mit Code und Gerätename. Das ist die **eine** Stelle der Tür `/api/v1`, die ohne Token antwortet (Ausnahme in `V1Door.CheckAsync`, nur dieser Pfad, nur POST); sie hat ihre eigene Bremse (die vom Token-Weg, je Adresse, plus eine Sperre je Code nach drei Fehlversuchen).
+3. Der Server antwortet **einmal** mit dem Gerätetoken: 256 zufällige Bit, Präfix `nt1_` (damit ein verlorenes Token in einem Fund erkennbar ist), und speichert nur den SHA-256. Die App legt ihn im Schlüsselbund ab. Der Code ist verbraucht.
+
+**Tabelle** `device_tokens(id uuid pk, person_id uuid not null, name text, hash text unique, created_at, last_seen, last_address, revoked_at)`; Index auf `hash`. Kein Fremdschlüssel (wie bei `owner_id`), aber das Löschen der Person löscht ihre Token (10.3).
+
+**Die Tür:** `CheckAsync` sucht den SHA-256 des gesendeten Tokens zuerst unter den Gerätetoken (nicht widerrufen, Person aktiv), sonst gilt der alte Instanz-Token. Ergebnis wie heute in `Items`: die Person und, neu, das Gerät. Ein Gerätetoken gilt **für seine Person**, auch wenn sie nicht Administrator ist; der alte Token bleibt „die festgeschriebene Person“. `last_seen` wird höchstens einmal je Minute geschrieben. Falsche Token laufen weiter in die Bremse und ins Sicherheitsprotokoll (nie der Token selbst). Das Sicherheitsprotokoll nennt künftig bei Verstößen gegen die Schreibregeln den **Gerätenamen** statt „app-token“.
+
+**Ablösen des alten Tokens, in drei Schritten:**
+1. Meilenstein 3 liefert die Kopplung; der alte Token bleibt gültig (Geräte, die noch nicht gekoppelt sind, gleichen weiter ab).
+2. Jedes Gerät wird gekoppelt (die App meldet beim ersten Start nach dem Update „Bitte koppeln“, arbeitet aber mit dem alten Token weiter, bis die Person es tut).
+3. Der Administrator schaltet „Gemeinsamer Token“ in der Verwaltung **aus** (Einstellung in der Datenbank, nicht in der Umgebung; mit Rückfrage und Protokollzeile). Danach ist `Sync__Token` wirkungslos und kann bei der Umstellung der Compose-Datei verschwinden. Wieder einschalten geht nur, solange die Umgebung ihn noch trägt.
+
+**Verwaltung der Geräte:** Jede Person sieht in ihren Einstellungen ihre Geräte (Name, gekoppelt am, zuletzt gesehen, Adresse gekürzt) und kann sie **entfernen**; ein entferntes Gerät bekommt 401, die App zeigt „Bitte neu koppeln“. Der Administrator sieht je Person nur die **Anzahl** und kann ein Gerät widerrufen (Protokollzeile), nie einen Token lesen.
+
+**App-Änderung (klein, eigener Entwurf, einzige erzwungene in diesem Meilenstein):** Kopplungsbildschirm (Code eintippen oder scannen), Schlüsselbund, Token senden, bei 401 die Kopplung anbieten, die Antwort von `push` auswerten (`accepted`, siehe 3a). Ohne diese Änderung läuft die App unverändert mit dem alten Token. Gebaut wird sie wie bisher in der CI (kein Mac); getestet auf dem Gerät erst, wenn jemand es installiert.
+
+**Verworfen:** Passwort am Gerät eintippen (Regel, und es gäbe keinen zweiten Faktor); den Instanz-Token pro Person ableiten (ein Leck des einen verrät alle). **Offen:** Ob der Hub einen Gerätefluss (Device Authorization Grant) anbietet; dann könnte die Kopplung ihn nutzen. Das habe ich nicht gelesen und baue nicht darauf.
+
+### 10.2 Freigaben, Stufe 1 (nur Web)
+
+Wie in 3a entschieden: Freigaben gelten im Web, nicht im Abgleich; die App der Empfängerin bekommt freigegebene Hefte erst mit Stufe 2.
+
+- **Tabelle** `shares(id, notebook_id, owner_id, recipient_id, mode, created_at, revoked_at)`; `mode` zunächst nur `read`. Geteilt wird **ein Heft** (nicht ein Ordner; ein Ordner kann später dazukommen). Das Teilen gibt es nur der Besitzerin des Hefts.
+- **Wege** (alle hinter der Sitzung, alle prüfen die Freigabe bei **jeder** Anfrage, nichts wird zwischengespeichert): `shared` (Liste „mit mir geteilt“), `shared/notebooks/{id}`, `…/pages`, `shared/pages/{id}`, `shared/assets/{id}`. Eine Datei darf die Empfängerin nur lesen, wenn sie in dem freigegebenen Heft **vorkommt** (Seiteninhalt, Objekt oder Cover); sonst könnte eine Freigabe jede Datei der Besitzerin öffnen. Dafür gibt es eine Abfrage „Dateien eines Hefts“ (liest die Nutzlasten der Seiten und Objekte).
+- **Wer wählbar ist:** Die Basis gibt die Personenliste nur dem Administrator. Für das Teilen braucht jede Person eine **Namensliste** der aktiven Personen (nur Name und id, kein Konto, keine Rollen): `GET /api/web/v1/people`. In einer Familie ist das vertretbar; bei größerem Kreis wäre es eine Einstellung (Teilen nur mit Eingeladenen). Zu klären mit dem Eigentümer.
+- **Oberfläche:** „Teilen“ am Heft (Personen wählen, Freigabe entziehen), „Mit mir geteilt“ als Eintrag in der Bibliothek, ein Hinweis „nur lesen“, Seiten wie die eigenen. Entziehen wirkt sofort (die nächste Anfrage bekommt 404).
+- **Protokoll:** Freigabe und Entzug als Zeilen im Sicherheitsprotokoll (Person, Gegenüber, Heft-id).
+- **Tests (Zwei- und Drei-Personen):** Empfängerin liest Seiten, Striche und eingebundene Dateien des freigegebenen Hefts; sie liest **kein** anderes Heft derselben Besitzerin, keine nicht eingebundene Datei, und eine Dritte nichts davon; Entzug wirkt bei der nächsten Anfrage; ein gelöschtes oder in den Papierkorb gelegtes Heft ist nicht mehr abrufbar; der Abgleich der Empfängerin ändert sich nicht (der Pull liefert nichts Geteiltes); der App-Token öffnet nichts davon.
+
+### 10.3 Löschen einer Person: nie Hefte stehen lassen
+
+**Regel:** Eine Person mit Heften, Dateien oder Freigaben wird **nicht** gelöscht, bevor ihre Hefte versorgt sind. Der Administrator wählt, in dieser Reihenfolge der Vorsicht: (a) **Übergeben** an eine andere Person (10.4), (b) **Löschen** der Hefte endgültig (zweite Rückfrage mit Zahlen, vorher eine Sicherung von Hand, Protokollzeile). Das Löschen der Person selbst läuft danach über die Verwaltung der Basis.
+
+**Umsetzung ohne die Kopie der Basis zu ändern:** Die Basis löscht über `DELETE /api/people/{id}`. Davor liegt eine **eigene Prüfung** unserer App (eine Middleware, die genau diesen Weg erkennt und mit `409 person.has_notes` und einem Satz antwortet, solange die Person Heften, Dateien oder Gerätetoken hat; die Verwaltung der Basis zeigt die Meldung). Besser wäre ein **Haken in der Basis** (`BaseAppOptions.BeforeDeletePerson`, eine Funktion, die ein Nein mit Text liefern darf); das gebe ich dem Orchestrator für die Basis mit. Gesperrte Personen behalten ihre Hefte (nichts geschieht).
+**Beim Löschen einer Person mit versorgten Heften:** ihre Gerätetoken, Freigaben (als Besitzerin und als Empfängerin) und Kopplungscodes werden mit gelöscht (in derselben Prüfung, vor der Löschung der Basis; scheitert eines, wird nichts gelöscht).
+
+### 10.4 Übergabe von Heften an eine andere Person (Verwaltungsfunktion)
+
+**Wozu:** (1) vor dem Einspielen, falls die Hefte auf dem iPad nicht der Person gehören, die die Einrichtung abschließt (offene Frage an den Eigentümer); (2) beim Löschen einer Person (10.3); (3) wenn jemand die Hefte einer anderen Person übernimmt.
+
+**Was übergeben wird:** alles einer Person oder ein Teil (gewählte Ordner und Hefte samt allem darunter: Seiten, Striche, Objekte, Noten, Karten, Dateien). Der Umfang ist eine Wurzelliste; die **Hülle** wird über `parent_id` bestimmt (Ordner, Hefte, Seiten, Striche, Objekte, Noten, Karten).
+
+**Ablauf, in einer Transaktion unter der Sperre des Abgleichs:**
+1. **Vorschau** (ohne Änderung): Anzahl der Zeilen je Art, Seiten, Dateien, Hinweise. **Bricht ab** (mit Liste), wenn eine Datei auch von Zeilen **außerhalb** der Übergabe gebraucht wird (ein Bild in zwei Heften): so etwas wird nicht stillschweigend zerrissen; die Lösung (Datei kopieren) ist ein eigener Schritt, falls es vorkommt.
+2. **Sicherung von Hand** (nur wenn der Administrator das Ja gibt; ohne Passphrase wird gesagt, dass der Schlüssel nicht in ihr liegt).
+3. **Umschreiben:** `owner_id` der Hülle und `assets.owner_id` der Dateien auf die neue Person; jede umgeschriebene Zeile bekommt ein **neues `seq`**, **Eltern vor Kindern** (nach der Tiefe sortiert), damit der Pull der neuen Person sie vollständig und in sinnvoller Reihenfolge liefert (bei ihr sind es neue Zeilen).
+4. **Der bisherigen Person die Löschung melden:** Für jede umgeschriebene Zeile entsteht ein Eintrag in `removed_rows(owner_id, kind, id, parent_id, seq)`; der Pull der bisherigen Person liefert sie als **Löschungen** (`deleted: true`), **für jede Zeile einzeln**, nicht nur für die Wurzeln, weil die App beim Löschen die Kinder nicht mitnimmt (3a). Ohne das behielten ihre Geräte die Hefte und schickten Änderungen, die stillschweigend ausgelassen werden. Das ist derselbe Weg wie der „synthetische Löschung“ in 3a Stufe 2; er wird hier zum ersten Mal gebraucht und für Freigaben wiederverwendet.
+5. **Protokoll:** Wer, von wem an wen, Zahlen, Zeit (keine Inhalte).
+
+**Rückgängig:** nicht als Knopf; dieselbe Funktion in die Gegenrichtung stellt es wieder her (die Hefte bekommen dann wieder neue `seq`).
+
+**Was dabei auf dem iPad geschieht:** Die bisherige Person verliert die Hefte auf ihren Geräten beim nächsten Abgleich (Löschungen); die neue Person bekommt sie, sobald ihr Gerät gekoppelt ist. **Vorsicht:** Solange der **alte gemeinsame Token** gilt, steht er für die festgeschriebene Person (10.1). Übergibt der Administrator seine Hefte an jemand anderen, bevor ein Gerät gekoppelt ist, verliert das iPad (das noch den alten Token trägt) alles. Darum gehört zur Übergabe **vor der Kopplung** die zweite Verwaltungsfunktion:
+
+**„Person hinter dem alten Token ändern“:** Der Administrator wählt eine andere aktive Person (mit Rückfrage, Protokoll, nur wenn der Eigentümer seinen zweiten Faktor eben bestätigt hat); `token_owner` wird neu geschrieben. Eine Übergabe der Hefte auf diese Person und diese Umstellung bilden **einen** geführten Ablauf („Hefte und iPad an Person Y geben“), damit nichts dazwischen steht.
+
+**Zur offenen Frage vor dem Einspielen (wem gehört das iPad?):**
+- **Fall A:** Es gehört der Person, die die Einrichtung abschließt. Nichts weiter nötig; Meilenstein 3 kann nach dem Einspielen kommen.
+- **Fall B:** Es gehört einer anderen Person. Dann gibt es zwei Wege: B1, **diese Person schließt die Einrichtung ab** (sie wird die erste Administratorin; der Eigentümer lädt sich selbst danach ein und wird Administrator): das ist **ohne** Neues machbar und mein Vorschlag, wenn es passt. B2, der Eigentümer schließt ab und übergibt später: braucht die geführte Übergabe aus diesem Abschnitt **vor** dem Einspielen.
+
+### 10.5 Scheiben und Reihenfolge
+
+3a Gerätetoken und Kopplung (Server mit Tests; der Entwurf der App-Änderung getrennt) · 3b Löschprüfung und Übergabe (ohne die Umstellung des Tokens zuerst als Vorschau) und die Umstellung · 3c Freigaben im Web · 3d Verwaltung der Geräte, Abschalten des gemeinsamen Tokens. Jede Scheibe lauffähig, mit Tests mit mehreren Personen, STATE.md am Ende.
+**Abhängigkeiten/Risiken:** Die Löschungen für die bisherige Person (10.4, Punkt 4) sind der heikelste Teil: ein Fehler lässt Hefte auf einem Gerät stehen oder löscht sie dort zu früh. Der Test dafür braucht einen Abgleich in zwei Richtungen mit der echten Swift-Logik; die kann hier nur als Vertrag nachgebildet werden, **nicht auf einem iPad** geprüft werden. Das ist vor dem ersten echten Gebrauch ein offener Punkt.
+
 ## 9. Reihenfolge der Risiken
 
 1. Besitzer und Abgleich (Abschnitt 3, Punkt 3): ein Fehler lässt eine Person fremde Daten sehen oder überschreiben.
