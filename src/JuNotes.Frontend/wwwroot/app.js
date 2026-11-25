@@ -11,7 +11,7 @@ import en from '/i18n/en.js';
 import { homePage, folderPage, notebookPage, pagePage, searchPage, sharedNotebookPage, sharedPagePage } from '/pages/library.js';
 import { gradesPage, cardsPage } from '/pages/study.js';
 import { pairingCard } from '/pages/devices.js';
-import { overviewPage, codexPage, profilesPage, backupsPage } from '/pages/admin.js';
+import { overviewPage, codexPage, profilesPage, devicesPage, backupsPage } from '/pages/admin.js';
 
 addMessages('de', de);
 addMessages('en', en);
@@ -60,7 +60,7 @@ function run(me) {
     '/cards': () => cardsPage({}),
     '/cards/:folder': cardsPage,
     '/settings': settingsPage,
-    ...(admin ? { '/admin': overviewPage, '/admin/codex': codexPage, '/admin/profiles': profilesPage, '/admin/backups': backupsPage } : {}),
+    ...(admin ? { '/admin': overviewPage, '/admin/codex': codexPage, '/admin/profiles': profilesPage, '/admin/devices': devicesPage, '/admin/backups': backupsPage } : {}),
   }, frame);
 
   function settingsPage() {

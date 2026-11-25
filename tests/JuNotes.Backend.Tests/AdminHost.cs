@@ -21,6 +21,9 @@ namespace JuNotes.Backend.Tests
         private readonly string _codex;
         private readonly (string Url, string Token)? _paperless;
 
+        // The shared token the environment carries (null: none, as on a server where it has been taken out of the environment).
+        public string? SharedToken { get; init; } = Token;
+
         // A stand-in for pg_dump, for tests that only need a backup to be made (the real one must be of the version of the server).
         public string? PgDump { get; init; }
 
@@ -36,7 +39,7 @@ namespace JuNotes.Backend.Tests
         protected override void ConfigureWebHost(Microsoft.AspNetCore.Hosting.IWebHostBuilder builder)
         {
             builder.UseSetting("ConnectionStrings:JuNotes", _database.ConnectionString);
-            builder.UseSetting("Sync:Token", Token);
+            builder.UseSetting("Sync:Token", SharedToken ?? string.Empty);
             builder.UseSetting("Backup:Directory", BackupDirectory);
             builder.UseSetting("Backup:BeforeMigration", "false");
             builder.UseSetting("Backup:PgDump", PgDump ?? PostgresTools.PgDump);

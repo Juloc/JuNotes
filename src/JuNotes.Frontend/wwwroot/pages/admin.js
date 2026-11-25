@@ -1,6 +1,6 @@
 /* The administration: overview, the AI connection (Codex), the AI profiles and the backups. For the role admin; the server checks the role at every path. */
 import { t, tp, fmtDate, fmtDay, fmtNumber } from '/base/i18n.js';
-import { h, icon, api, field, switchField, capsule, badge, notice, toast, busy, confirmDialog, emptyState, errorText, ApiError } from '/base/base.js';
+import { h, icon, api, field, switchField, capsule, badge, notice, toast, busy, confirmDialog, openDialog, emptyState, errorText, ApiError } from '/base/base.js';
 import { API } from './util.js';
 
 const A = `${API}/admin`;
@@ -11,6 +11,7 @@ function tabs(current) {
     { href: '#/admin', label: t('adm.overview'), icon: 'activity', current: current === 'overview' },
     { href: '#/admin/codex', label: t('adm.codex'), icon: 'bolt', current: current === 'codex' },
     { href: '#/admin/profiles', label: t('adm.profiles'), icon: 'sliders', current: current === 'profiles' },
+    { href: '#/admin/devices', label: t('adm.devices'), icon: 'phone', current: current === 'devices' },
     { href: '#/admin/backups', label: t('adm.backups'), icon: 'database', current: current === 'backups' },
   ] });
 }
@@ -124,6 +125,55 @@ export async function profilesPage() {
     return form;
   });
   return { title: t('adm.profiles'), sub: t('adm.profilesSub'), body: h('div', { class: 'page stack l' }, tabs('profiles'), notice(t('adm.profilesNote')), cards) };
+}
+
+/* ---------- devices and the shared token ---------- */
+export async function devicesPage() {
+  const [d, tok] = await Promise.all([api('GET', `${A}/devices`), api('GET', `${A}/shared-token`)]);
+  const state = !tok.configured ? [t('adm.tokNotSet'), ''] : tok.enabled ? [t('adm.tokOn'), 'ok'] : [t('adm.tokOff'), 'warn'];
+  const use = tok.recentAddresses ? tp('adm.tokUse', tok.recentAddresses, { when: tok.lastUse ? fmtDate(tok.lastUse) : '' }) : t('adm.tokUseNone');
+
+  // Switching the token off or on asks for a fresh code of the administrator's own second factor, and says first how many addresses used it lately.
+  function askCode(turnOff) {
+    const code = field({ label: t('adm.tokCode'), name: 'code', hint: t('dev.codeHint'), inputmode: 'numeric', autocomplete: 'one-time-code', maxlength: 7, spellcheck: 'false' });
+    const body = h('div', { class: 'stack s' }, h('p', { class: 'muted', text: turnOff ? t('adm.tokOffText') : t('adm.tokOnText') }), turnOff ? notice(use, tok.recentAddresses ? 'warn' : 'info') : null, code);
+    openDialog({
+      title: t(turnOff ? 'adm.tokOffTitle' : 'adm.tokOnTitle'),
+      body,
+      actions: [
+        { label: t('common.cancel'), kind: 'ghost' },
+        { label: t(turnOff ? 'adm.tokOffDo' : 'adm.tokOnDo'), kind: turnOff ? 'danger' : 'primary', run: async () => {
+          await api('POST', `${A}/shared-token/${turnOff ? 'off' : 'on'}`, { code: code.querySelector('input').value });
+          toast(t(turnOff ? 'adm.tokSwitchedOff' : 'adm.tokSwitchedOn'), { kind: 'ok' });
+          location.reload();
+        } },
+      ],
+    });
+  }
+
+  const toggle = !tok.configured ? null
+    : h('button', { class: `btn ${tok.enabled ? 'outline danger' : 'primary'}`, type: 'button', text: t(tok.enabled ? 'adm.tokOffDo' : 'adm.tokOnDo') });
+  if (toggle) toggle.addEventListener('click', () => askCode(tok.enabled));
+
+  const people = d.people.map((p) => {
+    const revoke = h('button', { class: 'btn ghost danger', type: 'button', text: t('adm.revokeAll'), disabled: p.devices === 0 });
+    revoke.addEventListener('click', async () => {
+      if (!await confirmDialog({ title: t('adm.revokeTitle', { name: p.name }), text: t('adm.revokeText', { name: p.name, n: p.devices }), confirmLabel: t('adm.revokeAll'), danger: true })) return;
+      await act(revoke, api('POST', `${A}/people/${p.id}/devices/revoke`), () => { toast(t('adm.revoked'), { kind: 'ok' }); location.reload(); });
+    });
+    return row(p.name, tp('adm.devicesN', p.devices) + (p.state === 'active' ? '' : ` · ${t('adm.blocked')}`), revoke);
+  });
+
+  const body = h('div', { class: 'page stack l' }, tabs('devices'),
+    h('section', { class: 'card stack s' }, h('h2', { class: 'card-title', text: t('adm.sharedToken') }),
+      h('div', { class: 'cluster' }, badge(state[0], state[1])),
+      h('p', { class: 'muted', text: t('adm.tokIntro') }),
+      tok.configured ? h('p', { text: use }) : notice(t('adm.tokNoEnv'), 'info'),
+      tok.configured ? h('p', { class: 'field-hint', text: t('adm.tokAddressNote') }) : null,
+      toggle ? h('div', { class: 'cluster' }, toggle) : null),
+    h('section', { class: 'card stack s' }, h('h2', { class: 'card-title', text: t('adm.peopleDevices') }), h('p', { class: 'muted', text: t('adm.peopleDevicesText' ) }),
+      people.length ? h('div', { class: 'list' }, people) : emptyState({ icon: 'phone', title: t('adm.noPeople') })));
+  return { title: t('adm.devices'), sub: t('adm.devicesSub'), body };
 }
 
 /* ---------- backups ---------- */

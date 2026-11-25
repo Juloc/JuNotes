@@ -24,42 +24,16 @@ namespace JuNotes.Frontend.Api
             devices.MapGet(string.Empty, async (int? limit, string? cursor, HttpContext ctx, DeviceStore store) =>
                 WebApi.Paged((await store.ListAsync(ctx.Person().UserId, ctx.RequestAborted)).Select(device => new DeviceDto(device.Id, device.Name, device.CreatedAt, device.LastSeen, DeviceStore.Shorten(device.LastAddress))).ToList(), limit, cursor, device => device.Id));
 
-            devices.MapPost("/pairing", async (PairingRequest body, HttpContext ctx, DeviceStore store, UserStore users, LoginLimiter limiter, AuditStore audit, TimeProvider time) =>
+            devices.MapPost("/pairing", async (PairingRequest body, HttpContext ctx, DeviceStore store, FreshSecondFactor factor, AuditStore audit) =>
             {
                 var who = ctx.Person();
-                var address = ctx.ClientIp();
-                string[] keys = ["acct:" + who.UserId, "ip:" + address];
-                if (limiter.WaitSeconds(keys) is > 0 and var wait)
+                if (await factor.CheckAsync(ctx, body.Code) is { } refused)
                 {
-                    return Error.TooMany(wait).ToHttp();
+                    return refused.ToHttp();
                 }
 
-                var user = await users.FindByIdAsync(who.UserId, ctx.RequestAborted);
-                if (user is null || user.State != PersonState.Active)
-                {
-                    return Error.Unauthorized().ToHttp();
-                }
-
-                // A person who signs in only through the hub has no second factor here to ask for.
-                if (!user.TotpConfirmed)
-                {
-                    return Error.Conflict("pairing.needs_totp", "Pairing needs a second factor in this account.").ToHttp();
-                }
-
-                var step = Totp.Check(user.TotpSecret, (body.Code ?? string.Empty).Replace(" ", string.Empty, StringComparison.Ordinal), user.TotpLastStep, time.GetUtcNow());
-                if (step is null || !await users.TryAdvanceTotpStepAsync(user.Id, step.Value, ctx.RequestAborted))
-                {
-                    foreach (var key in keys)
-                    {
-                        limiter.Fail(key);
-                    }
-
-                    return new Error(ErrorKind.Forbidden, "totp.wrong", "The code is not right.").ToHttp();
-                }
-
-                limiter.Succeed("acct:" + user.Id);
-                var (code, expires) = await store.NewCodeAsync(user.Id, ctx.RequestAborted);
-                await audit.AddAsync(user.Name, "pairing.code_made", address, null, ctx.RequestAborted);
+                var (code, expires) = await store.NewCodeAsync(who.UserId, ctx.RequestAborted);
+                await audit.AddAsync(who.UserName, "pairing.code_made", ctx.ClientIp(), null, ctx.RequestAborted);
                 return Results.Ok(new PairingCode(code, expires));
             });
 

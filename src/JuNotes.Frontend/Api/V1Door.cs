@@ -60,6 +60,15 @@ namespace JuNotes.Frontend.Api
                 return false;
             }
 
+            // The right shared token, but the administrator has switched it off: 401, and not counted as a wrong token (it is not one). Devices with their own token are not affected.
+            var sharedToken = services.GetRequiredService<SharedToken>();
+            if (await sharedToken.IsOffAsync(context.RequestAborted))
+            {
+                sharedToken.Refused(address);
+                return false;
+            }
+
+            await sharedToken.SeenAsync(address, context.RequestAborted);
             var owner = await services.GetRequiredService<OwnerDirectory>().TokenOwnerAsync(context.RequestAborted);
             if (owner.State == TokenState.Refused)
             {

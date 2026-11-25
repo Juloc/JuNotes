@@ -11,6 +11,9 @@ namespace JuNotes.Frontend.Admin
     // What the door needs when a device token is sent: the device and the person it stands for (active, not blocked).
     public sealed record DeviceHit(Guid DeviceId, string DeviceName, Guid PersonId, string PersonName);
 
+    // What the administrator sees of a person's devices: how many, nothing else (no name, no address, never a token).
+    public sealed record PersonDevices(Guid Id, string Name, string State, int Devices);
+
     // The answer to a pairing: the token (shown once, never stored in the clear), the device and the person.
     public sealed record Paired(string Token, Guid DeviceId, string PersonName);
 
@@ -174,6 +177,38 @@ namespace JuNotes.Frontend.Admin
             command.Parameters.Add(new NpgsqlParameter { Value = person });
             command.Parameters.Add(new NpgsqlParameter { Value = time.GetUtcNow() });
             return await command.ExecuteScalarAsync(ct) as string;
+        }
+
+        // ----- The administrator -----
+
+        // Every person who can sign in, with the number of their devices that still work.
+        public async Task<IReadOnlyList<PersonDevices>> CountsAsync(CancellationToken ct)
+        {
+            await using var command = data.CreateCommand("select u.id, u.name, u.state, count(d.id) from users u left join device_tokens d on d.person_id = u.id and d.revoked_at is null where u.totp_confirmed or u.hub_sub is not null group by u.id, u.name, u.state order by lower(u.name), u.id");
+            await using var reader = await command.ExecuteReaderAsync(ct);
+            var list = new List<PersonDevices>();
+            while (await reader.ReadAsync(ct))
+            {
+                list.Add(new PersonDevices(reader.GetGuid(0), reader.GetString(1), reader.GetString(2), (int)reader.GetInt64(3)));
+            }
+
+            return list;
+        }
+
+        // Revokes every device of a person (a lost iPad: the person pairs the others again). How many there were, and the name for the log; null when there is no such person.
+        public async Task<(int Revoked, string Name)?> RevokeAllAsync(Guid person, CancellationToken ct)
+        {
+            await using var who = data.CreateCommand("select name from users where id = $1");
+            who.Parameters.Add(new NpgsqlParameter { Value = person });
+            if (await who.ExecuteScalarAsync(ct) is not string name)
+            {
+                return null;
+            }
+
+            await using var revoke = data.CreateCommand("update device_tokens set revoked_at = $2 where person_id = $1 and revoked_at is null");
+            revoke.Parameters.Add(new NpgsqlParameter { Value = person });
+            revoke.Parameters.Add(new NpgsqlParameter { Value = time.GetUtcNow() });
+            return (await revoke.ExecuteNonQueryAsync(ct), name);
         }
 
         // ----- Helpers -----
