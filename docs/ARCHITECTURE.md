@@ -236,6 +236,12 @@ Entscheidung des Eigentümers (24.11.2026): **eigene Anmeldung für den Stundenp
   selbst zu prüfen (sie tippt, nicht wir). Bis dahin wird nichts gegen den echten Dienst probiert. Beide Wege nutzen eine Schnittstelle, die Untis nicht öffentlich beschreibt: Das sollte der Eigentümer wissen, und im Zweifel fragt man bei Untis oder der Schule nach, ob die Nutzung
   für das eigene Konto in Ordnung ist. Kann A nicht bestätigt werden, gilt B nur mit der Regel „nachweislich nicht anders“, und der Eigentümer entscheidet.
 
+## 9. Reihenfolge der Risiken
+
+1. Besitzer und Abgleich (Abschnitt 3, Punkt 3): ein Fehler lässt eine Person fremde Daten sehen oder überschreiben.
+2. Die App-Seite: die App wird auf dem Gerät nie vom Server aus getestet, sondern nur übersetzt; eine Änderung am Vertrag fiele erst auf dem iPad auf.
+3. Versionsfrage (Abschnitt 4): billig zu prüfen, teuer zu spät.
+
 ## 10. Meilenstein 3: Personen, Geräte, Freigaben (Entwurf, nichts gebaut)
 
 Stand 25.11.2026, Text für den Orchestrator. Grundlage ist, was gebaut und gelesen ist: die Basis hat **kein** Modul für Gerätetoken (nur Sitzungen im Browser, Einladungen und das Hub-Konto), der App-Token ist der eine
@@ -310,9 +316,3 @@ Wie in 3a entschieden: Freigaben gelten im Web, nicht im Abgleich; die App der E
 
 3a Gerätetoken und Kopplung (Server mit Tests; der Entwurf der App-Änderung getrennt) · 3b Löschprüfung und Übergabe (ohne die Umstellung des Tokens zuerst als Vorschau) und die Umstellung · 3c Freigaben im Web · 3d Verwaltung der Geräte, Abschalten des gemeinsamen Tokens. Jede Scheibe lauffähig, mit Tests mit mehreren Personen, STATE.md am Ende.
 **Abhängigkeiten/Risiken:** Die Löschungen für die bisherige Person (10.4, Punkt 4) sind der heikelste Teil: ein Fehler lässt Hefte auf einem Gerät stehen oder löscht sie dort zu früh. Der Test dafür braucht einen Abgleich in zwei Richtungen mit der echten Swift-Logik; die kann hier nur als Vertrag nachgebildet werden, **nicht auf einem iPad** geprüft werden. Das ist vor dem ersten echten Gebrauch ein offener Punkt.
-
-## 9. Reihenfolge der Risiken
-
-1. Besitzer und Abgleich (Abschnitt 3, Punkt 3): ein Fehler lässt eine Person fremde Daten sehen oder überschreiben.
-2. Die App-Seite: die App wird auf dem Gerät nie vom Server aus getestet, sondern nur übersetzt; eine Änderung am Vertrag fiele erst auf dem iPad auf.
-3. Versionsfrage (Abschnitt 4): billig zu prüfen, teuer zu spät.
