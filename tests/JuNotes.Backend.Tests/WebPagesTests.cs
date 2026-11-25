@@ -59,6 +59,19 @@ namespace JuNotes.Backend.Tests
             Assert.DoesNotMatch(@"#[0-9a-fA-F]{3,8}\b|rgb\(|hsl\(|oklch\(", css.Replace("--accent-hue: 75", string.Empty, StringComparison.Ordinal));
         }
 
+        // Review 2, point 8: signing out empties the page, takes the search term out of the address, and a page brought back from the memory of the browser is loaded again.
+        [Fact]
+        public void Signing_out_empties_the_page_and_a_restored_page_is_loaded_again()
+        {
+            var text = File.ReadAllText(Path.Combine(Wwwroot, "app.js"));
+            var signOut = text[text.IndexOf("onSignOut:", StringComparison.Ordinal)..];
+
+            Assert.Contains("document.body.replaceChildren()", signOut, StringComparison.Ordinal);
+            Assert.Contains("history.replaceState(null, '', location.pathname)", signOut, StringComparison.Ordinal);
+            Assert.True(signOut.IndexOf("replaceChildren", StringComparison.Ordinal) < signOut.IndexOf("location.reload()", StringComparison.Ordinal));
+            Assert.Contains("addEventListener('pageshow', (e) => { if (e.persisted) location.reload(); })", text, StringComparison.Ordinal);
+        }
+
         [GeneratedRegex(@"^\s*'([a-zA-Z0-9.]+)':", RegexOptions.Multiline, matchTimeoutMilliseconds: 2000)]
         private static partial Regex KeyPattern();
 

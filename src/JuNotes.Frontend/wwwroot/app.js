@@ -16,6 +16,9 @@ addMessages('de', de);
 addMessages('en', en);
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => { /* the app works without it */ });
 
+// A page the browser brings back from its memory of going back and forth (after sign-out, say) is not shown as it was: it is loaded again.
+addEventListener('pageshow', (e) => { if (e.persisted) location.reload(); });
+
 start({ icon: 'file', onSignedIn: run });
 
 function run(me) {
@@ -36,6 +39,9 @@ function run(me) {
       const r = await api('POST', '/api/auth/logout');
       // the worker keeps only the static shell (SEC-08); the copies are emptied at sign-out all the same
       if ('caches' in window) await caches.keys().then((keys) => Promise.all(keys.map((k) => caches.delete(k)))).catch(() => { /* nothing to empty */ });
+      // the content leaves the page before the page does, and no search term stays in the address of this history entry
+      document.body.replaceChildren();
+      history.replaceState(null, '', location.pathname);
       if (r && r.hubLogoutUrl) location.assign(r.hubLogoutUrl); else location.reload();
     },
   });
