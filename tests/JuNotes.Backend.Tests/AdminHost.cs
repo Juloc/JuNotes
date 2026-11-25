@@ -2,6 +2,8 @@ using System.Net;
 using JuNotes.Backend.Ai;
 using JuNotes.Backend.Backup;
 using JuNotes.Frontend.Admin;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -46,11 +48,32 @@ namespace JuNotes.Backend.Tests
             builder.UseSetting("BASE_SETUP_CODE", SetupCode);
             builder.UseSetting("BASE_DATA", Path.Combine(BackupDirectory, "base"));
 
+            // A test server has no remote address: a request may name one in X-Test-Remote (set before anything else looks at the connection), so tests can speak as different
+            // addresses, with and without a proxy in front.
+            builder.ConfigureServices(services => services.AddSingleton<IStartupFilter, TestRemote>());
+
             if (_paperless is { } paperless)
             {
                 builder.UseSetting("Paperless:BaseUrl", paperless.Url);
                 builder.UseSetting("Paperless:Token", paperless.Token);
             }
+        }
+
+        private sealed class TestRemote : IStartupFilter
+        {
+            public Action<IApplicationBuilder> Configure(Action<IApplicationBuilder> next) => app =>
+            {
+                app.Use(async (context, continuation) =>
+                {
+                    if (context.Request.Headers.TryGetValue("X-Test-Remote", out var address) && IPAddress.TryParse(address, out var parsed))
+                    {
+                        context.Connection.RemoteIpAddress = parsed;
+                    }
+
+                    await continuation();
+                });
+                next(app);
+            };
         }
 
         public HttpClient Browser() => CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false, HandleCookies = true });

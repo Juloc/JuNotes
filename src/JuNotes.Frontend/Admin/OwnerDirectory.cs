@@ -38,6 +38,7 @@ namespace JuNotes.Frontend.Admin
         private readonly SemaphoreSlim _gate = new(1, 1);
         private volatile bool _claimed;
         private volatile bool _failed;
+        private volatile object? _pinned; // a boxed Guid: one reference, so a read never sees half of it
 
         // True when giving the old rows to their owner failed: the door of the app answers 503 until the server is restarted (the administration shows it).
         public bool ClaimFailed => _failed;
@@ -81,6 +82,24 @@ namespace JuNotes.Frontend.Admin
             return await ClaimAsync(owner.Id, ct) ? new TokenOwner(TokenState.Person, owner) : new TokenOwner(TokenState.Pending);
         }
 
+        // The person behind a device token: always that person, whatever their role, and only their rows (the old rows without an owner are given to the pinned person alone).
+        // The device does not depend on the pinned person: if the old token is refused (that person gone or blocked) the devices of everybody else keep working. Only while the
+        // giving of the old rows to their owner has not worked (Pending) the door says 503 for devices too, as it does for the old token.
+        public async Task<TokenOwner> ForDeviceAsync(DeviceHit device, CancellationToken ct)
+        {
+            if (_failed)
+            {
+                return new TokenOwner(TokenState.Pending);
+            }
+
+            if (!_claimed && (await TokenOwnerAsync(ct)).State == TokenState.Pending)
+            {
+                return new TokenOwner(TokenState.Pending);
+            }
+
+            return new TokenOwner(TokenState.Person, new SyncOwner(device.PersonId, device.PersonName, device.DeviceName, AdoptsUnowned: _pinned is Guid pinned && pinned == device.PersonId));
+        }
+
         // Called whenever somebody signs in or the server starts, so the claim does not wait for the first request of the app. It never fails the caller.
         public async Task EnsureClaimedAsync(CancellationToken ct)
         {
@@ -103,7 +122,10 @@ namespace JuNotes.Frontend.Admin
         {
             await using var command = data.CreateCommand("select value from app_instance_settings where key = $1");
             command.Parameters.Add(new NpgsqlParameter { Value = Key });
-            return await command.ExecuteScalarAsync(ct) is string text && Guid.TryParse(text, out var id) ? id : null;
+            var pinned = await command.ExecuteScalarAsync(ct) is string text && Guid.TryParse(text, out var id) ? id : (Guid?)null;
+            // Written once and never changed: kept, so a device of that person is known as theirs without asking again.
+            _pinned = pinned is { } found ? found : _pinned;
+            return pinned;
         }
 
         // Any account that can sign in, whatever its state: from then on the server is no longer "new".
@@ -233,13 +255,38 @@ namespace JuNotes.Frontend.Admin
     public sealed class TokenBrake(Base.Web.RateLimit limit, AuditStore audit, TimeProvider time)
     {
         public const int FailuresPerMinute = 10;
+
+        // Pairing is stricter (a code is short and nobody sends one all day): after this many wrong codes from an address even a right code is refused until the minute is over.
+        public const int PairFailuresBeforeLock = 3;
         private static readonly TimeSpan LogGap = TimeSpan.FromHours(1);
 
         private readonly ConcurrentDictionary<string, DateTimeOffset> _locked = new();
         private readonly ConcurrentDictionary<string, DateTimeOffset> _logged = new();
+        private readonly ConcurrentDictionary<string, DateTimeOffset> _pairLocked = new();
         private DateTimeOffset _swept;
 
         public bool IsLocked(string address) => _locked.TryGetValue(address, out var until) && until > time.GetUtcNow();
+
+        // Seconds left of the lock of an address for pairing, 0 when it is free. Looked at before the code is looked at, and it counts nothing itself.
+        public int PairWait(string address) => _pairLocked.TryGetValue(address, out var until) && until > time.GetUtcNow() ? (int)Math.Ceiling((until - time.GetUtcNow()).TotalSeconds) : 0;
+
+        // A wrong code from this address. The third one in a minute locks the address for the rest of that minute, and the lock is written to the log (once an hour for an address).
+        public void PairFailed(string address)
+        {
+            var now = time.GetUtcNow();
+            Sweep(now);
+            if (limit.Allow("v1-pair", address, PairFailuresBeforeLock - 1, out var wait))
+            {
+                return;
+            }
+
+            _pairLocked[address] = now.AddSeconds(wait);
+            if (!_logged.TryGetValue("pair|" + address, out var last) || now - last >= LogGap)
+            {
+                _logged["pair|" + address] = now;
+                _ = audit.AddAsync("app-token", "api.pair_refused", address, $"{PairFailuresBeforeLock} wrong pairing codes in a minute from this address (at most one line an hour for it)");
+            }
+        }
 
         public void Failed(string address)
         {
@@ -272,6 +319,14 @@ namespace JuNotes.Frontend.Admin
                 if (until <= now)
                 {
                     _locked.TryRemove(address, out _);
+                }
+            }
+
+            foreach (var (address, until) in _pairLocked)
+            {
+                if (until <= now)
+                {
+                    _pairLocked.TryRemove(address, out _);
                 }
             }
 

@@ -3,6 +3,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Http.Json;
 using Microsoft.Extensions.Options;
+using Base.Accounts;
 using JuNotes.Backend.Ai;
 using JuNotes.Backend.Assets;
 using JuNotes.Backend.Backup;
@@ -27,25 +28,39 @@ namespace JuNotes.Frontend.Api
 
         private const string OwnerKey = "notes.token-owner";
 
-        // The check of the door. Only /status (the exact path) is open. Everything else needs the token, and a right token always gets through; wrong ones are counted per
-        // address (TokenBrake). With the token the person it stands for is looked up (OwnerDirectory) and kept for the endpoints; if the token has no person any more the
-        // door says 401.
+        // The check of the door. Only /status (the exact path) is open, and POST /api/v1/pair (below). Everything else needs a token, and a right token always gets through;
+        // wrong ones are counted per address (TokenBrake). A device token (nt1_...) is looked for first and stands for its person; otherwise the instance token is checked,
+        // which stands for the person written down once (OwnerDirectory). If the token has no person any more the door says 401.
         public static async ValueTask<bool> CheckAsync(HttpContext context)
         {
-            if (context.Request.Path.Equals(Prefix + "/status", StringComparison.OrdinalIgnoreCase))
+            if (context.Request.Path.Equals(Prefix + "/status", StringComparison.OrdinalIgnoreCase) || IsPairRequest(context.Request))
             {
                 return true;
             }
 
-            // The token is looked at first: a right one always gets through. Only wrong ones are counted (and, past ten a minute from one address, written to the log once an hour).
-            var access = context.RequestServices.GetRequiredService<SyncAccess>();
-            if (!access.IsConfigured || !access.IsAuthorized(context.Request.Headers.Authorization))
+            var services = context.RequestServices;
+            var address = Base.Web.Auth.RequestIdentity.ClientIp(context);
+            var header = context.Request.Headers.Authorization.ToString();
+            if (header.StartsWith(DeviceBearer, StringComparison.Ordinal))
             {
-                context.RequestServices.GetRequiredService<TokenBrake>().Failed(Base.Web.Auth.RequestIdentity.ClientIp(context));
+                // A device token. One that is unknown, removed or of a blocked person falls through to the old check, which it fails: counted like any wrong token.
+                var device = await services.GetRequiredService<DeviceStore>().FindAsync(header[BearerPrefix.Length..], address, context.RequestAborted);
+                if (device is not null)
+                {
+                    context.Items[OwnerKey] = await services.GetRequiredService<OwnerDirectory>().ForDeviceAsync(device, context.RequestAborted);
+                    return true;
+                }
+            }
+
+            // The instance token is looked at next: a right one always gets through. Only wrong ones are counted (and, past ten a minute from one address, written to the log once an hour).
+            var access = services.GetRequiredService<SyncAccess>();
+            if (!access.IsConfigured || !access.IsAuthorized(header))
+            {
+                services.GetRequiredService<TokenBrake>().Failed(address);
                 return false;
             }
 
-            var owner = await context.RequestServices.GetRequiredService<OwnerDirectory>().TokenOwnerAsync(context.RequestAborted);
+            var owner = await services.GetRequiredService<OwnerDirectory>().TokenOwnerAsync(context.RequestAborted);
             if (owner.State == TokenState.Refused)
             {
                 return false;
@@ -54,6 +69,14 @@ namespace JuNotes.Frontend.Api
             context.Items[OwnerKey] = owner;
             return true;
         }
+
+        private const string BearerPrefix = "Bearer ";
+        private const string DeviceBearer = BearerPrefix + DeviceStore.TokenPrefix;
+
+        // The one exception of the door besides /status: exactly this path (no prefix, no trailing slash, no other spelling) and only POST. The endpoint refuses what is left to refuse.
+        private static bool IsPairRequest(HttpRequest request) => HttpMethods.IsPost(request.Method) && string.Equals(request.Path.Value, PairPath, StringComparison.Ordinal);
+
+        public const string PairPath = Prefix + "/pair";
 
         private static TokenOwner OwnerOf(HttpContext context) => (TokenOwner)context.Items[OwnerKey]!;
 
@@ -72,9 +95,84 @@ namespace JuNotes.Frontend.Api
             Map(app);
         }
 
+        private sealed record PairRequest(string? Code, string? DeviceName);
+
+        private const int PairBodyLimit = 2048;
+
+        // Pairing (ARCHITECTURE 10.1): the person has a one-time code from their settings and gives it with the name of the device; the answer is the device token, once.
+        // This is the only path of the door that answers without a token, so every refusal looks the same (401 with one body): a code that never was, one that ran out, one
+        // already used, a request over http, a body that is not ours. After three wrong codes from an address even a right one is refused for the rest of the minute (429).
+        private static async Task<IResult> PairAsync(HttpContext context, DeviceStore devices, TokenBrake brake, AuditStore audit, CancellationToken ct)
+        {
+            var address = Base.Web.Auth.RequestIdentity.ClientIp(context);
+            if (brake.PairWait(address) is > 0 and var wait)
+            {
+                context.Response.Headers.RetryAfter = wait.ToString(System.Globalization.CultureInfo.InvariantCulture);
+                return Results.Problem("Too many wrong codes. Try again in a minute.", statusCode: 429);
+            }
+
+            // Not over https: refused before the code is looked at, so a code that was sent in the clear stays unspent (and nobody has learned anything about it).
+            if (!ArrivedSecurely(context))
+            {
+                return PairRefused();
+            }
+
+            var request = await ReadPairRequestAsync(context.Request, ct);
+            var paired = request is null ? null : await devices.RedeemAsync(request.Code, request.DeviceName, address, ct);
+            if (paired is null)
+            {
+                brake.PairFailed(address);
+                return PairRefused();
+            }
+
+            await audit.AddAsync(paired.PersonName, "device.paired", address, "device " + DeviceStore.CleanName(request!.DeviceName), ct);
+            return Json(new { token = paired.Token, deviceId = paired.DeviceId, personName = paired.PersonName, api = 1 });
+        }
+
+        private static IResult PairRefused() => Results.Problem("The code is not valid or has expired.", statusCode: 401);
+
+        // https as the server sees it (the base believes X-Forwarded-Proto only from its trusted proxies), or the machine itself under the name localhost (development and tests).
+        private static bool ArrivedSecurely(HttpContext context) =>
+            context.Request.IsHttps
+            || (string.Equals(context.Request.Host.Host, "localhost", StringComparison.OrdinalIgnoreCase)
+                && (context.Connection.RemoteIpAddress is null || System.Net.IPAddress.IsLoopback(context.Connection.RemoteIpAddress)));
+
+        // At most 2 KB, read here and not through the binding of the framework: this path is open, and the door allows 30 MB for the others.
+        private static async Task<PairRequest?> ReadPairRequestAsync(HttpRequest request, CancellationToken ct)
+        {
+            if (request.ContentLength is > PairBodyLimit)
+            {
+                return null;
+            }
+
+            var buffer = new byte[PairBodyLimit + 1];
+            var total = 0;
+            int read;
+            while (total < buffer.Length && (read = await request.Body.ReadAsync(buffer.AsMemory(total), ct)) > 0)
+            {
+                total += read;
+            }
+
+            if (total > PairBodyLimit)
+            {
+                return null;
+            }
+
+            try
+            {
+                return JsonSerializer.Deserialize<PairRequest>(buffer.AsSpan(0, total), _options);
+            }
+            catch (JsonException)
+            {
+                return null;
+            }
+        }
+
         private static void Map(IEndpointRouteBuilder endpoints)
         {
             endpoints.MapGet("/api/v1/status", () => Json(new { name = "JuNotes", version = Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "0.0.0", api = 1 }));
+
+            endpoints.MapPost(PairPath, PairAsync);
 
             var secured = endpoints.MapGroup("/api/v1");
             // Giving the old rows to their owner did not work (logged, tried again at the next start): no sync on rows nobody owns.

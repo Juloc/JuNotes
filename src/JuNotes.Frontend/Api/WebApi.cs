@@ -132,7 +132,7 @@ namespace JuNotes.Frontend.Api
 
         // Page by page, the cursor being the id of the last row given. A cursor that is not ours, or whose row is gone since the last page, is an error (cursor.stale) and
         // not a start from the beginning: the page asks again from the top and drops what it has seen twice.
-        private static IResult Paged<T>(IReadOnlyList<T> all, int? limit, string? cursor, Func<T, Guid> idOf)
+        internal static IResult Paged<T>(IReadOnlyList<T> all, int? limit, string? cursor, Func<T, Guid> idOf)
         {
             var request = PageRequest.From(limit, cursor);
             var start = 0;

@@ -65,6 +65,7 @@ var maintenance = new MaintenanceData(Base.Data.Database.Create(maintenanceConne
 builder.Services.AddSingleton(maintenance);
 builder.Services.AddSingleton<OwnerDirectory>();
 builder.Services.AddSingleton<TokenBrake>();
+builder.Services.AddSingleton<DeviceStore>();
 builder.Services.AddSingleton<ISecurityLog, SecurityLog>();
 // After the base, so that the one data source of the server is ours (the base asks for "the" NpgsqlDataSource and gets this one).
 builder.Services.AddJuNotesServices(builder.Configuration);
@@ -114,6 +115,7 @@ app.MapGet("/Notes/{id:guid}", (Guid id) => Results.Redirect($"/#/notebook/{id}"
 app.MapBase();
 app.MapV1();
 app.MapWebApi();
+app.MapDevicesApi();
 app.MapAdminApi();
 app.MapGet("/health/live", () => Results.Ok());
 app.MapGet("/health/ready", async (HealthService health, CancellationToken ct) => await health.IsReadyAsync(ct) ? Results.Ok() : Results.StatusCode(503));
