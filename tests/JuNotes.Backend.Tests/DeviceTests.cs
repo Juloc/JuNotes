@@ -34,8 +34,7 @@ namespace JuNotes.Backend.Tests
         // Two people (the first an administrator, the second a member) with a session each, a throwaway database and a second factor whose key the tests know.
         private sealed class Scene : IAsyncDisposable
         {
-            private readonly long _step = DateTimeOffset.UtcNow.ToUnixTimeSeconds() / Base.Accounts.Totp.StepSeconds;
-            private readonly Dictionary<Guid, int> _used = [];
+            private readonly Dictionary<Guid, long> _last = [];
             private readonly FakeCodex _fake;
 
             private Scene(AdminHost host, TestDatabase database, FakeCodex fake, Guid a, HttpClient aClient, Guid b, HttpClient bClient)
@@ -78,13 +77,15 @@ namespace JuNotes.Backend.Tests
                 await Database.DisposeAsync();
             }
 
-            // A code of the second factor that has not been used yet (the tests share one key; each person may use three steps: the window of the server is one step either side).
+            // A code of the second factor that has not been used yet: the oldest step the server still accepts that is newer than the last one this person used (a step is spent when
+            // it is used; the window is one step either side of now, so a person has three codes at most, and a step boundary in the middle of a test does not matter).
             public string SecondFactor(Guid person)
             {
-                var used = _used.GetValueOrDefault(person);
-                _used[person] = used + 1;
-                Assert.True(used < 3, "a person has three fresh codes of the second factor in a test");
-                return Base.Accounts.Totp.Hotp(Base32.Decode("TESTSECRET"), _step - 1 + used);
+                var now = DateTimeOffset.UtcNow.ToUnixTimeSeconds() / Base.Accounts.Totp.StepSeconds;
+                var step = Math.Max(_last.GetValueOrDefault(person) + 1, now - 1);
+                Assert.True(step <= now + 1, "a person has three fresh codes of the second factor in a test");
+                _last[person] = step;
+                return Base.Accounts.Totp.Hotp(Base32.Decode("TESTSECRET"), step);
             }
 
             public static HttpRequestMessage Web(HttpMethod method, string path, string? json = null, string? remote = null)
