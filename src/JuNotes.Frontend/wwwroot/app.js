@@ -1,5 +1,5 @@
 /* Notes: the front door (sign-in and setup come from the base), the library and the study pages, and the settings. Reading only; what is written on the iPad is read here.
- * Pages are in pages/, texts in i18n/. Until the administration moves here too (milestone 2c) its link leads to the old pages. */
+ * Pages are in pages/, texts in i18n/. */
 import { addMessages, t } from '/base/i18n.js';
 import { h, icon, api, shell, router } from '/base/base.js';
 import { start } from '/base/auth.js';
@@ -10,6 +10,7 @@ import de from '/i18n/de.js';
 import en from '/i18n/en.js';
 import { homePage, folderPage, notebookPage, pagePage, searchPage } from '/pages/library.js';
 import { gradesPage, cardsPage, timetablePage } from '/pages/study.js';
+import { overviewPage, codexPage, profilesPage, backupsPage } from '/pages/admin.js';
 
 addMessages('de', de);
 addMessages('en', en);
@@ -26,7 +27,7 @@ function run(me) {
       { label: t('nav.grades'), icon: 'check-circle', href: '#/grades' },
       { label: t('nav.cards'), icon: 'copy', href: '#/cards' },
       { label: t('nav.timetable'), icon: 'clock', href: '#/timetable' },
-      ...(admin ? [{ label: t('nav.admin'), icon: 'sliders', href: '/Admin' }] : []),
+      ...(admin ? [{ label: t('nav.admin'), icon: 'sliders', href: '#/admin' }] : []),
       { label: t('shell.settings'), icon: 'user', href: '#/settings', foot: true },
     ],
     person: { name: me.user },
@@ -52,6 +53,7 @@ function run(me) {
     '/cards/:folder': cardsPage,
     '/timetable': timetablePage,
     '/settings': settingsPage,
+    ...(admin ? { '/admin': overviewPage, '/admin/codex': codexPage, '/admin/profiles': profilesPage, '/admin/backups': backupsPage } : {}),
   }, frame);
 
   function settingsPage() {

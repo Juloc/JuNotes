@@ -28,3 +28,6 @@
 .board { overflow: auto; max-width: 100%; }
 .board .layer .picture { width: 3000px; height: 2000px; }
 details.card > summary { cursor: pointer; font-weight: 600; }
+
+/* the code of a device sign-in, large and readable */
+.code { font: 700 var(--text-xl)/1.2 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .08em; padding: var(--s3) var(--s4); background: var(--surface-2); border-radius: var(--r-m); width: max-content; max-width: 100%; }
