@@ -10,6 +10,7 @@ import de from '/i18n/de.js';
 import en from '/i18n/en.js';
 import { homePage, folderPage, notebookPage, pagePage, searchPage } from '/pages/library.js';
 import { gradesPage, cardsPage } from '/pages/study.js';
+import { pairingCard } from '/pages/devices.js';
 import { overviewPage, codexPage, profilesPage, backupsPage } from '/pages/admin.js';
 
 addMessages('de', de);
@@ -63,7 +64,7 @@ function run(me) {
   function settingsPage() {
     return {
       title: t('shell.settings'),
-      body: h('div', { class: 'page narrow stack l' }, appearanceCard(), securityCard(me), devicesCard(), historyCard(),
+      body: h('div', { class: 'page narrow stack l' }, appearanceCard(), securityCard(me), devicesCard(), pairingCard(), historyCard(),
         admin ? peopleCard(me) : null, admin ? hubCard(me) : null, admin ? installationCard() : null, aboutCard(me)),
     };
   }
