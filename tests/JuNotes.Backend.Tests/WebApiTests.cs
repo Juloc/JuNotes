@@ -269,5 +269,27 @@ namespace JuNotes.Backend.Tests
                 await EndAsync(scene);
             }
         }
+
+        [RequiresDatabaseFact]
+        public async Task The_first_person_sees_the_old_rows_in_the_web_even_if_nothing_else_has_touched_the_server_since_the_account_was_made()
+        {
+            var database = await TestDatabase.CreateAsync();
+            var fake = new FakeCodex("exit 0");
+            using var host = new AdminHost(database, fake.Executable);
+            await using (database)
+            using (fake)
+            {
+                // Rows made before any account exists, through the door of the app.
+                using var app = host.Browser();
+                app.DefaultRequestHeaders.Authorization = new("Bearer", AdminHost.Token);
+                var push = await app.PostAsync(Url("/api/v1/sync/push"), new StringContent("""{"changes":[{"kind":"subject","id":"50000000-0000-0000-0000-0000000000a1","parentId":null,"payload":{"name":"Altbestand"},"deleted":false}]}""", System.Text.Encoding.UTF8, "application/json"));
+                Assert.Equal(HttpStatusCode.OK, push.StatusCode);
+
+                var (_, first) = await host.SignedInPersonAsync();
+                var folders = await JsonAsync(await first.GetAsync(Url("/api/web/v1/folders")));
+
+                Assert.Equal("Altbestand", Assert.Single(folders.GetProperty("items").EnumerateArray()).GetProperty("name").GetString());
+            }
+        }
     }
 }

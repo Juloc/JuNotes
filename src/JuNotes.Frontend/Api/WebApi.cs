@@ -29,6 +29,12 @@ namespace JuNotes.Frontend.Api
         public static void MapWebApi(this IEndpointRouteBuilder app)
         {
             var api = app.MapGroup(Prefix);
+            // The first request after the first account may be one of these (nobody has used the old pages or the app yet): the old rows are given to their owner first.
+            api.AddEndpointFilter(async (invocation, next) =>
+            {
+                await invocation.HttpContext.RequestServices.GetRequiredService<OwnerDirectory>().EnsureClaimedAsync(invocation.HttpContext.RequestAborted);
+                return await next(invocation);
+            });
 
             api.MapGet("/folders", async (int? limit, string? cursor, HttpContext ctx, LibraryReader library) =>
                 Paged((await Mine(ctx, library).SubjectsAsync(ctx.RequestAborted)).Select(Folder).ToList(), limit, cursor, folder => folder.Id));

@@ -1,5 +1,5 @@
-/* Notes, the front door: sign-in and setup come from the base (start), and from here the person goes on to the notebooks, and the administrator to the administration.
- * Until the web pages move to the base (milestone 2) those two are the old pages; the settings page is the cards of the base. */
+/* Notes: the front door (sign-in and setup come from the base), the library and the study pages, and the settings. Reading only; what is written on the iPad is read here.
+ * Pages are in pages/, texts in i18n/. Until the administration moves here too (milestone 2c) its link leads to the old pages. */
 import { addMessages, t } from '/base/i18n.js';
 import { h, icon, api, shell, router } from '/base/base.js';
 import { start } from '/base/auth.js';
@@ -8,6 +8,8 @@ import { peopleCard } from '/base/people.js';
 import { hubCard } from '/base/hub.js';
 import de from '/i18n/de.js';
 import en from '/i18n/en.js';
+import { homePage, folderPage, notebookPage, pagePage, searchPage } from '/pages/library.js';
+import { gradesPage, cardsPage, timetablePage } from '/pages/study.js';
 
 addMessages('de', de);
 addMessages('en', en);
@@ -20,8 +22,12 @@ function run(me) {
   const frame = shell({
     app: { name: me.app.name, icon: 'file' },
     nav: [
-      { label: t('nav.home'), icon: 'home', href: '#/' },
-      { label: t('shell.settings'), icon: 'sliders', href: '#/settings', foot: true },
+      { label: t('nav.library'), icon: 'home', href: '#/' },
+      { label: t('nav.grades'), icon: 'check-circle', href: '#/grades' },
+      { label: t('nav.cards'), icon: 'copy', href: '#/cards' },
+      { label: t('nav.timetable'), icon: 'clock', href: '#/timetable' },
+      ...(admin ? [{ label: t('nav.admin'), icon: 'sliders', href: '/Admin' }] : []),
+      { label: t('shell.settings'), icon: 'user', href: '#/settings', foot: true },
     ],
     person: { name: me.user },
     menu: [{ label: t('shell.settings'), icon: 'sliders', href: '#/settings' }],
@@ -34,23 +40,19 @@ function run(me) {
     },
   });
   document.body.append(frame.el);
-  router({ '/': homePage, '/settings': settingsPage }, frame);
-
-  function tile(href, iconName, title, text) {
-    return h('a', { class: 'card stack', href },
-      h('h2', { class: 'card-title' }, icon(iconName), ' ', title),
-      h('p', { class: 'muted', text }),
-      h('span', { class: 'btn primary' }, t('home.open'), icon('right')));
-  }
-
-  function homePage() {
-    return {
-      title: t('home.title'), sub: t('home.sub'),
-      body: h('div', { class: 'page narrow stack' },
-        tile('/Notes', 'file', t('home.notes'), t('home.notesText')),
-        admin ? tile('/Admin', 'sliders', t('home.admin'), t('home.adminText')) : null),
-    };
-  }
+  router({
+    '/': homePage,
+    '/folder/:id': folderPage,
+    '/notebook/:id': notebookPage,
+    '/page/:id': pagePage,
+    '/search/:q': searchPage,
+    '/grades': () => gradesPage({}),
+    '/grades/:folder': gradesPage,
+    '/cards': () => cardsPage({}),
+    '/cards/:folder': cardsPage,
+    '/timetable': timetablePage,
+    '/settings': settingsPage,
+  }, frame);
 
   function settingsPage() {
     return {

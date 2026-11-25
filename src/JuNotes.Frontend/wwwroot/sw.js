@@ -2,9 +2,9 @@
  * It keeps ONLY the static shell (the files below), never an answer that needs a session: no API answer and no other page (SEC-08).
  * The shell is asked from the network first, so an update arrives at once; what was fetched is the fallback.
  * An app that adds a static file to its shell adds its path here. */
-const CACHE = 'notes-v2';
+const CACHE = 'notes-v3';
 const SHELL = new Set(['/', '/index.html', '/app.css', '/app.js', '/manifest.webmanifest', '/icon.svg', '/icon-maskable.svg']);
-const SHELL_FOLDERS = ['/base/', '/i18n/'];   // the look of the base and the texts of the app
+const SHELL_FOLDERS = ['/base/', '/i18n/', '/pages/'];   // the look of the base, the texts and the code of the pages (static files, nothing of a person)
 
 const isShell = (path) => SHELL.has(path) || SHELL_FOLDERS.some((p) => path.startsWith(p));
 

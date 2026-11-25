@@ -75,6 +75,15 @@ Körper wie nicht vorhandene) und Listen kommen seitenweise (`limit` 1 bis 200, 
 **Zuschnitt gegenüber „Noten, Karten, Stundenplan, Suche soweit sie heute geht“:** Im Web gab es davon bisher nichts. Noten und Karten sind **Listen** (ohne Durchschnitt: die Rechenregeln des Schuljahres stehen in der Swift-Logik); der Stundenplan und die
 Neuigkeiten nur für die Person, für die der App-Token steht (die Schuldaten sind bis Meilenstein 4 einmal für den ganzen Server); die Suche findet **Namen von Ordnern und Heften** (der erkannte Text liegt nur auf dem iPad).
 
+### Scheibe 2b: die Leseseiten im Baukasten (25.11.2026)
+
+`wwwroot/app.js` mit `shell()`, Seiten in `wwwroot/pages/` (`library.js`, `study.js`, `util.js`), Texte `i18n/de.js` und `en.js`. Bibliothek (Ordner und Hefte als Kacheln mit Cover), Ordner (mit Verweisen zu Noten und Karten), Heft (Seitenliste),
+Seite (das Bild der Seite wie die alte Web-Ansicht; Scan, PDF-Verweis, Überschrift, gedruckter Text, Lösung, Ergänzungen, vor und zurück), Noten und Karten als Listen, Stundenplan mit Neuigkeiten, Suche nach Namen, Einstellungen. Das Bild einer Seite kommt
+als SVG vom Server und wird als **Knoten** eingesetzt (nie als Markup): Skripte, Ereignis-Attribute und fremde Verweise fallen weg, `style=`-Attribute (die die Richtlinie der Basis ignorieren würde) werden über das Objektmodell gesetzt. Die Farben eines Covers kommen aus den
+Daten und werden ebenso über das Objektmodell gesetzt; `app.css` hat die eine Farbvariable (Akzent 75) und sonst nur Form. Der Service Worker nimmt `/pages/` in die statische Hülle auf (`notes-v3`).
+Geprüft im Browser mit Testdaten: Bibliothek, Ordner, Heft, Seite (mit Strichen, Objekt, Lösung, Ergänzungen), Whiteboard, Scan, Noten, Karten, Stundenplan, Suche, bei breit und 390 px, hell und dunkel (das Blatt bleibt hell). Tests: `WebPagesTests` (Texte vollständig und gleich in beiden Sprachen,
+keine Markup-Erzeugung, keine eigene Farbe). **Fehlt dem Baukasten etwas, das auch andere Apps brauchen würden?** Zwei Kleinigkeiten, die ich hier gelöst habe und nenne: ein Kachelraster mit Titelbild (hier `.cover` und `.tile.notebook`) und ein Abschnittstitel (`.section-title`).
+
 ## Entscheidungen, die schon gefallen sind
 
 - Frei verschachtelbare Ordner und Hefte, Fächer sind Ordner mit Eigenschaften (PHASE5.md).

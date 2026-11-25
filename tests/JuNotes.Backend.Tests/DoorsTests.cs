@@ -150,7 +150,7 @@ namespace JuNotes.Backend.Tests
         {
             var text = await File.ReadAllTextAsync(Path.Combine(AppContext.BaseDirectory, "../../../../../src/JuNotes.Frontend/wwwroot/sw.js"));
 
-            Assert.Contains("const CACHE = 'notes-v2'", text, StringComparison.Ordinal);
+            Assert.Contains("const CACHE = 'notes-v3'", text, StringComparison.Ordinal);
             Assert.Contains("!isShell(url.pathname)) return", text, StringComparison.Ordinal);
             // No private path is in the list, and the old rule (everything outside /api) is gone.
             foreach (var private_ in new[] { "/Notes", "/Admin", "/api" })
