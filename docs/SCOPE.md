@@ -104,8 +104,12 @@ Jeder endet in etwas, das er aufmachen kann. Reihenfolge und Zuschnitt gegenübe
 
 ### 4. Schule pro Person *(vorgezogen, damit Meilenstein 5 und 6 mit echten Daten laufen)*
 
-- **Stundenplan mit eigener Anmeldung:** Jede Person verbindet in ihrer Einstellungsseite den Stundenplan-Dienst der Schule mit ihrem eigenen Schulkonto, nur für sich (Regeln oben). Die Variante (dauerhaftes App-Geheimnis
-  statt gespeichertem Passwort, oder Passwort verschlüsselt) wird am Anfang des Meilensteins an einem Konto der Person selbst entschieden (ARCHITECTURE.md 8). Der Administrator sieht nur „verbunden / nicht verbunden“.
+- **Stundenplan, je Person, ohne Passwort (Entscheidung vom 25.11.2026, Entwurf in ARCHITECTURE.md 8):** Jede Person verbindet in ihrer Einstellungsseite ihren Stundenplan auf einem von zwei Wegen, in dieser
+  Reihenfolge angeboten: **(a) der iCal-Link** ihres Stundenplans, **(b) der Text des QR-Codes aus ihrem Profil** („Zugriff über Untis Mobile“; ein App-Geheimnis, nicht das Passwort). **Es gibt kein Passwortfeld.**
+  Beides liegt je Person verschlüsselt, „Trennen“ löscht sofort. Höchstens ein Abruf am Tag und einer auf Knopfdruck; gespeichert werden nur die eigenen Stunden (Zeit, Fach, Raum, Klasse, Zustand). Der heutige
+  `UntisClient` mit Passwort wird durch diese zwei Wege ersetzt. Der Administrator sieht nur „verbunden / nicht verbunden“. **Unbestätigt:** Felder des Feeds, ob die Schule das Modul für Schüler hat, ob (b) bei
+  Single Sign-on oder zweitem Faktor geht, größter Zeitraum eines Abrufs; ausgefallene Stunden fehlen im Feed (a), (b) liefert sie. Weg (b) ist nicht offiziell beschrieben und eine Grauzone gegenüber den
+  Geschäftsbedingungen des Herstellers (Vertragspartner ist die Schule). Kein Aufruf gegen den echten Dienst, bevor der Eigentümer die Erlaubnis bestätigt hat.
 - **Was die Schule sonst offiziell anbietet** (Kalender-Abo, Feed, Export) bleibt als Weg für Neuigkeiten und als Rückfall.
 - **Schul-Intranet: offener Punkt.** Kein Entwurf für eine Anmeldung dort, kein Code, bis der Eigentümer entschieden hat.
 - **Der Stundenplan erscheint im Web erst hier** (und mit der Seite dafür), nicht schon in Meilenstein 2.
