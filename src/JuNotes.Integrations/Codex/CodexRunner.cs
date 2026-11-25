@@ -200,7 +200,18 @@ namespace JuNotes.Integrations.Codex
                 StandardOutputEncoding = Encoding.UTF8,
             };
             Directory.CreateDirectory(options.Home);
-            start.Environment["CODEX_HOME"] = Path.GetFullPath(options.Home);
+            // Codex gets almost nothing of what the server knows: not the connection to the database, not the passphrase of the backups, not the token of the app. Only where to
+            // find programs, a home of its own and where its sign-in lives.
+            var path = Environment.GetEnvironmentVariable("PATH");
+            start.Environment.Clear();
+            if (path is not null)
+            {
+                start.Environment["PATH"] = path;
+            }
+
+            var home = Path.GetFullPath(options.Home);
+            start.Environment["HOME"] = home;
+            start.Environment["CODEX_HOME"] = home;
             return start;
         }
 

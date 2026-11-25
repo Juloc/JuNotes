@@ -102,7 +102,7 @@ export default {
   'adm.ok': 'ok',
   'adm.version': 'Version',
   'adm.deviceText': 'Open this page on any device and enter the code:',
-  'adm.deviceNote': 'This page looks again every few seconds and shows "Signed in" as soon as it worked. The code is valid for 15 minutes.',
+  'adm.deviceNote': 'This page looks again every 15 seconds while it is in front and shows "Signed in" as soon as it worked. The code is valid for 15 minutes.',
   'adm.signIn': 'Sign in',
   'adm.signedOutLong': 'Not signed in. The learning helpers only work once the server is signed in. You sign in with the ChatGPT account whose allowance is to be used. The server never sees the password.',
   'adm.modelPlaceholder': 'empty = account default',

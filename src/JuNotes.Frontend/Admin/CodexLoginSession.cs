@@ -5,6 +5,8 @@ namespace JuNotes.Frontend.Admin
     // The device login of Codex that is running right now, if any: one at a time, and it ends after the CLI's own sixteen minutes.
     public sealed class CodexLoginSession(TimeProvider time) : IDisposable
     {
+        // One login at a time, also when two people press the button together: the second waits for the first and then replaces it.
+        private readonly SemaphoreSlim _starting = new(1, 1);
         private static readonly TimeSpan Lifetime = TimeSpan.FromMinutes(16);
         private readonly object _gate = new();
         private DeviceLogin? _current;
@@ -12,20 +14,29 @@ namespace JuNotes.Frontend.Admin
 
         public async Task<DeviceCode?> StartAsync(CodexAccount account, CancellationToken ct)
         {
-            Cancel();
-            var login = await account.StartLoginAsync(ct);
-            if (login is null)
+            await _starting.WaitAsync(ct);
+            try
             {
-                return null;
-            }
+                Cancel();
+                var login = await account.StartLoginAsync(ct);
+                if (login is null)
+                {
+                    return null;
+                }
 
-            lock (_gate)
+                lock (_gate)
+                {
+                    _current?.Dispose();
+                    _current = login;
+                    _startedAt = time.GetUtcNow();
+                }
+
+                return login.Code;
+            }
+            finally
             {
-                _current = login;
-                _startedAt = time.GetUtcNow();
+                _starting.Release();
             }
-
-            return login.Code;
         }
 
         // The code to show, or null when none is running, it ended or it ran out.
@@ -54,6 +65,10 @@ namespace JuNotes.Frontend.Admin
             }
         }
 
-        public void Dispose() => Cancel();
+        public void Dispose()
+        {
+            Cancel();
+            _starting.Dispose();
+        }
     }
 }

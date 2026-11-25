@@ -69,10 +69,12 @@ export async function codexPage() {
     cancel.addEventListener('click', () => act(cancel, api('POST', `${A}/codex/cancel`), reload));
     signIn.append(h('p', { text: t('adm.deviceText') }), h('p', null, h('a', { href: c.waiting.url, target: '_blank', rel: 'noopener noreferrer', text: c.waiting.url })), h('p', { class: 'code', text: c.waiting.code }), h('p', { class: 'muted', text: t('adm.deviceNote') }), h('div', { class: 'cluster' }, cancel));
     // the page looks again every few seconds and shows "signed in" as soon as it worked
+    // (every 15 seconds and only while the page is in front: each look costs the server two programs)
     const timer = setInterval(async () => {
       if (!location.hash.startsWith('#/admin/codex')) { clearInterval(timer); return; }
+      if (document.visibilityState !== 'visible') return;
       try { if ((await api('GET', `${A}/codex`)).status.signedIn) { clearInterval(timer); reload(); } } catch { /* try again */ }
-    }, 5000);
+    }, 15000);
   } else {
     const login = h('button', { class: 'btn primary', type: 'button' }, t('adm.signIn'));
     login.addEventListener('click', () => act(login, api('POST', `${A}/codex/login`), reload));

@@ -10,7 +10,10 @@ namespace JuNotes.Integrations.Codex
     // Sign-in of the server's Codex: by the device flow, so the person signs in on a page of their own browser and the server never sees a password.
     public sealed partial class CodexAccount(CodexOptions options)
     {
-        private static readonly TimeSpan CommandTimeout = TimeSpan.FromSeconds(15);
+        // How long a short command (version, status, logout) may take, and how long the device login may take to show its code.
+        public TimeSpan CommandTimeout { get; init; } = TimeSpan.FromSeconds(15);
+
+        public TimeSpan CodeTimeout { get; init; } = TimeSpan.FromSeconds(20);
 
         private sealed record CommandResult(int ExitCode, string Output);
 
@@ -49,8 +52,24 @@ namespace JuNotes.Integrations.Codex
 
             process.StandardInput.Close();
             var login = new DeviceLogin(process);
-            await login.WaitForCodeAsync(TimeSpan.FromSeconds(20), ct);
-            return login.Code is null ? null : login;
+            try
+            {
+                await login.WaitForCodeAsync(CodeTimeout, ct);
+            }
+            catch
+            {
+                login.Dispose();
+                throw;
+            }
+
+            // No code: the process that was started is ended, not left waiting for somebody who never comes.
+            if (login.Code is null)
+            {
+                login.Dispose();
+                return null;
+            }
+
+            return login;
         }
 
         private async Task<CommandResult?> RunAsync(string[] arguments, CancellationToken ct)
@@ -71,11 +90,22 @@ namespace JuNotes.Integrations.Codex
                     return null;
                 }
 
-                process.StandardInput.Close();
-                var output = process.StandardOutput.ReadToEndAsync(limit.Token);
-                var errors = process.StandardError.ReadToEndAsync(limit.Token);
-                await process.WaitForExitAsync(limit.Token);
-                return new CommandResult(process.ExitCode, StripAnsi(await output + await errors));
+                try
+                {
+                    process.StandardInput.Close();
+                    var output = process.StandardOutput.ReadToEndAsync(limit.Token);
+                    var errors = process.StandardError.ReadToEndAsync(limit.Token);
+                    await process.WaitForExitAsync(limit.Token);
+                    return new CommandResult(process.ExitCode, StripAnsi(await output + await errors));
+                }
+                finally
+                {
+                    // After a timeout (or when the caller gives up) the program is ended, not left running.
+                    if (!process.HasExited)
+                    {
+                        process.Kill(entireProcessTree: true);
+                    }
+                }
             }
             catch (System.ComponentModel.Win32Exception)
             {

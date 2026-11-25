@@ -102,7 +102,7 @@ export default {
   'adm.ok': 'in Ordnung',
   'adm.version': 'Version',
   'adm.deviceText': 'Öffne diese Seite auf einem beliebigen Gerät und gib den Code ein:',
-  'adm.deviceNote': 'Diese Seite schaut alle paar Sekunden nach und zeigt „Angemeldet“, sobald es geklappt hat. Der Code gilt 15 Minuten.',
+  'adm.deviceNote': 'Diese Seite schaut alle 15 Sekunden nach, solange sie vorne ist, und zeigt „Angemeldet“, sobald es geklappt hat. Der Code gilt 15 Minuten.',
   'adm.signIn': 'Anmelden',
   'adm.signedOutLong': 'Nicht angemeldet. Die Lernfunktionen gehen erst, wenn der Server angemeldet ist. Du meldest dich mit dem ChatGPT-Konto an, dessen Kontingent genutzt werden soll. Das Passwort sieht der Server nie.',
   'adm.modelPlaceholder': 'leer = Standard des Kontos',
