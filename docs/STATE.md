@@ -242,55 +242,95 @@ Alle Punkte sind nach dem Startzeichen des Orchestrators behoben, je Punkt ein C
 - Der Wächter `owner_id is not distinct from excluded.owner_id` im `ON CONFLICT` ist weiter nicht einzeln getestet.
 - Die Bilder sind nur hell (der Headless-Browser ignoriert hier die Einstellung für dunkel).
 
-## Für das Einspielen (Meilenstein 1 auf die laufende Installation)
+## Für das Einspielen (Meilenstein 1 und 2 auf die laufende Installation)
 
-Nichts davon ist an der laufenden Installation ausgeführt. Einspielen ist Sache des Orchestrators, mit Sicherung davor und dem Ja des Eigentümers.
+Stand 25.11.2026, nach beiden Sicherheitsprüfungen. **Nichts davon ist an der laufenden Installation ausgeführt.** Einspielen ist Sache des Orchestrators, mit dem Ja des Eigentümers. Adresse, Ordner und Host der Installation stehen in `docs/LOCAL.md`
+(nicht im Repository); hier stehen `<ordner>` (der Ordner mit `docker-compose.yml` und `.env`) und `<adresse>` (die öffentliche Adresse). Die Dienste der Compose-Datei heißen `junotes` und `postgres`, Datenbank und Benutzer `junotes`.
 
-**Was sich an Compose-Datei und Volume ändern muss: nichts, was nicht additiv ist.**
-- Die **Schlüsseldatei der Basis** (`secret.key`, 32 Zufallsbytes, Rechte nur für den Nutzer) liegt im Ordner `BASE_DATA`. Das **Image setzt `BASE_DATA=/data/base`** (Dockerfile); `/data` ist schon das Volume `junotes-data`.
-  Der Ordner wird beim ersten Start angelegt. Die Compose-Datei der Installation braucht dafür **keine** Änderung. Sicherungen des Volumes enthalten den Schlüssel jetzt mit; **ohne diese Datei sind die
-  verschlüsselten Werte in der Datenbank (zweite Faktoren) nicht zu lesen**: Datei und Datenbanksicherung gehören zusammen aufbewahrt.
-- Die Datenbankverbindung bleibt `ConnectionStrings__JuNotes`; die Basis liest sie, wenn `BASE_DB` fehlt.
-- `Admin__Password`, `Web__Password` und ihre Umgebungswerte werden nicht mehr gelesen und können später aus der Compose-Datei verschwinden.
-- Der Port, die Gesundheitsprüfung (`/health/live`) und der Reverse-Proxy bleiben. Die Basis glaubt `X-Forwarded-*` von privaten Netzen; die Einstellung „vertrauenswürdige Proxys“ ist in der App einstellbar.
+**Ohne Änderung der Compose-Datei und der Volumes:** Der Schlüssel der Basis liegt im Volume unter `/data/base` (das Image setzt `BASE_DATA`), die Datenbankverbindung bleibt `ConnectionStrings__JuNotes`, die Werte `Admin__Password`/`Web__Password`/`UNTIS_*` werden nicht mehr gelesen (harmlos).
 
-**Zusätzlich nach der Prüfung (25.11.2026):**
-- **`Sync__Token` muss mindestens 32 Zeichen haben,** sonst startet der Server nicht (Meldung nennt `Sync__Token` und die Länge, nicht den Wert). **Der Orchestrator prüft die Länge des echten Tokens vor dem Einspielen** und tauscht es bei Bedarf (in der App und im Server zugleich).
-- **Sperre je Adresse:** Sie hängt daran, dass der Server die **Adresse des Aufrufers** sieht und nicht die des Proxys (sonst könnte ein Fremder mit zehn falschen Token pro Minute das iPad aussperren). **Vor dem Einspielen prüft der Orchestrator, dass die vertrauenswürdigen Proxys stimmen und im Sicherheitsprotokoll (`api.token_refused`) die Adresse des Geräts steht, nicht die des Proxys.**
-- **Der App-Token steht danach für eine festgeschriebene Person** (`token_owner` in `app_instance_settings`), die beim ersten Zuweisen bestimmt wird. Wird sie gesperrt oder gelöscht, antwortet `/api/v1` mit 401; es wird nie jemand anderes gewählt.
-- **Sicherung:** `secret.key` geht nur mit einer Passphrase (`Backup__Passphrase`) und einem zweiten Ort verschlüsselt mit; ohne beides warnt die Sicherungsseite, und der Schlüssel muss getrennt aufgehoben werden (Datei im Volume unter `/data/base`).
-- **Zuweisung:** läuft auf einer eigenen Verbindung ohne Zeitgrenze, beim Start und bei der ersten Anmeldung; scheitert sie, antwortet `/api/v1` mit 503, bis der Server neu gestartet wird (es steht im Log).
-- Der Service Worker heißt jetzt `notes-v2`; Browser, die noch die alte Fassung haben, räumen beim ersten Besuch auf.
+### Schritt 0: zwei Antworten des Eigentümers
+1. **Wem gehören die Hefte auf dem iPad?** (Fall A: der Person, die die Einrichtung abschließt: weiter. Fall B1: einer anderen Person: **diese** schließt die Einrichtung ab und wird erste Administratorin, der Eigentümer lädt sich danach ein. Fall B2: der Eigentümer schließt ab und gibt später ab: braucht die zurückgestellte Übergabe, **dann nicht einspielen**.) Die Zuweisung der alten Hefte gibt **alle** an die Person, die die Einrichtung abschließt, und ändert sich später nicht.
+2. **Sein Ja** zum Einspielen (Sicherung davor, Wartezeit der App, Rückweg bekannt).
 
-**Was beim ersten Start passiert:** Vor der ersten Migration läuft die automatische Sicherung (`Backup__BeforeMigration`, schlägt sie fehl, startet der Server nicht). Dann: die Tabelle `instance_settings` heißt `app_instance_settings`;
-die Basis legt ihre Tabellen an (`users`, `sessions`, … und `base_migrations`); Migration 8 fügt `entities.owner_id` und die Tabelle `assets` hinzu. **Keine Zeile wird verändert.** Im Log steht
-„FIRST SETUP … setup code: XXXX-XXXX-XXXX“.
+### Schritt 1: vorher prüfen
+| Prüfung | Befehl oder Ort | Soll |
+|---|---|---|
+| Stand der Installation | `cd <ordner> && docker compose ps` und `curl -fsS <adresse>/api/v1/status` | beide Dienste laufen, Antwort mit `"api":1` und der alten Version |
+| **Länge des App-Tokens** | `awk -F= '/^SYNC_TOKEN=/{print length($2)}' <ordner>/.env` (gibt nur die Länge aus) | **mindestens 32**, sonst startet der Server nicht. Ist es kürzer: neues Token (`openssl rand -base64 32`), in `.env` und **gleichzeitig** in der App eintragen |
+| Besitzer des Volumes | `docker compose exec junotes ls -ld /data` | gehört `app` (sonst kann der Schlüssel nicht angelegt werden und der Start bricht ab) |
+| Anzahl der Zeilen merken | `docker compose exec -T postgres psql -U junotes -d junotes -Atc "select count(*) from entities; select max(number) from schema_migrations"` | Zahlen aufschreiben (Vergleich nachher); Migration steht auf **7** |
+| **Vertrauenswürdige Proxys** | Der Reverse-Proxy schickt `X-Forwarded-For` und `X-Forwarded-Proto` (die Voreinstellung von Caddy). Nach dem Start in der App unter Einstellungen › Installation die Adresse des Proxys eintragen | Im Sicherheitsprotokoll und im Verlauf der Anmeldungen steht die **Adresse des Geräts**, nicht die des Proxys (sonst sperrt ein Fremder mit 10 falschen Token pro Minute das iPad nicht aus, aber die Protokollzeilen und die Sperre je Adresse sind wertlos) |
+| Der Stand, der gebaut wird | `git ls-remote <repository> refs/heads/main` stimmt mit dem getesteten Commit überein; der Build-Kontext der Compose-Datei zeigt auf **dieses** Repository (nach der Umbenennung zu `notes` prüfen, ob die Adresse noch stimmt) | derselbe Commit; Tests auf ihm: 379 von 384 grün, die 5 roten brauchen `pg_dump` 18 (in der CI und im Image vorhanden) |
+| Platz | `df -h` auf dem Host und `docker system df` | genug für Image, Sicherung, Volume-Kopie |
 
-**Was der Eigentümer einmal tun muss:** Adresse des Servers öffnen, den Einrichtungscode aus dem Log eingeben (`docker compose logs junotes`), Benutzername und Passwort wählen (mindestens 12 Zeichen), den zweiten Faktor
-einrichten (Authenticator-App, sechs Ziffern), die Wiederherstellungscodes sichern. Das erste Konto ist der Administrator. Danach gehören alle bisherigen Hefte und Dateien diesem Konto.
+### Schritt 2: Sicherung (vor dem ersten Start des neuen Images)
+Zusätzlich zur automatischen Sicherung, die der Server vor der ersten Migration selbst macht (schlägt sie fehl, startet er nicht):
+1. Datenbank von Hand: `cd <ordner> && docker compose exec -T postgres pg_dump -U junotes -Fc junotes > ~/vor-der-basis-$(date +%F).dump` (die Datei ist **nicht** verschlüsselt; auf dem Host im Ordner des Benutzers lassen, nicht kopieren).
+2. Dateien (Scans): `docker volume ls | grep junotes` zeigt den Namen des Volumes mit `/data`; dann `docker run --rm -v <volumename>:/data -v "$PWD":/out alpine tar czf /out/vor-der-basis-daten.tgz -C /data .`
+3. `.env` und `docker-compose.yml` kopieren (`cp .env .env.vor-der-basis`, `cp docker-compose.yml docker-compose.yml.vor-der-basis`).
+4. **Das alte Image behalten:** `docker image ls` zeigt das Image der Installation; `docker tag <image-id> junotes-vor-der-basis` (ohne das ist der Rückweg ein neuer Bau des alten Commits).
 
-**Was passiert, solange er es nicht getan hat:** Die iPad-App gleicht **weiter ab**, mit demselben Token, mit denselben Antworten (Vertragstests; Altstand-Probe unten). Die Zeilen, die dabei neu entstehen, gehören niemandem und gehen
-beim ersten Konto mit an den Administrator. **Nicht erreichbar sind bis dahin:** die Seiten und Wege der Web-App (sie brauchen ein Konto; die Startseite zeigt die Einrichtung), also auch die Codex-Anmeldung und die Sicherungsseite im Browser. Wer die Adresse und
-den Einrichtungscode aus dem Log hat, kann das erste Konto anlegen: Die Einrichtung nicht liegen lassen.
+### Schritt 3: einspielen
+```
+cd <ordner>
+docker compose build --pull
+docker compose up -d
+docker compose logs -f junotes
+```
+**Erfolg im Protokoll:** `Notes … (base 0.3.4)`, `Database ready, N migration(s) applied`, dann `FIRST SETUP: there is no account yet … setup code: XXXX-XXXX-XXXX` (der Code steht **nur** dort). Fehlermeldungen: `Sync__Token has N characters` (zu kurz, siehe Schritt 1), `The data folder … cannot be written` (Besitzer des Volumes), `Backup … failed` (die Sicherung vor der Migration schlug fehl; es wurde **nichts** geändert; Ursache beheben).
 
-**Wie man zurückgeht:**
-1. **Sicher:** das alte Image starten und die Datenbank aus der Sicherung vor dem Update zurückspielen (`pg_restore`). Das ist der Weg, den man wirklich geht.
-2. **Von Hand (an einer Kopie mit Testdaten geprüft, nicht an echten Daten):** Das Schema geht damit in den Stand vor der Basis zurück (`pg_dump -s` beider Datenbanken war bis auf die Zufallsmarken gleich); die Zeilen
-   in `entities` bleiben, auch die neuen. Das alte Image startet dann wieder.
-   ```sql
-   begin;
-   drop table recovery_codes, sessions, account_audit, user_settings, invites, hub_flows, hub_logout_tokens, users cascade;
-   drop table instance_settings;
-   drop table base_migrations;
-   alter table app_instance_settings rename to instance_settings;
-   alter index app_instance_settings_pkey rename to instance_settings_pkey;
-   delete from schema_migrations where number = 8;
-   drop table assets;
-   drop index entities_owner_seq, entities_unowned;
-   alter table entities drop column owner_id;
-   commit;
-   ```
-   Dabei gehen die Konten, Sitzungen und der zweite Faktor der Basis verloren (nicht die Hefte).
+### Schritt 4: Erfolg erkennen (Der Eigentümer hat noch nichts getan)
+| Was | Befehl | Soll |
+|---|---|---|
+| Gesundheit | `curl -fsS <adresse>/api/health` | `ok`, neue Version, Version der Basis |
+| Tür der App offen | `curl -fsS <adresse>/api/v1/status` | `"api":1` |
+| Alter Token geht | `read -rs T; curl -s -o /dev/null -w '%{http_code}\n' -H "Authorization: Bearer $T" "<adresse>/api/v1/sync/pull?limit=1"` (das Token erscheint weder im Verlauf noch auf dem Bildschirm) | **200** |
+| Nichts verloren | dieselbe Abfrage wie in Schritt 1 | **dieselbe** Zeilenzahl; `schema_migrations` zeigt **8**; `select count(*) filter (where owner_id is null) from entities` = Zeilenzahl (noch niemandem zugewiesen) |
+| Neue Tabellen | `\dt` in `psql` | `users`, `sessions`, `base_migrations`, `assets`, `app_instance_settings` sind da |
+| iPad | Die App öffnen | Statuszeile „synchronisiert“ (**nur am Gerät prüfbar**; hier nie ausprobiert) |
+
+### Schritt 5: der Eigentümer, einmal (oder die Person aus Fall B1)
+1. `<adresse>` im Browser öffnen. Den **Einrichtungscode** aus dem Protokoll eingeben (`docker compose logs junotes | grep "setup code"`), Name und Passwort wählen (mindestens 12 Zeichen), den zweiten Faktor einrichten (Authenticator-App), die **Wiederherstellungscodes sichern** (nicht auf diesem Gerät allein). Das erste Konto ist der Administrator.
+2. **Prüfen:** `select count(*) filter (where owner_id is null) from entities` ist jetzt **0** (alles gehört dem Konto), und der Verlauf unter Einstellungen zeigt die Anmeldung. In der Verwaltung › Sicherungen steht, ob der Schlüssel in einer Sicherung liegt (ohne `Backup__Passphrase` und zweiten Ort **nicht**: die Datei `/data/base/secret.key` getrennt aufheben).
+3. Einstellungen › Installation: **vertrauenswürdige Proxys** setzen (Schritt 1).
+4. Verwaltung › KI-Verbindung: der Status von Codex bleibt (die Anmeldung liegt im Volume); sonst neu anmelden.
+5. Weitere Personen einladen (Einstellungen › Personen).
+6. Später, mit dem Umzug der Compose-Datei: die Zeilen `ADMIN_PASSWORD`, `WEB_PASSWORD`, `UNTIS_*` aus `.env` und Compose entfernen.
+
+### Was passiert, solange das nicht geschehen ist
+Die iPad-App gleicht **weiter ab**, mit demselben Token und denselben Antworten (Vertragstests; Altstand-Probe). Die Zeilen, die dabei neu entstehen, gehören niemandem und gehen beim ersten Konto mit an den Administrator. **Nicht erreichbar:** die Web-App und die Verwaltung (sie brauchen ein Konto; die Startseite zeigt die Einrichtung), also auch die Codex-Anmeldung im Browser. **Wer die Adresse und den Einrichtungscode aus dem Protokoll hat, kann das erste Konto anlegen: die Einrichtung nicht liegen lassen**, möglichst im selben Zug einspielen und einrichten.
+**Der App-Token steht danach für eine festgeschriebene Person** (`token_owner` in `app_instance_settings`): Wird sie gesperrt oder gelöscht, antwortet `/api/v1` mit 401 und es wird nie jemand anderes gewählt. Scheitert die Zuweisung der alten Hefte (steht im Protokoll, die Übersicht der Verwaltung zeigt es), antwortet `/api/v1` mit **503**, bis die Ursache behoben und der Server **neu gestartet** ist.
+
+### Rückweg
+**Weg 1 (der sichere, mit den Dateien von Schritt 2):**
+1. `cd <ordner> && docker compose down` (**nicht** `-v`: das Volume bleibt).
+2. In `docker-compose.yml` das Image des Dienstes `junotes` vorübergehend auf `junotes-vor-der-basis` stellen (die Zeile `build:` für den Dienst auskommentieren, `image: junotes-vor-der-basis` einfügen), oder den alten Commit bauen.
+3. Datenbank zurück: `docker compose up -d postgres`, dann
+   `docker compose exec -T postgres psql -U junotes -d postgres -c "drop database junotes with (force)" -c "create database junotes owner junotes"` und
+   `docker compose exec -T postgres pg_restore -U junotes -d junotes --no-owner < ~/vor-der-basis-<datum>.dump`.
+4. Dateien nur, wenn sie beschädigt sind: `docker run --rm -v <volumename>:/data -v "$PWD":/in alpine sh -c 'cd /data && tar xzf /in/vor-der-basis-daten.tgz'`.
+5. `docker compose up -d`. **Erfolg:** `/api/v1/status` antwortet, der alte Token geht (Schritt 4), `/Admin` fragt wieder nach dem alten Passwort aus `.env`, das iPad gleicht ab.
+Dabei gehen Konten, Sitzungen und der zweite Faktor verloren **und** alles, was seit der Sicherung geschrieben wurde (das iPad schickt es beim nächsten Abgleich erneut, soweit es bei ihm noch im Postausgang steht).
+
+**Weg 2 (nur das Schema zurück, die Zeilen bleiben, auch die neuen; an einer Kopie mit Testdaten geprüft, nicht an echten Daten):** das alte Image starten (Schritt 2 des Weges 1) und
+```sql
+begin;
+drop table recovery_codes, sessions, account_audit, user_settings, invites, hub_flows, hub_logout_tokens, users cascade;
+drop table instance_settings;
+drop table base_migrations;
+alter table app_instance_settings rename to instance_settings;
+alter index app_instance_settings_pkey rename to instance_settings_pkey;
+delete from schema_migrations where number = 8;
+drop table assets;
+drop index entities_owner_seq, entities_unowned;
+alter table entities drop column owner_id;
+commit;
+```
+Dabei gehen die Konten, Sitzungen und der zweite Faktor der Basis verloren (nicht die Hefte). Danach wie in Weg 1, Punkte 5 ff.
+
+### Was bewusst nicht Teil des Einspielens ist
+Kein neues Compose (der Umzug auf die Compose-Datei der Basis ohne Variablen plant der Orchestrator getrennt), keine Änderung der Volumes, kein Abschalten des gemeinsamen Tokens (das gibt es erst mit Meilenstein 3), keine Schule (Meilenstein 4), keine KI-Zugang für Mitglieder (zuerst die Sandbox von Codex klären, siehe „Sicherheitsprüfung 2“).
 
 ## Für die Sicherheitsprüfung (1a und 1b)
 

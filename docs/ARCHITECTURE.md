@@ -252,7 +252,11 @@ Instanz-Token (festgeschrieben auf den ersten Administrator), `owner_id` hat kei
 
 **Kopplung (einmal je Gerät):**
 1. Die Person ist im Browser angemeldet (mit zweitem Faktor) und wählt in ihren Einstellungen „Gerät koppeln“. Der Server macht einen **Kopplungscode**: 10 Zeichen aus dem Alphabet der Basis (Base32, 50 Bit), 10 Minuten gültig, **einmal** benutzbar, nur als SHA-256 gespeichert. Angezeigt als Text und als QR-Code (Adresse des Servers und Code; die Basis hat `qr.js`).
-2. Auf dem iPad gibt die Person den Code ein oder scannt den QR-Code (die Kamera für Scans ist schon in der App). Die App ruft `POST /api/v1/pair` mit Code und Gerätename. Das ist die **eine** Stelle der Tür `/api/v1`, die ohne Token antwortet (Ausnahme in `V1Door.CheckAsync`, nur dieser Pfad, nur POST); sie hat ihre eigene Bremse (die vom Token-Weg, je Adresse, plus eine Sperre je Code nach drei Fehlversuchen).
+2. Auf dem iPad gibt die Person den Code ein oder scannt den QR-Code. Die App ruft `POST /api/v1/pair` mit Code und Gerätename. Das ist die **einzige** Stelle der Tür `/api/v1`, die ohne Token antwortet, und die Ausnahme gilt **nur für genau diesen Pfad und nur für POST** (kein Präfix, kein anderer Verb, keine andere Schreibweise: `/API/V1/PAIR/`, `/api/v1/pair/x`, `GET`, `PUT` und `HEAD` bleiben 401; ein Test je Fall).
+   - Der Code wird **in fester Zeit** gesucht: Der Server bildet den SHA-256 des (vereinheitlichten: Großbuchstaben, ohne Bindestriche und Leerzeichen) Codes und vergleicht ihn mit **jedem** gültigen Code mit `CryptographicOperations.FixedTimeEquals` (es gibt höchstens ein paar), nicht mit einer Abfrage, deren Zeit vom Treffer abhängt.
+   - **Bremse:** Nach drei falschen Versuchen von einer Adresse greift die Bremse dieser Adresse (`TokenBrake`, derselbe Zähler wie bei falschen Token, ein richtiger Code geht immer durch). Eine „Sperre je Code“ gibt es nicht: ein falscher Code lässt sich keinem Code zuordnen.
+   - Ein Code gilt **zehn Minuten oder bis zum ersten Treffer**, dann ist er weg (gelöscht, nicht nur markiert).
+   - **Die Antwort verrät nichts:** Für einen Code, den es nie gab, einen abgelaufenen und einen schon benutzten kommt dieselbe Antwort (401 mit demselben Körper und, soweit messbar, derselben Zeit).
 3. Der Server antwortet **einmal** mit dem Gerätetoken: 256 zufällige Bit, Präfix `nt1_` (damit ein verlorenes Token in einem Fund erkennbar ist), und speichert nur den SHA-256. Die App legt ihn im Schlüsselbund ab. Der Code ist verbraucht.
 
 **Tabelle** `device_tokens(id uuid pk, person_id uuid not null, name text, hash text unique, created_at, last_seen, last_address, revoked_at)`; Index auf `hash`. Kein Fremdschlüssel (wie bei `owner_id`), aber das Löschen der Person löscht ihre Token (10.3).
@@ -281,14 +285,16 @@ Wie in 3a entschieden: Freigaben gelten im Web, nicht im Abgleich; die App der E
 - **Protokoll:** Freigabe und Entzug als Zeilen im Sicherheitsprotokoll (Person, Gegenüber, Heft-id).
 - **Tests (Zwei- und Drei-Personen):** Empfängerin liest Seiten, Striche und eingebundene Dateien des freigegebenen Hefts; sie liest **kein** anderes Heft derselben Besitzerin, keine nicht eingebundene Datei, und eine Dritte nichts davon; Entzug wirkt bei der nächsten Anfrage; ein gelöschtes oder in den Papierkorb gelegtes Heft ist nicht mehr abrufbar; der Abgleich der Empfängerin ändert sich nicht (der Pull liefert nichts Geteiltes); der App-Token öffnet nichts davon.
 
-### 10.3 Löschen einer Person: nie Hefte stehen lassen
+### 10.3 Löschen einer Person: nie Hefte stehen lassen (für 1.0: kein Übergeben)
 
-**Regel:** Eine Person mit Heften, Dateien oder Freigaben wird **nicht** gelöscht, bevor ihre Hefte versorgt sind. Der Administrator wählt, in dieser Reihenfolge der Vorsicht: (a) **Übergeben** an eine andere Person (10.4), (b) **Löschen** der Hefte endgültig (zweite Rückfrage mit Zahlen, vorher eine Sicherung von Hand, Protokollzeile). Das Löschen der Person selbst läuft danach über die Verwaltung der Basis.
+**Regel (Entscheidung des Orchestrators, 25.11.2026):** Solange eine Person Hefte, Dateien oder Geräte hat, antwortet das **Löschen mit 409 und einem Satz** (`person.has_notes`). Der Administrator hat stattdessen zwei Wege: (a) die Person nur **sperren** (sie behält ihre Hefte, nichts geschieht), oder (b) **ihre Hefte endgültig löschen** und danach die Person löschen: mit zweiter Rückfrage **mit Zahlen** (Zeilen je Art, Seiten, Dateien), einer **Sicherung davor** (von Hand, mit dem Hinweis, ob der Schlüssel in ihr liegt) und einer Protokollzeile (wer, wessen, Zahlen; keine Inhalte). Eine Übergabe an eine andere Person gibt es für 1.0 **nicht** (10.4, zurückgestellt).
 
-**Umsetzung ohne die Kopie der Basis zu ändern:** Die Basis löscht über `DELETE /api/people/{id}`. Davor liegt eine **eigene Prüfung** unserer App (eine Middleware, die genau diesen Weg erkennt und mit `409 person.has_notes` und einem Satz antwortet, solange die Person Heften, Dateien oder Gerätetoken hat; die Verwaltung der Basis zeigt die Meldung). Besser wäre ein **Haken in der Basis** (`BaseAppOptions.BeforeDeletePerson`, eine Funktion, die ein Nein mit Text liefern darf); das gebe ich dem Orchestrator für die Basis mit. Gesperrte Personen behalten ihre Hefte (nichts geschieht).
-**Beim Löschen einer Person mit versorgten Heften:** ihre Gerätetoken, Freigaben (als Besitzerin und als Empfängerin) und Kopplungscodes werden mit gelöscht (in derselben Prüfung, vor der Löschung der Basis; scheitert eines, wird nichts gelöscht).
+**Umsetzung ohne die Kopie der Basis zu ändern:** Die Basis löscht über `DELETE /api/people/{id}`. Davor liegt **eine** eigene Prüfung unserer App (eine Middleware, die genau diesen Weg erkennt, auch in anderer Schreibweise, und mit 409 antwortet, solange die Person Hefte, Dateien oder Gerätetoken hat). Ein **Test** zeigt, dass kein Weg an ihr vorbei eine Person mit Heften löscht: Er liest alle Wege der Basis, die `users` verändern (beim Bau zu klären), und prüft jeden. Besser wäre ein **Haken in der Basis** (`BaseAppOptions.BeforeDeletePerson`); der steht auf der Liste für die Basis.
+**Endgültiges Löschen der Hefte** (Verwaltung, `RequireRole("admin")`): in einer Transaktion unter der Sperre des Abgleichs werden die Zeilen der Person (`entities`), ihre Dateien (`assets` und die Dateien im Ordner), ihre Freigaben (als Besitzerin und als Empfängerin), Gerätetoken und Kopplungscodes gelöscht; ihre Geräte sehen danach 401 (das Token ist weg). Die Person selbst löscht danach die Verwaltung der Basis (die Prüfung findet nichts mehr).
 
-### 10.4 Übergabe von Heften an eine andere Person (Verwaltungsfunktion)
+### 10.4 Übergabe von Heften an eine andere Person (Verwaltungsfunktion) — **zurückgestellt, wird gebaut, wenn Fall B2 oder ein echter Bedarf kommt**
+
+*Entscheidung des Orchestrators, 25.11.2026: Dieser Abschnitt bleibt als Entwurf stehen und wird in 1.0 nicht gebaut. Grund: Er ist der heikelste Teil (Löschungen an die bisherige Person, nur als Vertrag prüfbar, nie auf einem iPad) und wird nur gebraucht, wenn der Eigentümer Fall B2 will.*
 
 **Wozu:** (1) vor dem Einspielen, falls die Hefte auf dem iPad nicht der Person gehören, die die Einrichtung abschließt (offene Frage an den Eigentümer); (2) beim Löschen einer Person (10.3); (3) wenn jemand die Hefte einer anderen Person übernimmt.
 
@@ -317,7 +323,46 @@ Wie in 3a entschieden: Freigaben gelten im Web, nicht im Abgleich; die App der E
 2. **Gerätetoken** zuerst in notes, wie vorgeschlagen. **Auf der Liste für die Basis:** der Haken `BeforeDeletePerson` und ein Geräte-Modul. Die eigene Prüfung vor dem Löschen einer Person ist bis dahin in Ordnung, **wenn sie an einer Stelle sitzt** und ein Test zeigt, dass **kein Weg an ihr vorbei** eine Person mit Heften löscht (auch nicht ein anderer Weg der Basis, der die Person entfernt; beim Bau alle Wege der Basis lesen, die `users` verändern, und den Test darüber legen).
 3. **Fall A, B1 oder B2** beim Einspielen hängt an der Antwort des Eigentümers. **B1** (die Person, der die Hefte gehören, schließt die Einrichtung ab) ist der Vorschlag beider Seiten, falls es Fall B ist. **„Person hinter dem alten Token ändern“ wird nur gebaut, wenn der Eigentümer B2 will.**
 
-### 10.5 Scheiben und Reihenfolge
+### 10.5 Scheiben und Reihenfolge (Stand 25.11.2026)
 
-3a Gerätetoken und Kopplung (Server mit Tests; der Entwurf der App-Änderung getrennt) · 3b Löschprüfung und Übergabe (ohne die Umstellung des Tokens zuerst als Vorschau) und die Umstellung · 3c Freigaben im Web · 3d Verwaltung der Geräte, Abschalten des gemeinsamen Tokens. Jede Scheibe lauffähig, mit Tests mit mehreren Personen, STATE.md am Ende.
-**Abhängigkeiten/Risiken:** Die Löschungen für die bisherige Person (10.4, Punkt 4) sind der heikelste Teil: ein Fehler lässt Hefte auf einem Gerät stehen oder löscht sie dort zu früh. Der Test dafür braucht einen Abgleich in zwei Richtungen mit der echten Swift-Logik; die kann hier nur als Vertrag nachgebildet werden, **nicht auf einem iPad** geprüft werden. Das ist vor dem ersten echten Gebrauch ein offener Punkt.
+**Vorher:** Das **Einspielen von Meilenstein 1 und 2** auf die laufende Installation (Sache des Orchestrators; siehe „Für das Einspielen“ in STATE.md). Auf nicht eingespielter Arbeit wird Meilenstein 3 nicht gebaut.
+**Danach, in dieser Reihenfolge:** 3a Gerätetoken und Kopplung (Server mit Tests; die App-Änderung nach Abschnitt 11) · 3c Freigaben im Web · 3d Geräteverwaltung und Abschalten des gemeinsamen Tokens · 3b klein (Löschprüfung und endgültiges Löschen der Hefte). Jede Scheibe lauffähig, mit Tests mit mehreren Personen, STATE.md am Ende.
+**Risiken:** Die Kopplung braucht eine Änderung der App, die hier nur übersetzt, nicht auf einem iPad geprüft werden kann (Abschnitt 11). Die zurückgestellte Übergabe (10.4) bleibt der heikelste Teil, falls sie doch kommt.
+
+## 11. App-Änderung für die Kopplung (Entwurf, nichts gebaut)
+
+Stand 25.11.2026. Ziel: Das iPad koppelt sich mit einem Einmalcode (10.1) und schickt danach seinen eigenen Gerätetoken statt des gemeinsamen. Gelesen sind `clients/ios` (`ServerSettings.swift`, `Keychain.swift`, `SettingsView.swift`, `AppModel.swift`, `JuNotesCore/Sources/JuNotesCore/Sync/*`); gebaut oder gestartet wurde nichts.
+
+**Was die App heute hat:** Adresse und Token stehen in den Einstellungen; die Adresse in `UserDefaults` (`serverURL`), das Token im Schlüsselbund (`Keychain`, Konto `syncToken`). `URLSessionTransport` schickt `Authorization: Bearer <token>`; ein 401 wird zu `TransportError.unauthorized` und zu `SyncResult.unauthorized` (die Statuszeile sagt es). `SyncEngine` wertet die Antwort von `push` nicht aus (3a). Der Dokumentenscanner nutzt VisionKit (`VNDocumentCameraViewController`).
+
+**Geänderte und neue Dateien (Vorschlag):**
+| Datei | Änderung |
+|---|---|
+| `JuNotesCore/Sources/JuNotesCore/Sync/PairingClient.swift` (neu) | `POST /api/v1/pair` mit Code und Gerätename; Antwort: Token, Name der Person. Reine Logik, **unter Linux testbar** (wie `URLSessionTransportTests`, mit einer Attrappe des Servers). Behandelt jede Antwort ohne Token (401, 429, Netz) als „Code ungültig oder abgelaufen“ ohne Unterschied. |
+| `JuNotesCore/.../Sync/URLSessionTransport.swift` | Das Token kommt aus einer Quelle (Gerätetoken, sonst das alte), nicht aus einem festen Wert; ein 401 bleibt `unauthorized`. |
+| `JuNotesCore/.../Sync/SyncEngine.swift`, `SyncProtocol.swift` | `PushResponse.accepted` auswerten: nimmt der Server weniger an, als geschickt wurde, meldet die App das in der Statuszeile („N Änderungen vom Server nicht angenommen“) und bietet **„Neu vom Server laden“** (Merker auf 0, der Stand des Servers gilt). Die ausgelassenen Zeilen gehen nicht mehr still verloren (Vorbedingung der Freigaben Stufe 2). |
+| `App/Sources/Keychain.swift` | Neues Konto `deviceToken` (Zugriff „nach dem ersten Entsperren“, damit der Abgleich im Hintergrund geht; **zu prüfen**, was `Keychain` heute setzt). |
+| `App/Sources/ServerSettings.swift` | Ein Wert „gekoppelt: ja/nein, mit welcher Person“; `token` bleibt für ungekoppelte Geräte. |
+| `App/Sources/SettingsView.swift` | Neuer Abschnitt **„Dieses Gerät koppeln“** (siehe unten), und „Entkoppeln“. |
+| `App/Sources/PairingView.swift` (neu) | Der Kopplungsbildschirm. |
+| `App/Sources/AppModel.swift` | Baut den Transport mit dem Gerätetoken, wenn es da ist; Zustand „muss koppeln“, wenn der Server `pairing: true` meldet und das Gerät keins hat. |
+| `App/Sources/RootView.swift`, `StatusLineView.swift` | Hinweis „Dieses Gerät ist noch nicht gekoppelt“ (Tippen öffnet die Einstellungen); bei 401 eines gekoppelten Geräts „Dieses Gerät wurde entfernt. Bitte neu koppeln.“ |
+| `App/Sources/DemoData.swift`, Start-Argumente | Ein Demo-Bildschirm `-JuNotesScreen pairing` für das Bildschirmfoto der CI. |
+| Server: `/api/v1/status` | Ein **zusätzliches** Feld `pairing` (true, solange der Server Kopplung kann); additiv, die alte App ignoriert es. |
+
+**Bildschirme:**
+1. *Einstellungen › Server:* Adresse, Zustand („Gekoppelt als Name“ / „Nicht gekoppelt“), Knopf „Koppeln“ (ungekoppelt) oder „Entkoppeln“ (gekoppelt, mit Rückfrage). Das alte Token-Feld bleibt, bis der Administrator den gemeinsamen Token abschaltet.
+2. *Kopplung:* Eingabefeld für den Code (10 Zeichen, nimmt Kleinbuchstaben, Bindestriche und Leerzeichen an und formatiert `XXXXX-XXXXX`), Knopf „QR-Code scannen“ (Kamera; füllt Adresse und Code), Fortschritt, Ergebnis. Fehlertext immer derselbe („Der Code stimmt nicht oder ist abgelaufen.“). Bei Erfolg: Token in den Schlüsselbund, **das alte gemeinsame Token wird aus dem Schlüsselbund gelöscht**, ein Abgleich läuft sofort.
+3. *Statuszeile:* die Hinweise oben; sonst unverändert.
+4. *QR-Code:* enthält nur Adresse des Servers und Code (nie ein Token). Die App fragt vor dem Koppeln, wenn die Adresse im QR-Code **nicht** die eingestellte ist („Mit diesem Server koppeln?“ mit dem Namen des Servers), und koppelt nie über `http` (außer im lokalen Netz, wie die App es heute erlaubt, zu klären).
+
+**Was die CI baut und prüft** (Runner `xcode-27`, `.github/workflows/ios.yml`): `swift test` für `JuNotesCore` (Linux und macOS) mit den neuen Tests für `PairingClient` und die Auswertung von `accepted`; die App wird übersetzt; die Bildschirmfotos im Demomodus bekommen den Kopplungsbildschirm (`scripts/screenshots.sh` um `pairing` erweitern); eine unsignierte `.ipa` und das Release `latest` mit `source.json` für SideStore wie bisher. Die CI ändert sich sonst nicht.
+
+**Nur am Gerät prüfbar (von hier nicht):**
+- das **Scannen des QR-Codes** (der Simulator hat keine Kamera; auch die CI nicht);
+- das Verhalten des **Schlüsselbunds** beim erneuten Signieren durch SideStore (bleibt das Gerätetoken erhalten, oder ist nach einer Auffrischung neu zu koppeln?), und dass der **Abgleich im Hintergrund** mit dem Gerätetoken läuft (Art des Zugriffs);
+- die Kopplung über das **echte Netz** mit HTTPS und Proxy (und dass der Server die Adresse des Geräts sieht);
+- der **Tipp-Komfort** des Codes (verwechselbare Zeichen, Einfügen aus einer Nachricht);
+- die Meldungen, wenn die **Uhr des Geräts** oder des Servers abweicht (der Code gilt zehn Minuten nach der Uhr des Servers, die App muss nichts davon wissen).
+
+**Reihenfolge beim Bau:** (1) Server: Kopplung, Token, Tür (3a); (2) `PairingClient` und `accepted` in `JuNotesCore` mit Tests; (3) die Bildschirme und der Schlüsselbund; (4) CI und Bildschirmfoto; (5) der Eigentümer installiert die neue `.ipa` und koppelt; erst danach schaltet der Administrator den gemeinsamen Token ab (3d).
