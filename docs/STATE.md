@@ -214,6 +214,29 @@ gefahren; die Skripte der Basis laufen über die normale Verbindung (kleine neue
 
 **Offene Frage des Orchestrators an den Eigentümer** (nichts gebaut): Die Zuweisung gibt alle heutigen Hefte der Person, die die Einrichtung abschließt; der Besitzer ändert sich später nicht mehr.
 
+## Sicherheitsprüfung 2: Behebungen von Meilenstein 1 und Meilenstein 2 (Befunde vom 25.11.2026, Stand)
+
+Ergebnis der Prüfung: kein kritischer oder hoher Befund, kein Weg, auf dem ein Mitglied oder jemand ohne Zugang an Hefte, Seiten, Striche, Scans, Noten, Karten oder die Verwaltung kommt; die Behebungen aus der ersten Prüfung halten.
+**Bauen der Punkte wartet auf das Startzeichen des Orchestrators** (je Punkt ein Commit und, wo möglich, ein Test). Text ist erledigt.
+
+| Nr. | Befund | Vorgesehene Behebung | Stand |
+|---|---|---|---|
+| 1 | Falsche Token spülen das Sicherheitsprotokoll leer (`Keep = 2000`, eine Zeile je gesperrter Minute) | höchstens eine Zeile je Adresse und Stunde oder eine Sammelzeile je Stunde mit Anzahl | offen |
+| 2 | Die Sperre weist auch das richtige Token ab (Sperre vor der Token-Prüfung) | **erst das Token prüfen, ein richtiges geht immer durch**; gezählt und abgewiesen werden nur falsche; `_locked` aufräumen; Test „das richtige Token geht trotz Sperre durch“ | offen |
+| 3 | Das Einsetzen des SVG ist eine Verbotsliste (`pages/util.js`) | **Erlaubnisliste** genau dessen, was `PageRenderer` ausgibt (`href` nur an `image` auf `^/api/web/v1/assets/<guid>$`, `style` nur am einen `div` mit vier Eigenschaften); Test, dass jedes genannte Ding wegfällt | offen |
+| 4 | Zeilen, die während der ersten Zuweisung gepusht werden, bleiben bis zum Neustart ohne Besitzer | Zuweisung unter derselben Sperre wie der Push, oder ein Push mit Besitzer übernimmt besitzerlose Zeilen seines Stapels | offen |
+| 5 | Die Schlüsseldatei liegt beim Sichern kurz im Klartext unter `/tmp` | direkt aus der Schlüsseldatei verschlüsseln, keine Klartextkopie | offen |
+| 6 | Ein verformter Inhalt (kein Objekt) macht alle Listen seiner Art für den Besitzer kaputt (500) | beim Prüfen ablehnen, beim Lesen überspringen; wichtig vor den Freigaben | offen |
+| 7 | Die Zuweisung hängt an der auslösenden Anfrage (bricht ab, wenn der Aufrufer aufgibt) | mit dem Token des Programmendes laufen lassen | offen |
+| 8 | Abmelden über den Hub: Inhalt bleibt im Vor-und-zurück-Speicher; Suchbegriffe im Verlauf | Inhalt vor dem Weggehen leeren, bei `pageshow` mit `persisted` neu laden, beim Abmelden die Adresse auf `#/` setzen | offen (unbestätigt) |
+| 9 | Der Codex-Prozess erbt die ganze Umgebung des Servers und läuft als derselbe Benutzer wie Schlüsseldatei, Sicherungen und Dateien | Umgebung leeren, nur `PATH`, `HOME`, `CODEX_HOME` setzen. **Offener Punkt:** Ob die Sandbox von Codex das Lesen dieser Dateien verhindert, ist **unbelegt**; vor dem Zugang der Mitglieder zur KI zu klären | offen |
+| 10 | Codex-Anmeldeprozesse werden nach 20 s ohne Code, bei zwei gleichzeitigen Anmeldungen oder nach einer Zeitüberschreitung nicht beendet; die KI-Seite fragt alle 5 s mit je zwei Prozessen ab | beenden; seltener abfragen und nur, solange die Seite sichtbar ist | offen |
+| 11 | Der ungefilterte `LibraryReader` steht im DI | nur ein Typ, der ausschließlich `Of(person)` kennt (Code) | offen (Code) |
+| 11 | Der Test für die Admin-Rolle benutzt eine handgeschriebene Wegliste | die Liste der Endpunkte selbst nehmen (Code) | offen (Code) |
+| 11 | STATE.md und ARCHITECTURE.md nannten gelöschte Tests und überholte Aussagen | berichtigt (Commit `4d07e35`) | **erledigt** |
+| 11 | Die Bilder `docs/screenshots/web-*.png` zeigen noch den Menüpunkt „Stundenplan“ | neu aufnehmen, wenn die App das nächste Mal läuft | offen |
+| 11 | Seitenweises Lesen: ein unbekannter Cursor beginnt von vorn, eine zwischen zwei Seiten gelöschte Zeile lässt Zeilen wiederholen | Cursor als Wert (Sortierschlüssel) statt id, oder die Oberfläche entdoppelt | offen |
+
 ## Für das Einspielen (Meilenstein 1 auf die laufende Installation)
 
 Nichts davon ist an der laufenden Installation ausgeführt. Einspielen ist Sache des Orchestrators, mit Sicherung davor und dem Ja des Eigentümers.
