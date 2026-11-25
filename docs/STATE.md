@@ -66,6 +66,15 @@ auf die gemeinsame Basis um (Entscheidungen vom 24.11.2026 in SCOPE.md).
 
 **Zentrale Paketverwaltung:** Die Versionen stehen jetzt in einer gemeinsamen Datei (`Directory.Packages.props`), ein zweites Paketsystem gibt es nicht; unsere Projekte nennen die Pakete nur noch ohne Version.
 
+## Meilenstein 2, Scheibe 2a: die lesenden Wege `/api/web/v1` (25.11.2026)
+
+Gebaut und getestet (`WebApiTests`, 7 Tests mit zwei Personen, Stichprobe: ohne Besitzer-Filter rot): `folders`, `notebooks` (mit `folder=<id>` oder `root`), `notebooks/{id}`, `notebooks/{id}/pages`, `pages/{id}` (Seite als ein Bild, wie die alte
+Web-Ansicht sie zeichnete, plus Angaben zur Seite), `assets/{id}` (nur eigene Dateien, `no-store`), `grades`, `cards`, `timetable`, `news`, `search`. Alle hängen an der Sitzung der Basis, liefern nur Eigenes (fremde Dinge sind ein 404 mit demselben
+Körper wie nicht vorhandene) und Listen kommen seitenweise (`limit` 1 bis 200, `cursor` ist die id der letzten Zeile). Der App-Token öffnet keinen davon.
+
+**Zuschnitt gegenüber „Noten, Karten, Stundenplan, Suche soweit sie heute geht“:** Im Web gab es davon bisher nichts. Noten und Karten sind **Listen** (ohne Durchschnitt: die Rechenregeln des Schuljahres stehen in der Swift-Logik); der Stundenplan und die
+Neuigkeiten nur für die Person, für die der App-Token steht (die Schuldaten sind bis Meilenstein 4 einmal für den ganzen Server); die Suche findet **Namen von Ordnern und Heften** (der erkannte Text liegt nur auf dem iPad).
+
 ## Entscheidungen, die schon gefallen sind
 
 - Frei verschachtelbare Ordner und Hefte, Fächer sind Ordner mit Eigenschaften (PHASE5.md).

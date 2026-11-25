@@ -15,7 +15,7 @@ namespace JuNotes.Backend.Library
 
         public static (double Width, double Height) SizeOf(string notebookType) => notebookType == "whiteboard" ? (BoardWidth, BoardHeight) : (PageWidth, PageHeight);
 
-        public static string Svg(string notebookType, string template, IReadOnlyList<StrokeInfo> strokes, IReadOnlyList<ObjectInfo>? objects = null)
+        public static string Svg(string notebookType, string template, IReadOnlyList<StrokeInfo> strokes, IReadOnlyList<ObjectInfo>? objects = null, string assetPath = "/Notes/Asset/")
         {
             var (width, height) = SizeOf(notebookType);
             var svg = new StringBuilder();
@@ -29,7 +29,7 @@ namespace JuNotes.Backend.Library
             svg.Append("<g class=\"objects\">");
             foreach (var item in items.Where(item => item.Type != "audio"))
             {
-                Item(svg, item);
+                Item(svg, item, assetPath);
             }
 
             svg.Append("</g><g class=\"ink\" fill=\"none\" stroke-linecap=\"round\" stroke-linejoin=\"round\">");
@@ -41,7 +41,7 @@ namespace JuNotes.Backend.Library
             svg.Append("</g><g class=\"recordings\">");
             foreach (var item in items.Where(item => item.Type == "audio"))
             {
-                Item(svg, item);
+                Item(svg, item, assetPath);
             }
 
             svg.Append("</g></svg>");
@@ -49,7 +49,7 @@ namespace JuNotes.Backend.Library
         }
 
         // One object. Every value from the data is checked or encoded on its way into the SVG: colours must be plain hex, numbers finite and bounded, text encoded.
-        private static void Item(StringBuilder svg, ObjectInfo item)
+        private static void Item(StringBuilder svg, ObjectInfo item, string assetPath)
         {
             var x = Clamp(item.X, -5000, 5000);
             var y = Clamp(item.Y, -5000, 5000);
@@ -66,7 +66,7 @@ namespace JuNotes.Backend.Library
                 case "image":
                     if (item.AssetId is { } picture)
                     {
-                        svg.Append(CultureInfo.InvariantCulture, $"<image href=\"/Notes/Asset/{picture}\" x=\"{Num(x)}\" y=\"{Num(y)}\" width=\"{Num(width)}\" height=\"{Num(height)}\" preserveAspectRatio=\"xMidYMid slice\"/>");
+                        svg.Append(CultureInfo.InvariantCulture, $"<image href=\"{assetPath}{picture}\" x=\"{Num(x)}\" y=\"{Num(y)}\" width=\"{Num(width)}\" height=\"{Num(height)}\" preserveAspectRatio=\"xMidYMid slice\"/>");
                     }
                     else
                     {

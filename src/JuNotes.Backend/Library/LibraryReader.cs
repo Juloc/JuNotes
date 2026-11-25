@@ -29,6 +29,11 @@ namespace JuNotes.Backend.Library
         string? Solution,
         IReadOnlyList<string> Additions);
 
+    // A mark and a card as the iPad syncs them, for lists in the web: no average is computed here (the rules of the school year live on the iPad).
+    public sealed record GradeInfo(Guid Id, Guid SubjectId, double Value, string Category, double? Weight, DateTimeOffset? Date, string Title);
+
+    public sealed record CardInfo(Guid Id, Guid SubjectId, string Front, string Back);
+
     public sealed record StrokeInfo(Guid Id, string Tool, string Color, double Width, IReadOnlyList<(double X, double Y)> Points);
 
     // Reads what the iPad synced, for the web view. Everything it hands out is what is not in the trash and not deleted.
@@ -79,21 +84,66 @@ namespace JuNotes.Backend.Library
             var result = new List<PageInfo>();
             foreach (var (id, parent, payload) in await ReadAsync("page", notebookId, ct))
             {
-                if (IsTrashed(payload))
+                if (!IsTrashed(payload))
                 {
-                    continue;
+                    result.Add(ToPage(id, parent ?? notebookId, payload));
                 }
-
-                var content = payload.TryGetProperty("content", out var node) && node.ValueKind == JsonValueKind.Object ? node : default;
-                var additions = payload.TryGetProperty("additions", out var list) && list.ValueKind == JsonValueKind.Array
-                    ? list.EnumerateArray().Select(item => item.GetString()).OfType<string>().ToList() : [];
-                result.Add(new PageInfo(id, parent ?? notebookId, Text(payload, "sort") ?? "", Text(payload, "template"), content.ValueKind == JsonValueKind.Object ? Text(content, "type") ?? "drawing" : "drawing",
-                    content.ValueKind == JsonValueKind.Object && Guid.TryParse(Text(content, "assetID"), out var asset) ? asset : null, content.ValueKind == JsonValueKind.Object ? Number(content, "pageIndex") : 0,
-                    Text(payload, "heading"), Text(payload, "printedText"), Text(payload, "solution"), additions));
             }
 
             // Equal keys can come from two devices; the id makes the order the same everywhere.
             return result.OrderBy(page => page.Sort, StringComparer.Ordinal).ThenBy(page => page.Id).ToList();
+        }
+
+        // One page of this reader's person, or nothing (also when it belongs to somebody else, or is in the trash).
+        public async Task<PageInfo?> PageAsync(Guid id, CancellationToken ct)
+        {
+            foreach (var (found, parent, payload) in await ReadAsync("page", null, ct))
+            {
+                if (found == id && parent is { } notebook && !IsTrashed(payload))
+                {
+                    return ToPage(found, notebook, payload);
+                }
+            }
+
+            return null;
+        }
+
+        private static PageInfo ToPage(Guid id, Guid notebookId, JsonElement payload)
+        {
+            var content = payload.TryGetProperty("content", out var node) && node.ValueKind == JsonValueKind.Object ? node : default;
+            var additions = payload.TryGetProperty("additions", out var list) && list.ValueKind == JsonValueKind.Array
+                ? list.EnumerateArray().Select(item => item.GetString()).OfType<string>().ToList() : [];
+            return new PageInfo(id, notebookId, Text(payload, "sort") ?? "", Text(payload, "template"), content.ValueKind == JsonValueKind.Object ? Text(content, "type") ?? "drawing" : "drawing",
+                content.ValueKind == JsonValueKind.Object && Guid.TryParse(Text(content, "assetID"), out var asset) ? asset : null, content.ValueKind == JsonValueKind.Object ? Number(content, "pageIndex") : 0,
+                Text(payload, "heading"), Text(payload, "printedText"), Text(payload, "solution"), additions);
+        }
+
+        public async Task<IReadOnlyList<GradeInfo>> GradesAsync(CancellationToken ct)
+        {
+            var result = new List<GradeInfo>();
+            foreach (var (id, parent, payload) in await ReadAsync("grade", null, ct))
+            {
+                if (parent is { } subject && payload.TryGetProperty("value", out var value) && value.TryGetDouble(out var number))
+                {
+                    result.Add(new GradeInfo(id, subject, number, Text(payload, "category") ?? "other", payload.TryGetProperty("weight", out var weight) && weight.TryGetDouble(out var w) ? w : null, Date(payload, "date"), Text(payload, "title") ?? string.Empty));
+                }
+            }
+
+            return result.OrderByDescending(grade => grade.Date).ThenBy(grade => grade.Id).ToList();
+        }
+
+        public async Task<IReadOnlyList<CardInfo>> CardsAsync(CancellationToken ct)
+        {
+            var result = new List<CardInfo>();
+            foreach (var (id, parent, payload) in await ReadAsync("card", null, ct))
+            {
+                if (parent is { } subject && Text(payload, "front") is { } front)
+                {
+                    result.Add(new CardInfo(id, subject, front, Text(payload, "back") ?? string.Empty));
+                }
+            }
+
+            return result.OrderBy(card => card.Front, StringComparer.CurrentCultureIgnoreCase).ThenBy(card => card.Id).ToList();
         }
 
         public async Task<IReadOnlyList<ObjectInfo>> ObjectsAsync(Guid pageId, CancellationToken ct)

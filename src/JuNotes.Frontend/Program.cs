@@ -121,6 +121,7 @@ app.UseAuthorization();
 app.MapRazorPages();
 app.MapBase();
 app.MapV1();
+app.MapWebApi();
 app.MapGet("/health/live", () => Results.Ok());
 app.MapGet("/health/ready", async (HealthService health, CancellationToken ct) => await health.IsReadyAsync(ct) ? Results.Ok() : Results.StatusCode(503));
 
