@@ -23,7 +23,9 @@ namespace JuNotes.Frontend.Admin
         Pending,
     }
 
-    public sealed record TokenOwner(TokenState State, SyncOwner? Person = null);
+    // Privileged: may use what the server holds only once for everybody (the AI of the installation and its daily limit, the school feed, the archive of Paperless). That is the person
+    // the shared token was written down for (and the shared token itself), and the administrators; a member's device is not, until those things are per person (milestone 4 to 6).
+    public sealed record TokenOwner(TokenState State, SyncOwner? Person = null, bool Privileged = false);
 
     // A connection of its own without a time limit for the work that may take long on a big table: the claim and the upgrade of the schema.
     public sealed record MaintenanceData(NpgsqlDataSource Source);
@@ -50,7 +52,7 @@ namespace JuNotes.Frontend.Admin
             {
                 if (!await AnyAccountAsync(ct))
                 {
-                    return new TokenOwner(TokenState.Ownerless);
+                    return new TokenOwner(TokenState.Ownerless, Privileged: true);
                 }
 
                 await using var first = data.CreateCommand("select id from users where 'admin' = any(roles) and state = 'active' and (totp_confirmed or hub_sub is not null) order by created_at, id limit 1");
@@ -79,7 +81,7 @@ namespace JuNotes.Frontend.Admin
 
             var owner = new SyncOwner(pinned.Value, reader.GetString(0), "app-token", AdoptsUnowned: true);
             await reader.DisposeAsync();
-            return await ClaimAsync(owner.Id, ct) ? new TokenOwner(TokenState.Person, owner) : new TokenOwner(TokenState.Pending);
+            return await ClaimAsync(owner.Id, ct) ? new TokenOwner(TokenState.Person, owner, Privileged: true) : new TokenOwner(TokenState.Pending);
         }
 
         // The person behind a device token: always that person, whatever their role, and only their rows (the old rows without an owner are given to the pinned person alone).
@@ -97,7 +99,8 @@ namespace JuNotes.Frontend.Admin
                 return new TokenOwner(TokenState.Pending);
             }
 
-            return new TokenOwner(TokenState.Person, new SyncOwner(device.PersonId, device.PersonName, device.DeviceName, AdoptsUnowned: _pinned is Guid pinned && pinned == device.PersonId));
+            var pinnedPerson = _pinned is Guid pinned && pinned == device.PersonId;
+            return new TokenOwner(TokenState.Person, new SyncOwner(device.PersonId, device.PersonName, device.DeviceName, AdoptsUnowned: pinnedPerson), Privileged: pinnedPerson || device.IsAdmin);
         }
 
         // Called whenever somebody signs in or the server starts, so the claim does not wait for the first request of the app. It never fails the caller.

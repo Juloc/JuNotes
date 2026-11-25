@@ -96,6 +96,13 @@ namespace JuNotes.Backend.Tests
                 return (await Host.Browser().SendAsync(request)).StatusCode;
             }
 
+            public async Task<HttpStatusCode> StatusAsync(string token, HttpMethod method, string path)
+            {
+                var request = new HttpRequestMessage(method, Url(path)) { Content = method == HttpMethod.Post ? new StringContent("{}", Encoding.UTF8, "application/json") : null };
+                request.Headers.Authorization = new("Bearer", token);
+                return (await Host.Browser().SendAsync(request)).StatusCode;
+            }
+
             public async Task<long> CountAsync(string table, string where = "true")
             {
                 await using var command = Database.Data.CreateCommand($"select count(*) from {table} where {where}");
@@ -307,6 +314,39 @@ namespace JuNotes.Backend.Tests
             Assert.Equal("sharedtoken.not_configured", (await ReadAsync(on)).GetProperty("error").GetString());
             // The code of the second factor was not spent on it.
             Assert.Equal(HttpStatusCode.OK, (await scene.SwitchAsync("off", scene.Factor.Next(scene.Ada))).StatusCode);
+        }
+
+        // ---------- what the server holds once for everybody ----------
+
+        [RequiresDatabaseFact]
+        public async Task The_AI_the_school_feed_and_the_archive_are_not_for_the_device_of_an_ordinary_member_but_for_the_shared_token_the_pinned_person_and_administrators()
+        {
+            await using var scene = await Scene.StartAsync();
+            var (second, _) = await scene.Host.SignedInPersonAsync();
+            var pinned = await scene.DeviceAsync(scene.Ada, "iPad von Ada");
+            var member = await scene.DeviceAsync(scene.Bea, "iPad von Bea");
+            var otherAdmin = await scene.DeviceAsync(second, "iPad des zweiten Administrators");
+            // The shared token is written down for the first administrator by its first use.
+            Assert.Equal(HttpStatusCode.OK, await scene.PullAsync(AdminHost.Token));
+            var paths = new[]
+            {
+                (HttpMethod.Get, "/api/v1/ai/profiles"), (HttpMethod.Post, "/api/v1/ai/quiz"), (HttpMethod.Post, "/api/v1/ai/anything"), (HttpMethod.Get, "/api/v1/school/status"),
+                (HttpMethod.Get, "/api/v1/school/calendar"), (HttpMethod.Get, "/api/v1/school/news"), (HttpMethod.Get, "/api/v1/export/status"), (HttpMethod.Post, "/api/v1/export/paperless?title=x"),
+            };
+
+            foreach (var (method, path) in paths)
+            {
+                Assert.True(await scene.StatusAsync(member, method, path) == HttpStatusCode.Forbidden, $"member {method} {path}");
+                foreach (var (who, token) in new[] { ("pinned person", pinned), ("shared token", AdminHost.Token), ("second administrator", otherAdmin) })
+                {
+                    var status = await scene.StatusAsync(token, method, path);
+                    Assert.True(status != HttpStatusCode.Forbidden && status != HttpStatusCode.Unauthorized, $"{who} {method} {path}: {(int)status}");
+                }
+            }
+
+            // What the app needs to sync is the member's as before.
+            Assert.Equal(HttpStatusCode.OK, await scene.PullAsync(member));
+            Assert.Equal(HttpStatusCode.OK, await scene.StatusAsync(member, HttpMethod.Get, "/api/v1/sync/info"));
         }
 
         private static HttpRequestMessage WithToken(HttpMethod method, string path)

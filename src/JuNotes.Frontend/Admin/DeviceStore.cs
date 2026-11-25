@@ -9,7 +9,7 @@ namespace JuNotes.Frontend.Admin
     public sealed record DeviceInfo(Guid Id, string Name, DateTimeOffset CreatedAt, DateTimeOffset? LastSeen, string? LastAddress);
 
     // What the door needs when a device token is sent: the device and the person it stands for (active, not blocked).
-    public sealed record DeviceHit(Guid DeviceId, string DeviceName, Guid PersonId, string PersonName);
+    public sealed record DeviceHit(Guid DeviceId, string DeviceName, Guid PersonId, string PersonName, bool IsAdmin);
 
     // What the administrator sees of a person's devices: how many, nothing else (no name, no address, never a token).
     public sealed record PersonDevices(Guid Id, string Name, string State, int Devices);
@@ -123,7 +123,7 @@ namespace JuNotes.Frontend.Admin
         // The device a token belongs to, when it is one that works: not removed, and its person active. The last sighting is written at most once a minute.
         public async Task<DeviceHit?> FindAsync(string token, string address, CancellationToken ct)
         {
-            await using var find = data.CreateCommand("select d.id, d.name, d.person_id, u.name, d.last_seen from device_tokens d join users u on u.id = d.person_id where d.hash = $1 and d.revoked_at is null and u.state = 'active'");
+            await using var find = data.CreateCommand("select d.id, d.name, d.person_id, u.name, d.last_seen, 'admin' = any(u.roles) from device_tokens d join users u on u.id = d.person_id where d.hash = $1 and d.revoked_at is null and u.state = 'active'");
             find.Parameters.Add(new NpgsqlParameter { Value = HashOf(token) });
             await using var reader = await find.ExecuteReaderAsync(ct);
             if (!await reader.ReadAsync(ct))
@@ -131,7 +131,7 @@ namespace JuNotes.Frontend.Admin
                 return null;
             }
 
-            var hit = new DeviceHit(reader.GetGuid(0), reader.GetString(1), reader.GetGuid(2), reader.GetString(3));
+            var hit = new DeviceHit(reader.GetGuid(0), reader.GetString(1), reader.GetGuid(2), reader.GetString(3), !reader.IsDBNull(5) && reader.GetBoolean(5));
             var seen = reader.IsDBNull(4) ? (DateTimeOffset?)null : reader.GetFieldValue<DateTimeOffset>(4);
             await reader.DisposeAsync();
             var now = time.GetUtcNow();

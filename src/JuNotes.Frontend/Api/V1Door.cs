@@ -104,6 +104,13 @@ namespace JuNotes.Frontend.Api
             Map(app);
         }
 
+        // The AI of the installation (one account, one daily limit, the sandbox question not settled), the school feed (one for everybody) and the Paperless archive (the
+        // administrator's) are held once for the whole installation. A device of an ordinary member does not get at them; the shared token and the administrators do.
+        private static async ValueTask<object?> OnlyWhatIsHeldForEverybody(EndpointFilterInvocationContext invocation, EndpointFilterDelegate next)
+            => invocation.HttpContext.Items[OwnerKey] is TokenOwner { Privileged: true }
+                ? await next(invocation)
+                : Results.Problem("Diese Funktion ist für dein Konto noch nicht freigegeben.", statusCode: 403);
+
         private sealed record PairRequest(string? Code, string? DeviceName);
 
         private const int PairBodyLimit = 2048;
@@ -203,7 +210,7 @@ namespace JuNotes.Frontend.Api
             sync.MapGet("/info", (BackupService backup, TimeProvider time) => Json(new { serverTime = time.GetUtcNow(), lastBackupAt = backup.Latest()?.At }));
             sync.MapGet("/pull", async (long? since, int? limit, HttpContext context, SyncService service, CancellationToken ct) => Json(await service.PullAsync(since ?? 0, limit ?? SyncService.MaxChanges, PersonId(context), ct)));
 
-            var schoolApi = secured.MapGroup("/school");
+            var schoolApi = secured.MapGroup("/school").AddEndpointFilter(OnlyWhatIsHeldForEverybody);
             schoolApi.MapGet("/status", (SchoolImportService import) => Json(import.Status));
             schoolApi.MapGet("/calendar", async (DateTimeOffset? from, DateTimeOffset? to, SchoolStore store, TimeProvider time, CancellationToken ct) =>
             {
@@ -232,7 +239,7 @@ namespace JuNotes.Frontend.Api
             assetApi.MapMethods("/{id:guid}", ["HEAD"], async (Guid id, HttpContext context, AssetService assets, CancellationToken ct) => await assets.ExistsAsync(id, PersonId(context), ct) ? Results.Ok() : Results.NotFound());
             assetApi.MapGet("/{id:guid}", async (Guid id, HttpContext context, AssetService assets, CancellationToken ct) => await assets.OpenAsync(id, PersonId(context), ct) is { } file ? Results.Stream(file.Stream, file.ContentType, enableRangeProcessing: true) : Results.NotFound());
 
-            var aiApi = secured.MapGroup("/ai");
+            var aiApi = secured.MapGroup("/ai").AddEndpointFilter(OnlyWhatIsHeldForEverybody);
             aiApi.MapGet("/profiles", async (AiProfileStore store, CancellationToken ct) => Json((await store.ListAsync(ct)).Select(profile => new { profile.Key, profile.Name, profile.Enabled })));
             aiApi.MapPost("/{task}", async (string task, AiRequest request, LearningService learning, CancellationToken ct) =>
             {
@@ -258,7 +265,7 @@ namespace JuNotes.Frontend.Api
                 }
             });
 
-            var exportApi = secured.MapGroup("/export");
+            var exportApi = secured.MapGroup("/export").AddEndpointFilter(OnlyWhatIsHeldForEverybody);
             exportApi.MapGet("/status", (PaperlessOptions paperless) => Json(new { paperless = paperless.IsConfigured }));
             // The finished PDF of a notebook goes to Paperless as an archive copy: the body is the PDF, the title and tags come in the query.
             exportApi.MapPost("/paperless", async (HttpRequest request, string title, string? tags, PaperlessOptions options, PaperlessClient paperless, CancellationToken ct) =>
