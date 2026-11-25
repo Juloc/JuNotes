@@ -35,6 +35,7 @@ namespace JuNotes.Backend.Tests
                 Host = host;
                 Database = database;
                 _fake = fake;
+                Factor = new TestSecondFactor(database.Data);
                 Ada = ada.Id;
                 AdaClient = ada.Client;
                 Bea = bea.Id;
@@ -47,7 +48,7 @@ namespace JuNotes.Backend.Tests
 
             public TestDatabase Database { get; }
 
-            public TestSecondFactor Factor { get; } = new();
+            public TestSecondFactor Factor { get; }
 
             public Guid Ada { get; }
 

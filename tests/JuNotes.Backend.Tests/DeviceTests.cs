@@ -34,7 +34,7 @@ namespace JuNotes.Backend.Tests
         // Two people (the first an administrator, the second a member) with a session each, a throwaway database and a second factor whose key the tests know.
         private sealed class Scene : IAsyncDisposable
         {
-            private readonly Dictionary<Guid, long> _last = [];
+            private readonly TestSecondFactor _factor;
             private readonly FakeCodex _fake;
 
             private Scene(AdminHost host, TestDatabase database, FakeCodex fake, Guid a, HttpClient aClient, Guid b, HttpClient bClient)
@@ -42,6 +42,7 @@ namespace JuNotes.Backend.Tests
                 Host = host;
                 Database = database;
                 _fake = fake;
+                _factor = new TestSecondFactor(database.Data);
                 A = a;
                 AClient = aClient;
                 B = b;
@@ -77,16 +78,7 @@ namespace JuNotes.Backend.Tests
                 await Database.DisposeAsync();
             }
 
-            // A code of the second factor that has not been used yet: the oldest step the server still accepts that is newer than the last one this person used (a step is spent when
-            // it is used; the window is one step either side of now, so a person has three codes at most, and a step boundary in the middle of a test does not matter).
-            public string SecondFactor(Guid person)
-            {
-                var now = DateTimeOffset.UtcNow.ToUnixTimeSeconds() / Base.Accounts.Totp.StepSeconds;
-                var step = Math.Max(_last.GetValueOrDefault(person) + 1, now - 1);
-                Assert.True(step <= now + 1, "a person has three fresh codes of the second factor in a test");
-                _last[person] = step;
-                return Base.Accounts.Totp.Hotp(Base32.Decode("TESTSECRET"), step);
-            }
+            public string SecondFactor(Guid person) => _factor.Next(person);
 
             public static HttpRequestMessage Web(HttpMethod method, string path, string? json = null, string? remote = null)
             {
@@ -605,6 +597,83 @@ namespace JuNotes.Backend.Tests
             Assert.Contains(await audit.ListAsync(100), entry => entry.Event == "device.removed" && entry.Detail == "device iPad A");
         }
 
+        [RequiresDatabaseFact]
+        public async Task A_failure_while_the_token_is_made_leaves_the_code_as_it_was_and_makes_no_device()
+        {
+            await using var scene = await Scene.StartAsync();
+            var store = scene.Host.Services.GetRequiredService<DeviceStore>();
+            var (code, _) = await store.NewCodeAsync(scene.A, default);
+            foreach (var sql in new[]
+            {
+                "create function refuse_device() returns trigger language plpgsql as $$ begin raise exception 'no device today'; end $$",
+                "create trigger refuse_device before insert on device_tokens for each row execute function refuse_device()",
+            })
+            {
+                await using var command = scene.Database.Data.CreateCommand(sql);
+                await command.ExecuteNonQueryAsync();
+            }
+
+            await Assert.ThrowsAnyAsync<Npgsql.PostgresException>(() => store.RedeemAsync(code, "iPad", "198.51.100.1", default));
+
+            Assert.Equal(1, await scene.CountAsync("pairing_codes"));
+            Assert.Equal(0, await scene.CountAsync("device_tokens"));
+            await using (var drop = scene.Database.Data.CreateCommand("drop trigger refuse_device on device_tokens"))
+            {
+                await drop.ExecuteNonQueryAsync();
+            }
+
+            Assert.NotNull(await store.RedeemAsync(code, "iPad", "198.51.100.1", default));
+            Assert.Equal(0, await scene.CountAsync("pairing_codes"));
+        }
+
+        [RequiresDatabaseFact]
+        public async Task A_flood_of_addresses_gets_three_lines_of_its_own_an_hour_and_one_line_that_counts_the_rest()
+        {
+            await using var scene = await Scene.StartAsync();
+            await scene.AClient.GetAsync(Url("/api/web/v1/devices"));
+            var clock = new ManualTime(DateTimeOffset.UtcNow);
+            var audit = scene.Host.Services.GetRequiredService<AuditStore>();
+            var brake = new TokenBrake(new Base.Web.RateLimit(clock), audit, clock);
+
+            for (var address = 1; address <= 6; address++)
+            {
+                for (var wrong = 0; wrong < TokenBrake.PairFailuresBeforeLock; wrong++)
+                {
+                    brake.PairFailed("203.0.113." + address);
+                }
+            }
+
+            IReadOnlyList<AuditEntry> log = [];
+            for (var i = 0; i < 40 && log.Count(entry => entry.Event == "api.pair_refused") < 3; i++)
+            {
+                await Task.Delay(50);
+                log = await audit.ListAsync(100);
+            }
+
+            await Task.Delay(300);
+            log = await audit.ListAsync(100);
+            Assert.Equal(3, log.Count(entry => entry.Event == "api.pair_refused"));
+            Assert.DoesNotContain(log, entry => entry.Event == "api.pair_refused_summary");
+
+            // The next hour: the three that were left out are counted in one line, before the new line of its own.
+            clock.Advance(TimeSpan.FromMinutes(61));
+            for (var wrong = 0; wrong < TokenBrake.PairFailuresBeforeLock; wrong++)
+            {
+                brake.PairFailed("203.0.113.7");
+            }
+
+            AuditEntry? summary = null;
+            for (var i = 0; i < 40 && summary is null; i++)
+            {
+                await Task.Delay(50);
+                summary = (await audit.ListAsync(100)).FirstOrDefault(entry => entry.Event == "api.pair_refused_summary");
+            }
+
+            Assert.NotNull(summary);
+            Assert.Contains("3 more address(es)", summary!.Detail, StringComparison.Ordinal);
+            Assert.Equal(4, (await audit.ListAsync(100)).Count(entry => entry.Event == "api.pair_refused"));
+        }
+
         // ---------- small parts ----------
 
         [Fact]
@@ -619,6 +688,17 @@ namespace JuNotes.Backend.Tests
             Assert.Null(DeviceStore.Shorten(null));
             Assert.Equal("ABCDEFGHIJ", DeviceStore.Normalise("abcde-fghij"));
             Assert.Equal("ABCDEFGHIJ", DeviceStore.Normalise(" abcde fghij "));
+
+            // Marks that turn text around or hide it are gone; the joiner that an emoji sequence needs is not.
+            Assert.Equal("evil", DeviceStore.CleanName("\u202Eevil\u202C"));
+            Assert.Equal("a\u200Bb".Replace("\u200B", string.Empty, StringComparison.Ordinal), DeviceStore.CleanName("a\u200Bb\u2067\u2028"));
+            const string Family = "\U0001F468\u200D\U0001F469\u200D\U0001F467";
+            Assert.Equal(Family, DeviceStore.CleanName(Family));
+            // Cut between text elements, never inside one: an emoji that stands at place 60 is kept whole, one that would be the 61st is left out.
+            Assert.Equal(new string('a', 59) + Family, DeviceStore.CleanName(new string('a', 59) + Family + "bbb"));
+            Assert.Equal(new string('a', 60), DeviceStore.CleanName(new string('a', 60) + Family));
+            // A single "letter" with hundreds of marks is one element but not a name.
+            Assert.Equal("Gerät", DeviceStore.CleanName("a" + new string('\u0301', 300)));
         }
 
         private static string Hash(string text) => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(text)));

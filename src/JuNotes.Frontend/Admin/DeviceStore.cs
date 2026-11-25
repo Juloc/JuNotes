@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
 using Base.Accounts;
@@ -87,34 +88,43 @@ namespace JuNotes.Frontend.Admin
                 }
             }
 
+            // The code is spent and the token made in one transaction: a failure in between leaves the code as it was (and no token), never a spent code without a device.
+            await using var connection = await data.OpenConnectionAsync(ct);
+            await using var transaction = await connection.BeginTransactionAsync(ct);
             Guid? person = null;
             if (hit is { } id)
             {
-                await using var spend = data.CreateCommand("delete from pairing_codes where id = $1 and expires_at > $2 returning person_id");
+                await using var spend = new NpgsqlCommand("delete from pairing_codes where id = $1 and expires_at > $2 returning person_id", connection, transaction);
                 spend.Parameters.Add(new NpgsqlParameter { Value = id });
                 spend.Parameters.Add(new NpgsqlParameter { Value = now });
                 person = await spend.ExecuteScalarAsync(ct) as Guid?;
             }
 
             // The same query and the same work whether or not there was a hit (the person of the code, or a made-up one that is not there).
-            await using var who = data.CreateCommand("select name from users where id = $1 and state = 'active'");
+            await using var who = new NpgsqlCommand("select name from users where id = $1 and state = 'active'", connection, transaction);
             who.Parameters.Add(new NpgsqlParameter { Value = person ?? Guid.Empty });
             var personName = await who.ExecuteScalarAsync(ct) as string;
             if (person is not { } personId || personName is null)
             {
+                // A code of a person who is not active any more is spent all the same.
+                await transaction.CommitAsync(ct);
                 return null;
             }
 
             var token = TokenPrefix + Base64Url(RandomNumberGenerator.GetBytes(32));
             var deviceId = Guid.NewGuid();
-            await using var insert = data.CreateCommand("insert into device_tokens (id, person_id, name, hash, created_at, last_seen, last_address) values ($1, $2, $3, $4, $5, $5, $6)");
-            insert.Parameters.Add(new NpgsqlParameter { Value = deviceId });
-            insert.Parameters.Add(new NpgsqlParameter { Value = personId });
-            insert.Parameters.Add(new NpgsqlParameter { Value = CleanName(deviceName) });
-            insert.Parameters.Add(new NpgsqlParameter { Value = HashOf(token) });
-            insert.Parameters.Add(new NpgsqlParameter { Value = now });
-            insert.Parameters.Add(new NpgsqlParameter { Value = address });
-            await insert.ExecuteNonQueryAsync(ct);
+            await using (var insert = new NpgsqlCommand("insert into device_tokens (id, person_id, name, hash, created_at, last_seen, last_address) values ($1, $2, $3, $4, $5, $5, $6)", connection, transaction))
+            {
+                insert.Parameters.Add(new NpgsqlParameter { Value = deviceId });
+                insert.Parameters.Add(new NpgsqlParameter { Value = personId });
+                insert.Parameters.Add(new NpgsqlParameter { Value = CleanName(deviceName) });
+                insert.Parameters.Add(new NpgsqlParameter { Value = HashOf(token) });
+                insert.Parameters.Add(new NpgsqlParameter { Value = now });
+                insert.Parameters.Add(new NpgsqlParameter { Value = address });
+                await insert.ExecuteNonQueryAsync(ct);
+            }
+
+            await transaction.CommitAsync(ct);
             return new Paired(token, deviceId, personName);
         }
 
@@ -213,16 +223,41 @@ namespace JuNotes.Frontend.Admin
 
         // ----- Helpers -----
 
-        // The name a person gives a device: no control characters, at most 60 characters, never empty.
+        public const int MaxNameCharacters = 240;
+
+        // The name a person gives a device: no control, format (bidi marks, zero-width marks, except the joiners that emoji need) or line separator characters, at most 60 text
+        // elements (a letter with its accents, an emoji with its modifiers are one) and 240 UTF-16 units, cut between elements and never inside one; never empty.
         public static string CleanName(string? name)
         {
-            var text = new string((name ?? string.Empty).Where(c => !char.IsControl(c)).ToArray()).Trim();
-            if (text.Length > MaxNameLength)
+            var kept = new StringBuilder();
+            foreach (var rune in (name ?? string.Empty).EnumerateRunes())
             {
-                text = text[..MaxNameLength].TrimEnd();
+                var category = Rune.GetUnicodeCategory(rune);
+                if (Rune.IsControl(rune) || (category == UnicodeCategory.Format && rune.Value is not (0x200C or 0x200D)) || category is UnicodeCategory.LineSeparator or UnicodeCategory.ParagraphSeparator)
+                {
+                    continue;
+                }
+
+                kept.Append(rune);
             }
 
-            return text.Length == 0 ? "Gerät" : text;
+            var text = new StringBuilder();
+            var elements = 0;
+            var enumerator = StringInfo.GetTextElementEnumerator(kept.ToString().Trim());
+            while (enumerator.MoveNext())
+            {
+                var element = (string)enumerator.Current;
+                if (elements == MaxNameLength || text.Length + element.Length > MaxNameCharacters)
+                {
+                    break;
+                }
+
+                text.Append(element);
+                elements++;
+            }
+
+            var result = text.ToString().TrimEnd();
+            return result.Length == 0 ? "Gerät" : result;
         }
 
         // The address as shown to the person: the last part is cut off (a device is recognised by its network, not by a full address).

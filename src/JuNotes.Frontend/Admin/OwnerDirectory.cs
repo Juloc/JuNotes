@@ -255,8 +255,21 @@ namespace JuNotes.Frontend.Admin
     // answered without further ado; **a right token always gets through**, whatever the address did before (an address is often shared: the same network, a mobile
     // provider, or a proxy). The first lock of an address is written to the security log, and at most once an hour for the same address, so nobody can push the real entries
     // (sign-ins, new devices, password changes) out of the log. Never the token that was tried.
-    public sealed class TokenBrake(Base.Web.RateLimit limit, AuditStore audit, TimeProvider time)
+    public sealed class TokenBrake
     {
+        private readonly Base.Web.RateLimit limit;
+        private readonly TimeProvider time;
+        private readonly HourlyLines _pairLines;
+        private readonly HourlyLines _tokenLines;
+
+        public TokenBrake(Base.Web.RateLimit limit, AuditStore audit, TimeProvider time)
+        {
+            this.limit = limit;
+            this.time = time;
+            _pairLines = new HourlyLines(audit);
+            _tokenLines = new HourlyLines(audit);
+        }
+
         public const int FailuresPerMinute = 10;
 
         // Pairing is stricter (a code is short and nobody sends one all day): after this many wrong codes from an address even a right code is refused until the minute is over.
@@ -287,7 +300,7 @@ namespace JuNotes.Frontend.Admin
             if (!_logged.TryGetValue("pair|" + address, out var last) || now - last >= LogGap)
             {
                 _logged["pair|" + address] = now;
-                _ = audit.AddAsync("app-token", "api.pair_refused", address, $"{PairFailuresBeforeLock} wrong pairing codes in a minute from this address (at most one line an hour for it)");
+                _pairLines.Write(now, address, "api.pair_refused", $"{PairFailuresBeforeLock} wrong pairing codes in a minute from this address (at most one line an hour for it)");
             }
         }
 
@@ -304,7 +317,7 @@ namespace JuNotes.Frontend.Admin
             if (!_logged.TryGetValue(address, out var last) || now - last >= LogGap)
             {
                 _logged[address] = now;
-                _ = audit.AddAsync("app-token", "api.token_refused", address, $"more than {FailuresPerMinute} wrong tokens in a minute from this address (at most one line an hour for it)");
+                _tokenLines.Write(now, address, "api.token_refused", $"more than {FailuresPerMinute} wrong tokens in a minute from this address (at most one line an hour for it)");
             }
         }
 
@@ -339,6 +352,54 @@ namespace JuNotes.Frontend.Admin
                 {
                     _logged.TryRemove(address, out _);
                 }
+            }
+        }
+    }
+
+    // Lines of the log for locked addresses, with a budget: an address gets at most one line an hour (the callers see to that), and all addresses together at most three lines
+    // an hour for one kind of event. What is left out is counted and written as one line when the next hour begins, so a flood of addresses cannot push the other entries out of
+    // the log, and a person reading it still sees that it happened and how often.
+    internal sealed class HourlyLines(AuditStore audit)
+    {
+        public const int LinesPerHour = 3;
+        private readonly object _gate = new();
+        private DateTimeOffset _start;
+        private int _used;
+        private int _left;
+
+        public void Write(DateTimeOffset now, string address, string evt, string detail)
+        {
+            int? summary = null;
+            bool own;
+            lock (_gate)
+            {
+                if (now - _start >= TimeSpan.FromHours(1))
+                {
+                    summary = _left > 0 ? _left : null;
+                    _start = now;
+                    _used = 0;
+                    _left = 0;
+                }
+
+                own = _used < LinesPerHour;
+                if (own)
+                {
+                    _used++;
+                }
+                else
+                {
+                    _left++;
+                }
+            }
+
+            if (summary is { } many)
+            {
+                _ = audit.AddAsync("app-token", evt + "_summary", null, $"{many} more address(es) were locked in the previous hour (only the first {LinesPerHour} an hour get a line of their own)");
+            }
+
+            if (own)
+            {
+                _ = audit.AddAsync("app-token", evt, address, detail);
             }
         }
     }
