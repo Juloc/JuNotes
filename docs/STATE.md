@@ -140,6 +140,11 @@ Der Stand davor ist als lokaler Tag `m2-geprueft` markiert (letzter Commit vor 3
 - **Die Zeit der Antworten ist nicht gemessen.** Für nie gewesen, abgelaufen und benutzt macht der Server dieselben Abfragen (Liste der gültigen Codes, Suche der Person mit einer Kennung, die es nicht gibt), aber ein Zeittest fehlt. Ein Code einer **gesperrten** Person braucht eine Abfrage mehr als ein unbekannter (nur wer einen gültigen Code erraten hat, kann es sehen).
 - **Ablehnung über http, zu großer Körper und Bremse** antworten schneller als die übrigen, weil sie die Datenbank nicht berühren; sie hängen nicht vom Code ab. Die Bremse antwortet 429 statt 401: das verrät nur, dass die Adresse gesperrt ist.
 - **Der https-Test hängt an `ProxyTrust`.** Solange in der Installation keine Proxys eingetragen sind, glaubt der Server jedes private Netz (so ist die Basis): Ein Gerät im selben Netz, das den Port **direkt** erreicht, kann `X-Forwarded-Proto: https` setzen und die Prüfung umgehen. Das schützt nur die Vertraulichkeit des Codes auf dem Weg, nicht vor dem Erraten (die Bremse gilt unabhängig). Abhilfe: die Proxys eintragen und den Port nur dem Proxy zugänglich machen (steht in der Liste „Für das Einspielen“). Eine Verbindung ohne Adresse (Unix-Socket) gilt für die Ausnahme `localhost` als Loopback, aber nur, wenn der Kopf `Host` `localhost` heißt.
+- **Die Ausnahme `localhost` der https-Prüfung** (der Name `localhost` im Kopf `Host` **und** eine Verbindung von der Maschine selbst): Steht ein Proxy **auf demselben Rechner**, dem der Server nicht traut (`ProxyTrust`) oder der `X-Forwarded-For` nicht schickt, und gibt er den Kopf `Host: localhost` weiter, dann sieht der Server jede Anfrage als „von der Maschine selbst“, und die Prüfung auf https entfiele (die Bremse nach Adresse zählte dann auch nur diese eine Adresse). Darum: Proxys eintragen (Einspiel-Liste) und den Proxy den Kopf `Host` nicht auf `localhost` umschreiben lassen.
+- **Ein paralleler Schwall von einer Adresse bekommt mehr als drei Versuche** (die Bremse zählt Fehlversuche, nachdem sie ausgewertet sind; sechs gleichzeitige Anfragen können alle noch durch). Bei 50 Bit und zehn Minuten Gültigkeit ist das in Ordnung und hier festgehalten.
+- **Gerätetoken überleben** „andere abmelden“, ein neues Passwort und das Zurücksetzen des zweiten Faktors: Sie sind ein eigener Schlüssel je Gerät und keine Sitzung. **Entscheidung** (nach dem Vorschlag der Prüfung): Die Karte „Gerät koppeln“ hat einen Knopf „Alle Geräte entfernen“ (`DELETE /api/web/v1/devices`, Protokollzeile `device.removed_all`, Test); die Kopplung ans Ende der Sitzungen zu binden wäre überraschend (das iPad müsste nach jedem Passwortwechsel neu gekoppelt werden). Test: `DeviceTests.Device_tokens_survive_…`.
+- **Die Zeilen im Protokoll für gesperrte Adressen** haben ein Stundenbudget: höchstens drei Zeilen je Art und Stunde; was darüber liegt, wird gezählt und mit einer Zeile `…_summary` zu Beginn der nächsten Stunde nachgetragen (`HourlyLines`, für `api.pair_refused` und `api.token_refused`). Ein Schwall vieler Adressen kann die übrigen Einträge so nicht mehr verdrängen. Wird danach nie wieder eine Adresse gesperrt, bleibt die Sammelzeile aus.
+- **Das Einlösen eines Codes ist atomar** (Löschen des Codes und Anlegen des Tokens in einer Transaktion; ein Fehler dazwischen lässt den Code, wie er war; Test mit einem Auslöser, der das Anlegen verweigert). Gerätenamen werden zwischen Textelementen gekürzt (60 Elemente, 240 Zeichen), ohne Steuer-, Bidi- und Formatzeichen (die Verbinder der Emoji bleiben).
 - **Der Code ist ein Geheimnis mit 50 Bit und nur ein ungesalzener SHA-256 in der Datenbank:** Wer die Datenbank in den zehn Minuten liest, kann ihn offline durchprobieren (Größenordnung von Stunden auf einer starken Grafikkarte, also **nach** Ablauf des Codes); danach ist er wertlos. Der Gerätetoken hat 256 Bit und ist unproblematisch.
 - **Keine Obergrenze für die Zahl der Geräte je Person** (jede Kopplung braucht aber einen frischen zweiten Faktor, also höchstens ein Gerät je 30 Sekunden). Entfernte Zeilen bleiben für das Protokoll in der Tabelle.
 - **Hub-Personen** ohne eigenen zweiten Faktor können in 3a **nicht koppeln** (409 mit einem Satz); wie sie es dürfen (zum Beispiel eine frische Anmeldung am Hub), ist eine offene Entscheidung. Die einzige Person, die heute hier ist, meldet sich mit Passwort und zweitem Faktor an.
@@ -432,6 +437,11 @@ docker compose logs -f junotes
 Die iPad-App gleicht **weiter ab**, mit demselben Token und denselben Antworten (Vertragstests; Altstand-Probe). Die Zeilen, die dabei neu entstehen, gehören niemandem und gehen beim ersten Konto mit an den Administrator. **Nicht erreichbar:** die Web-App und die Verwaltung (sie brauchen ein Konto; die Startseite zeigt die Einrichtung), also auch die Codex-Anmeldung im Browser. **Wer die Adresse und den Einrichtungscode aus dem Protokoll hat, kann das erste Konto anlegen: die Einrichtung nicht liegen lassen**, möglichst im selben Zug einspielen und einrichten.
 **Der App-Token steht danach für eine festgeschriebene Person** (`token_owner` in `app_instance_settings`): Wird sie gesperrt oder gelöscht, antwortet `/api/v1` mit 401 und es wird nie jemand anderes gewählt. Scheitert die Zuweisung der alten Hefte (steht im Protokoll, die Übersicht der Verwaltung zeigt es), antwortet `/api/v1` mit **503**, bis die Ursache behoben und der Server **neu gestartet** ist.
 
+### Was nach dem Einspielen gilt, bis die App sich koppeln kann (Sicherheitsprüfung 3a/3c, mittel)
+- **Der gemeinsame App-Token handelt als die festgeschriebene Person** (die erste Person mit der Rolle Administrator). Solange die App-Änderung (ARCHITECTURE 11) fehlt, **darf er keiner zweiten Person gegeben werden**: Wer ihn hat, liest und schreibt die Hefte der festgeschriebenen Person und darf die KI, den Stundenplan-Feed und Paperless benutzen.
+- **Die KI, der Stundenplan-Feed und Paperless (je einmal für die ganze Installation vorhanden) sind für Geräte gewöhnlicher Mitglieder gesperrt** (403): nur der gemeinsame Token, die festgeschriebene Person und Administratoren dürfen sie benutzen. Das gilt, bis KI, Stundenplan und Archiv je Person gelöst sind und die Frage der Codex-Sandbox (Lesen von Schlüssel und Sicherungen) geklärt ist.
+- Gekoppelte Geräte behalten ihren Schlüssel auch nach einem neuen Passwort oder zweiten Faktor (Entscheidung, siehe 3a); wer das beenden will, drückt in den Einstellungen „Alle Geräte entfernen“.
+
 ### Rückweg
 **Weg 1 (der sichere, mit den Dateien von Schritt 2):**
 1. `cd <ordner> && docker compose down` (**nicht** `-v`: das Volume bleibt).
@@ -444,6 +454,17 @@ Die iPad-App gleicht **weiter ab**, mit demselben Token und denselben Antworten 
 Dabei gehen Konten, Sitzungen und der zweite Faktor verloren **und** alles, was seit der Sicherung geschrieben wurde (das iPad schickt es beim nächsten Abgleich erneut, soweit es bei ihm noch im Postausgang steht).
 
 **Weg 2 (nur das Schema zurück, die Zeilen bleiben, auch die neuen; an einer Kopie mit Testdaten geprüft, nicht an echten Daten):** das alte Image starten (Schritt 2 des Weges 1) und
+**zuerst, nur wenn die Migrationen 0009 bis 0011 (Meilenstein 3) schon eingespielt sind** (das Einspielen von Meilenstein 1 und 2 bringt sie nicht mit; sie stehen erst auf `main` hinter dem Tag; die Anweisungen sind gelesen und gegen die Namen der Migrationen geprüft, **nicht** an einer Kopie mit Daten ausgeführt):
+```sql
+begin;
+drop table shared_token_seen;            -- 0011
+drop table shares;                       -- 0010
+drop table pairing_codes, device_tokens; -- 0009
+delete from schema_migrations where number in (9, 10, 11);
+delete from app_instance_settings where key = 'shared_token_off';
+commit;
+```
+Dabei sind alle gekoppelten Geräte und Freigaben weg (die Schlüssel der Geräte gelten nicht mehr; das iPad mit dem gemeinsamen Token ist davon nicht betroffen). Dann die Umkehr von Meilenstein 1 und 2:
 ```sql
 begin;
 drop table recovery_codes, sessions, account_audit, user_settings, invites, hub_flows, hub_logout_tokens, users cascade;
