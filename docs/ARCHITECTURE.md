@@ -70,7 +70,7 @@ Grundsatz: **Nur hinzufügen, nie umbauen.** Die App kennt die Form der Daten un
    `cursor` aus der Antwort (`meta`-Tabelle, `SQLiteStore.apply`), und schickt sie beim nächsten `pull` als `since` zurück (`SyncEngine`). `SyncRecord.seq` wird gelesen
    und nie benutzt, `PushResponse.seq` ebenso nicht; das `seq` des Postausgangs ist eine eigene lokale Zählung. Eine Besitzer-Filterung des Pulls (leere Antwort mit
    `cursor` = `since`) ist für die App also unbedenklich, solange der Server den Merker nie zurücksetzt oder senkt.
-5. **Der bestehende App-Token** wird zum „Gerät des Eigentümers“: Der Server ordnet ihn bei jeder Anfrage der Person Eigentümer zu. Neue Token je Gerät
+5. **Der bestehende App-Token** wird zum „Gerät des Eigentümers“: Der Server ordnet ihn der Person zu, die beim ersten Zuweisen **festgeschrieben** wurde (`token_owner`, einmal, danach nur gelesen; ist sie nicht mehr aktiv, antwortet die Tür mit 401, nie wird jemand anderes gewählt). Neue Token je Gerät
    und Person kommen mit Meilenstein 3 aus der Basis (Geräte-Modul). Der alte Token wird erst abgeschaltet, wenn die App ihn nicht mehr schickt, und das
    schaltet der Eigentümer von Hand.
 6. **Freigaben:** eigene Tabelle `shares(entity_id, recipient_id, mode, granted_seq, revoked_seq)`; Lesen prüft Besitz oder Freigabe. Ein freigegebenes Heft
@@ -148,8 +148,7 @@ Meilenstein 2 baut deshalb **die lesenden Wege von `/api/web/v1`** und die Seite
 | `/api/v1/*` (heute: `status`, Abgleich `push`/`pull`/`info`, Dateien `PUT`/`GET`, Schule `status`/`calendar`/`news`, KI `profiles`/`{task}`, Export `status`/`paperless`) | iPad-App | Bearer-Token. **Eingefroren.** Nur additive Felder. |
 | `/api/web/v1/*` | Browser | Sitzungs-Cookie der Basis, CSRF-Schutz, **nie** der App-Token |
 
-**Meilenstein 2, nur lesen:** `me`; Bibliothek (Ordnerbaum); Heft mit Seiten; Seite (mit Strichen, für die Ansicht); Datei; Noten; Karten; Stundenplan der
-Person. Die Namen sind ein Vorschlag, keine Seitenentwürfe. **Später:** Suche, Lernhilfen und KI, Freigaben (3), Zeichnen (8).
+**Meilenstein 2, nur lesen:** `me`; Bibliothek (Ordnerbaum); Heft mit Seiten; Seite (mit Strichen, für die Ansicht); Datei; Noten; Karten (nur Listen). **Der Stundenplan ist nicht in Meilenstein 2, er kommt mit Meilenstein 4** (Schuldaten je Person). Die Namen sind ein Vorschlag, keine Seitenentwürfe. **Später:** Suche, Lernhilfen und KI, Freigaben (3), Zeichnen (8).
 
 **Wichtig für die Suche:** Der erkannte Text (OCR) liegt heute nur auf dem iPad (siehe `docs/PHASE5.md`, Punkt 5). Eine Suche im Web gibt es erst, wenn
 der Text mit synchronisiert wird. Das ist eine **additive** Erweiterung des Abgleichs (neues Feld oder neue `kind`), kein Umbau.

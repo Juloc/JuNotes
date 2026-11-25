@@ -24,7 +24,7 @@ auf die gemeinsame Basis um (Entscheidungen vom 24.11.2026 in SCOPE.md).
 ## Nächster Schritt
 
 **Meilenstein 1 und 2 sind fertig** (1a, 1b, 1c; lokal committet, nichts gepusht, kein Release). Der Orchestrator prüft, die Sicherheitsprüfung (eigene Sitzung) liest 1a und 1b vor dem Einspielen
-(Liste unten). Meilenstein 2 beginnt erst mit seinem Startzeichen. Das Einspielen auf die laufende Installation ist seine Sache, mit Sicherung davor und dem Ja des Eigentümers.
+(Liste unten). **Meilenstein 2 ist gebaut** (siehe unten); Meilenstein 3 beginnt erst nach den Behebungen aus der zweiten Sicherheitsprüfung und dem Startzeichen des Orchestrators. Das Einspielen auf die laufende Installation ist seine Sache, mit Sicherung davor und dem Ja des Eigentümers.
 
 - **1a Basis eingehängt** (`base/` jetzt **0.3.4**, byteweise wie im Manifest): Konten, Sitzungen, Einrichtungsassistent, Rollen `admin` und `member`, Hub-Anmeldung, `/api/about`, `/api/health`, Einstellungen.
   `/api/v1` ist eine **eigene Tür der Basis** (SEC-07, `BaseAppOptions.Doors`), die Prüfung ist der Instanz-Token. Die Tabelle der Basis heißt `base_migrations` (DATA-04), unsere bleibt
@@ -46,8 +46,8 @@ auf die gemeinsame Basis um (Entscheidungen vom 24.11.2026 in SCOPE.md).
 4. **JSON mit Nullwerten bleibt auf `/api/v1`.** Die Basis stellt global ein, dass `null` in Antworten fehlt (`DefaultIgnoreCondition = WhenWritingNull`). Das würde die Antworten an die App verändern (`parentId`, `payload`,
    `lastSuccess` …). `/api/v1` schreibt darum mit den Optionen des Frameworks plus `Never` (`V1Door`). **Für die Basis:** diese globale Einstellung trifft jede App, die schon eigene Antworten hat.
 5. **Content-Security-Policy der alten Seiten:** Die Basis erlaubt weder `<style>`, noch `style=`, noch Inline-Skript. Die alten Seiten brauchen das. Die `<style>`-Blöcke und das eine Skript sind in Dateien
-   gewandert (`wwwroot/legacy-*.css|js`); nur für `/Notes` und `/Admin` wird zusätzlich `style-src-attr 'unsafe-inline'` erlaubt (Farben von Covern). Skripte bleiben auf `'self'`. Fällt mit den Razor-Seiten am Ende von Meilenstein 2 weg
-   (Test: `AdminTests.The_old_pages_get_only_the_one_relaxation_…`).
+   gewandert (`wwwroot/legacy-*.css|js`); nur für `/Notes` und `/Admin` wurde zusätzlich `style-src-attr 'unsafe-inline'` erlaubt (Farben von Covern). Skripte blieben auf `'self'`. **Mit den Razor-Seiten am Ende von Meilenstein 2 weggefallen**
+   (jetzt gilt überall die Richtlinie der Basis; Test: `DoorsTests.What_the_web_api_gives_is_never_kept_…`).
 6. **Zuweisung nicht im Augenblick der Kontoerstellung,** sondern beim ersten Zugriff danach (die Basis hat keinen Haken dafür): beim Start, bei jeder Anmeldung einer Person und bei jedem Zugriff mit dem App-Token, einmalig
    (`OwnerDirectory`). Bis dahin gehören die Zeilen niemandem und die App gleicht wie bisher ab.
 7. **Kein Fremdschlüssel von `owner_id` auf die Personen der Basis.** Sonst würde das Löschen einer Person entweder blockieren oder ihre Hefte löschen. Was mit den Heften einer gelöschten Person passiert, ist offen
@@ -206,7 +206,7 @@ je Punkt ein Commit (Zeitfolge `eec8b5a`, `5ff1e62`, danach Sicherungen und Sync
 | – | `on conflict … do update` ohne Besitzbedingung | Beide Anweisungen tragen `owner_id is not distinct from excluded.owner_id` | durch die Zwei-Personen-Tests in `OwnerTests` mit abgedeckt (die Vorprüfung fängt zuerst; der Wächter in der Anweisung selbst ist **nicht einzeln getestet**, weil er nur bei einem Wettlauf greift) |
 | – | `/status` war ein Präfix | exakter Pfad | `SecurityFindingsTests.Only_the_exact_status_path_is_open` |
 | – | Anmelde-Middleware las das Cookie auch unter `/api` | `NoResult()` für alles unter `/api` | durch `DoorsTests.A_session_opens_nothing_under_api_v1` und die Tests der Basis-Pfade mit abgedeckt |
-| – | Razor-Fangnetz | `AuthorizeFolder("/")` | `AdminTests` (Rollen, ohne Sitzung) |
+| – | Razor-Fangnetz | `AuthorizeFolder("/")` | **entfallen mit den Razor-Seiten** (die Wege prüft jetzt der Wächter der Basis; Tests: `DoorsTests`, `AdminApiTests`, `WebApiTests`) |
 | – | Sicherungen ohne `secret.key` | Mit Passphrase geht der Schlüssel verschlüsselt (`….key.enc`) zu jeder Kopie, wird zusammen mit seiner Sicherung gelöscht und liegt nie im Klartext neben einem Dump; ohne Passphrase kommt er nicht hinein und die Sicherungsseite warnt deutlich | `BackupKeyTests` (4; mit einem Ersatz für `pg_dump`, laufen deshalb auch hier) |
 
 **Nicht gefolgt / anders gelöst:** Bei Punkt 8 zählt die Bremse **falsche Versuche** mit dem `RateLimit` der Basis (es kann nur zählen, nicht nachsehen) und führt die Sperre selbst. Bei Punkt 5 wird die Migration **unserer** Folge über die Verbindung ohne Zeitgrenze
@@ -275,7 +275,7 @@ den Einrichtungscode aus dem Log hat, kann das erste Konto anlegen: Die Einricht
 | `/api/web/v1/**` (Bibliothek, Hefte, Seiten, Dateien, Noten, Karten, Suche) | Sitzung der Basis (Wächter der Basis), nur eigene Zeilen und Dateien; der App-Token öffnet nichts davon | `Api/WebApi.cs`, `LibraryReader.Of(person)`, `AssetService.OpenAsync(id, person)` | `WebApiTests.*`, `OwnerTests.The_notebooks_of_the_web_…`, `DoorsTests.The_instance_token_opens_nothing_outside_api_v1` |
 | `/api/web/v1/admin/**` | Sitzung der Basis und Rolle `admin` (`RequireRole`, geprüft im Wächter der Basis) | `Api/AdminApi.cs` | `AdminApiTests.Only_an_administrator_gets_in_at_any_path` (ohne Sitzung 401, als `member` 403) |
 | `/Notes`, `/Notes/{id}`, `/Admin`, `/Admin/Codex|Profiles|Backups` | nur noch Weiterleitungen auf die neuen Adressen, ohne Inhalt | `Program.cs` | `DoorsTests.What_the_web_api_gives_is_never_kept_…` |
-| `/health/live`, `/health/ready`, Dateien in `wwwroot/` | offen | `Program.cs` | `AdminTests.The_open_endpoints_stay_open_…` |
+| `/health/live`, `/health/ready`, `/api/health`, `/api/about`, Dateien in `wwwroot/` | offen | `Program.cs`, `base/` | `/api/health` und `/api/about`: `DoorsTests.The_base_answers_health_about_…`; **`/health/live` und `/health/ready` haben seit dem Wegfall der Razor-Tests keinen benannten Test mehr** (kommt mit dem nächsten Bauen) |
 
 **Jede neue Regel:**
 
@@ -327,7 +327,7 @@ angefasst.** Das ist ein offener Betriebspunkt, kein Auftrag an diese Sitzung.
 
 ## Hier nicht prüfbar
 
-- **Sechs Backup-Tests** (`BackupServiceTests`, `BackupMirrorIntegrationTests`, `AdminTests.A_manual_backup_is_written_and_listed`): Auf dieser Maschine liegt `pg_dump` in Version 17, der Testserver ist 18
+- **Sechs Backup-Tests** (`BackupServiceTests`, `BackupMirrorIntegrationTests`; der frühere `AdminTests.A_manual_backup_…` ist mit den Razor-Seiten entfallen, `AdminApiTests.A_backup_is_made_by_hand_…` läuft mit einem Ersatz für `pg_dump`): Auf dieser Maschine liegt `pg_dump` in Version 17, der Testserver ist 18
   („unpassende Serverversion“). Das ist die Umgebung. Sie bleiben, wie sie sind; in der CI (mit Version 18) laufen sie.
 
 ## Nicht geprüft (ehrlich)
