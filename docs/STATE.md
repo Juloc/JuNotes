@@ -23,7 +23,7 @@ auf die gemeinsame Basis um (Entscheidungen vom 24.11.2026 in SCOPE.md).
 
 ## Nächster Schritt
 
-**Meilenstein 1 und 2 sind fertig** (1a, 1b, 1c; lokal committet, nichts gepusht, kein Release). Der Orchestrator prüft, die Sicherheitsprüfung (eigene Sitzung) liest 1a und 1b vor dem Einspielen
+**Meilenstein 1 und 2 sind fertig und von zwei Sicherheitsprüfungen gelesen; als Nächstes kommt das Einspielen (Sache des Orchestrators, Liste „Für das Einspielen“), danach Meilenstein 3** (Entwurf in `docs/ARCHITECTURE.md` 10 und 11; Scheiben 3a, 3c, 3d, 3b klein; die Übergabe von Heften ist zurückgestellt). **Meilenstein 1 und 2 sind fertig** (1a, 1b, 1c; lokal committet, nichts gepusht, kein Release). Der Orchestrator prüft, die Sicherheitsprüfung (eigene Sitzung) liest 1a und 1b vor dem Einspielen
 (Liste unten). **Meilenstein 2 ist gebaut** (siehe unten); Meilenstein 3 beginnt erst nach den Behebungen aus der zweiten Sicherheitsprüfung und dem Startzeichen des Orchestrators. Das Einspielen auf die laufende Installation ist seine Sache, mit Sicherung davor und dem Ja des Eigentümers.
 
 - **1a Basis eingehängt** (`base/` jetzt **0.3.4**, byteweise wie im Manifest): Konten, Sitzungen, Einrichtungsassistent, Rollen `admin` und `member`, Hub-Anmeldung, `/api/about`, `/api/health`, Einstellungen.
@@ -260,7 +260,7 @@ Stand 25.11.2026, nach beiden Sicherheitsprüfungen. **Nichts davon ist an der l
 | **Länge des App-Tokens** | `awk -F= '/^SYNC_TOKEN=/{print length($2)}' <ordner>/.env` (gibt nur die Länge aus) | **mindestens 32**, sonst startet der Server nicht. Ist es kürzer: neues Token (`openssl rand -base64 32`), in `.env` und **gleichzeitig** in der App eintragen |
 | Besitzer des Volumes | `docker compose exec junotes ls -ld /data` | gehört `app` (sonst kann der Schlüssel nicht angelegt werden und der Start bricht ab) |
 | Anzahl der Zeilen merken | `docker compose exec -T postgres psql -U junotes -d junotes -Atc "select count(*) from entities; select max(number) from schema_migrations"` | Zahlen aufschreiben (Vergleich nachher); Migration steht auf **7** |
-| **Vertrauenswürdige Proxys** | Der Reverse-Proxy schickt `X-Forwarded-For` und `X-Forwarded-Proto` (die Voreinstellung von Caddy). Nach dem Start in der App unter Einstellungen › Installation die Adresse des Proxys eintragen | Im Sicherheitsprotokoll und im Verlauf der Anmeldungen steht die **Adresse des Geräts**, nicht die des Proxys (sonst sperrt ein Fremder mit 10 falschen Token pro Minute das iPad nicht aus, aber die Protokollzeilen und die Sperre je Adresse sind wertlos) |
+| **Vertrauenswürdige Proxys** | Der Reverse-Proxy schickt `X-Forwarded-For` und `X-Forwarded-Proto` (die Voreinstellung von Caddy). Nach dem Start in der App unter Einstellungen › Installation die Adresse des Proxys eintragen | Im Sicherheitsprotokoll und im Verlauf der Anmeldungen steht die **Adresse des Geräts**, nicht die des Proxys (sonst zählen alle Geräte unter der Adresse des Proxys, und die Protokollzeilen und die Bremse je Adresse sagen nichts; ein richtiges Token wird davon nie abgewiesen) |
 | Der Stand, der gebaut wird | `git ls-remote <repository> refs/heads/main` stimmt mit dem getesteten Commit überein; der Build-Kontext der Compose-Datei zeigt auf **dieses** Repository (nach der Umbenennung zu `notes` prüfen, ob die Adresse noch stimmt) | derselbe Commit; Tests auf ihm: 379 von 384 grün, die 5 roten brauchen `pg_dump` 18 (in der CI und im Image vorhanden) |
 | Platz | `df -h` auf dem Host und `docker system df` | genug für Image, Sicherung, Volume-Kopie |
 
