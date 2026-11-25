@@ -239,7 +239,7 @@ die Basis legt ihre Tabellen an (`users`, `sessions`, … und `base_migrations`)
 einrichten (Authenticator-App, sechs Ziffern), die Wiederherstellungscodes sichern. Das erste Konto ist der Administrator. Danach gehören alle bisherigen Hefte und Dateien diesem Konto.
 
 **Was passiert, solange er es nicht getan hat:** Die iPad-App gleicht **weiter ab**, mit demselben Token, mit denselben Antworten (Vertragstests; Altstand-Probe unten). Die Zeilen, die dabei neu entstehen, gehören niemandem und gehen
-beim ersten Konto mit an den Administrator. **Nicht erreichbar sind bis dahin:** die Seiten `/Notes` und `/Admin` (sie schicken zur Einrichtung), also auch die Codex-Anmeldung und die Sicherungsseite im Browser. Wer die Adresse und
+beim ersten Konto mit an den Administrator. **Nicht erreichbar sind bis dahin:** die Seiten und Wege der Web-App (sie brauchen ein Konto; die Startseite zeigt die Einrichtung), also auch die Codex-Anmeldung und die Sicherungsseite im Browser. Wer die Adresse und
 den Einrichtungscode aus dem Log hat, kann das erste Konto anlegen: Die Einrichtung nicht liegen lassen.
 
 **Wie man zurückgeht:**
@@ -269,8 +269,9 @@ den Einrichtungscode aus dem Log hat, kann das erste Konto anlegen: Die Einricht
 |---|---|---|---|
 | `/api/v1/*` (Prefix, ohne Rücksicht auf Groß- und Kleinschreibung) | nur mit `Authorization: Bearer <Sync__Token>`; kein Cookie, kein `X-Base`, kein Origin; nur `/status` offen | `Api/V1Door.cs` (`CheckAsync`), Deklaration in `Program.cs` (`Doors`) | `ApiContractTests.Every_other_route_answers_401_…` (14 Wege × 3 Köpfe), `DoorsTests.A_session_opens_nothing_under_api_v1`, `…The_instance_token_opens_nothing_outside_api_v1`, `…The_token_door_needs_no_header…`, `…The_door_is_the_same_door_in_any_spelling_of_its_path` |
 | `/api/**` der Basis (Anmeldung, Einrichtung, Personen, Einstellungen, Konto) | Sitzung der Basis, `X-Base: 1` und Origin bei Änderungen | `base/` (unverändert, Tests der Basis) | `DoorsTests.The_base_answers_health_about_…` |
-| `/Notes`, `/Notes/{id}`, `/Notes/Asset/{id}` | Sitzung, Rolle `admin` oder `member`, nur eigene Zeilen | `Admin/AdminSetup.cs` (`BaseSessionHandler`, Richtlinie `Reader`), `LibraryReader.Of(person)` | `WebReaderTests.*`, `OwnerTests.The_notebooks_of_the_reader_…`, `AdminTests.An_ended_session_…` |
-| `/Admin/**` | Sitzung, Rolle `admin` | dieselbe Stelle, Richtlinie `Admin` | `AdminTests.A_member_reads_notes_but_does_not_open_the_admin_area_…` |
+| `/api/web/v1/**` (Bibliothek, Hefte, Seiten, Dateien, Noten, Karten, Stundenplan, Suche) | Sitzung der Basis (Wächter der Basis), nur eigene Zeilen und Dateien; der App-Token öffnet nichts davon | `Api/WebApi.cs`, `LibraryReader.Of(person)`, `AssetService.OpenAsync(id, person)` | `WebApiTests.*`, `OwnerTests.The_notebooks_of_the_web_…`, `DoorsTests.The_instance_token_opens_nothing_outside_api_v1` |
+| `/api/web/v1/admin/**` | Sitzung der Basis und Rolle `admin` (`RequireRole`, geprüft im Wächter der Basis) | `Api/AdminApi.cs` | `AdminApiTests.Only_an_administrator_gets_in_at_any_path` (ohne Sitzung 401, als `member` 403) |
+| `/Notes`, `/Notes/{id}`, `/Admin`, `/Admin/Codex|Profiles|Backups` | nur noch Weiterleitungen auf die neuen Adressen, ohne Inhalt | `Program.cs` | `DoorsTests.What_the_web_api_gives_is_never_kept_…` |
 | `/health/live`, `/health/ready`, Dateien in `wwwroot/` | offen | `Program.cs` | `AdminTests.The_open_endpoints_stay_open_…` |
 
 **Jede neue Regel:**
@@ -284,7 +285,7 @@ den Einrichtungscode aus dem Log hat, kann das erste Konto anlegen: Die Einricht
 | Dateien: fremde nicht ersetzen, nicht lesen, nicht finden (gleiche Antwort wie „nicht vorhanden“) | `OwnerTests.A_file_of_somebody_else_…` |
 | Zeilen und Dateien ohne Besitzer gehen genau einmal an den ersten Administrator, an niemanden sonst; der Token steht danach für ihn, auch wenn weitere Administratoren kommen | `OwnerTests.Rows_and_files_that_nobody_owned_…` |
 | Ein Verstoß über die Tür der App ist still ausgelassen, die Antwort verrät nichts, das Sicherheitsprotokoll nennt Person, Gerät, Art, **keine Inhalte**, höchstens eine Zeile je Minute | `OwnerTests.A_broken_rule_through_the_door_of_the_app_…` |
-| Die alten Seiten bekommen nur `style-src-attr 'unsafe-inline'` zusätzlich, überall sonst gilt die Richtlinie der Basis unverändert | `AdminTests.The_old_pages_get_only_the_one_relaxation_…` |
+| Überall gilt die Richtlinie der Basis unverändert (die Lockerung der alten Seiten ist mit ihnen verschwunden) | `DoorsTests.What_the_web_api_gives_is_never_kept_…` |
 | Ein verformter Stapel bleibt 400 und speichert nichts | `ApiContractTests.Push_refuses_a_malformed_batch_…` |
 
 **Bekannte Lücken und Grenzen (ohne Beschönigung):**
@@ -295,7 +296,7 @@ den Einrichtungscode aus dem Log hat, kann das erste Konto anlegen: Die Einricht
 - Die Drossel des Sicherheitsprotokolls steht im Speicher (ein Neustart setzt sie zurück); das Schreiben ist „abschicken und weitermachen“ (ein Fehler wird nur ins Log geschrieben).
 - Die Zuweisung geschieht beim ersten Zugriff nach dem ersten Konto (Abweichung 6), die Ermittlung des ersten Administrators liest die Tabelle `users` der Basis mit eigenem SQL (Kopplung an deren Schema).
 - Die Einrichtungsseite ist offen, bis das erste Konto existiert (Entwurf der Basis); der Code steht im Log.
-- Die Seiten `/Notes` und `/Admin` sind alte Razor-Seiten mit Anti-Forgery; ihre Inhalte (`Html.Raw` des gezeichneten SVG) sind wie vorher.
+- Das gezeichnete Bild einer Seite kommt als SVG vom Server und wird im Browser als Knoten eingesetzt (kein `innerHTML`); `<foreignObject>` mit dem Text eines Textfelds bleibt erhalten (der Text ist dort HTML-kodiert, `PageRenderer`).
 - Nicht geprüft: Anmeldung über den **Hub** (kein Hub in dieser Umgebung), echte Proxys und HTTPS (das `__Host-`-Cookie gilt nur unter HTTPS), Lasttest.
 
 ## Betriebspunkt: die laufende Installation
