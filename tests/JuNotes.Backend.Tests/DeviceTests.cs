@@ -239,6 +239,43 @@ namespace JuNotes.Backend.Tests
         }
 
         [RequiresDatabaseFact]
+        public async Task A_person_can_remove_all_their_own_devices_at_once_and_nobody_elses()
+        {
+            await using var scene = await Scene.StartAsync();
+            using var a1 = scene.Device(await scene.PairAsync(scene.A, scene.AClient, "iPad A"));
+            using var a2 = scene.Device(await scene.PairAsync(scene.A, scene.AClient, "iPhone A"));
+            using var b = scene.Device(await scene.PairAsync(scene.B, scene.BClient, "iPad B"));
+
+            Assert.Equal(HttpStatusCode.Unauthorized, (await scene.Host.Browser().SendAsync(Scene.Web(HttpMethod.Delete, "/devices"))).StatusCode);
+            var answer = await scene.AClient.SendAsync(Scene.Web(HttpMethod.Delete, "/devices"));
+
+            Assert.Equal(2, (await ReadAsync(answer)).GetProperty("removed").GetInt32());
+            Assert.Equal(HttpStatusCode.Unauthorized, (await a1.GetAsync(Url("/api/v1/sync/pull"))).StatusCode);
+            Assert.Equal(HttpStatusCode.Unauthorized, (await a2.GetAsync(Url("/api/v1/sync/pull"))).StatusCode);
+            Assert.Equal(HttpStatusCode.OK, (await b.GetAsync(Url("/api/v1/sync/pull"))).StatusCode);
+            Assert.Equal(0, (await ReadAsync(await scene.AClient.SendAsync(Scene.Web(HttpMethod.Delete, "/devices")))).GetProperty("removed").GetInt32());
+            var entry = (await scene.Host.Services.GetRequiredService<AuditStore>().ListAsync(50)).First(line => line.Event == "device.removed_all");
+            Assert.Equal("0 device(s)", entry.Detail);
+        }
+
+        [RequiresDatabaseFact]
+        public async Task Device_tokens_survive_a_new_password_and_a_new_second_factor_and_signing_out_the_other_sessions_on_purpose()
+        {
+            await using var scene = await Scene.StartAsync();
+            using var a = scene.Device(await scene.PairAsync(scene.A, scene.AClient, "iPad A"));
+            var users = scene.Host.Services.GetRequiredService<UserStore>();
+
+            // What the person does to their account: a new password (other sessions end), a new second factor (all sessions end), signing the others out.
+            await users.SetPasswordAsync(scene.A, "not-a-hash-either", endSessions: true);
+            await users.ReplaceTotpAsync(scene.A, "OTHERSECRET", [], default);
+            await scene.Host.Services.GetRequiredService<SessionStore>().DeleteOthersAsync(scene.A, Guid.NewGuid());
+
+            // The key of the device is a key of its own and is not touched: this is the decision (STATE.md), and "remove all devices" is the way to end it.
+            Assert.Equal(HttpStatusCode.OK, (await a.GetAsync(Url("/api/v1/sync/pull"))).StatusCode);
+            Assert.Equal(HttpStatusCode.Unauthorized, (await scene.AClient.GetAsync(Url("/api/web/v1/devices"))).StatusCode);
+        }
+
+        [RequiresDatabaseFact]
         public async Task The_device_of_a_blocked_person_gets_401_and_the_other_persons_device_goes_on()
         {
             await using var scene = await Scene.StartAsync();

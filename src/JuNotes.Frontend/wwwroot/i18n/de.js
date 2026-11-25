@@ -222,4 +222,7 @@ export default {
   'adm.revoked': 'Geräte widerrufen.',
   'adm.noPeople': 'Noch keine Personen.',
   'adm.tokUseNone': 'In den letzten 30 Tagen hat ihn keine Adresse benutzt.',
+  'dev.removeAll': 'Alle Geräte entfernen',
+  'dev.removeAllTitle': 'Alle Geräte entfernen?',
+  'dev.removeAllText': '{n} Geräte haben danach keinen Zugriff mehr und müssen neu gekoppelt werden. Das ist der Weg nach einem verlorenen Gerät oder nach einem neuen Passwort oder zweiten Faktor: deren Schlüssel ändern sich dadurch nicht.',
 };

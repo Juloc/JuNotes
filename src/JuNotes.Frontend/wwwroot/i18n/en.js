@@ -222,4 +222,7 @@ export default {
   'adm.revoked': 'Devices revoked.',
   'adm.noPeople': 'No people yet.',
   'adm.tokUseNone': 'No address used it in the last 30 days.',
+  'dev.removeAll': 'Remove all devices',
+  'dev.removeAllTitle': 'Remove all devices?',
+  'dev.removeAllText': '{n} devices will have no access afterwards and have to be paired again. This is the way after a lost device, or after a new password or second factor: their keys are not changed by those.',
 };

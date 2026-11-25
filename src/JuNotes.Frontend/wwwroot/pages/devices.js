@@ -27,6 +27,7 @@ export function pairingCard() {
     devices = page.items;
     list.replaceChildren(...devices.map(row));
     none.hidden = devices.length > 0;
+    removeAll.hidden = devices.length < 2;
   }
 
   function row(device) {
@@ -87,7 +88,15 @@ export function pairingCard() {
     area.append(h('div', { class: 'stack s' }, h('p', { class: 'field-hint', text: t('dev.intro') }), form));
   }
 
+  // All devices at once: a lost device, or after a new password or second factor (the keys of the devices are not changed by those).
+  const removeAll = h('button', { class: 'btn ghost danger', type: 'button', text: t('dev.removeAll') });
+  removeAll.addEventListener('click', async () => {
+    if (!devices.length || !await confirmDialog({ title: t('dev.removeAllTitle'), text: t('dev.removeAllText', { n: devices.length }), confirmLabel: t('dev.removeAll'), danger: true })) return;
+    try { await api('DELETE', D); toast(t('dev.removed'), { kind: 'ok' }); await load(); }
+    catch (e) { if (!(e instanceof ApiError)) throw e; toast(errorText(e), { kind: 'danger' }); }
+  });
+
   showStart();
   load().catch((e) => list.replaceChildren(h('div', { class: 'row' }, notice(errorText(e), 'danger'))));
-  return h('section', { class: 'card stack s' }, h('h2', { class: 'card-title', text: t('dev.title') }), none, list, area);
+  return h('section', { class: 'card stack s' }, h('h2', { class: 'card-title', text: t('dev.title') }), none, list, h('div', { class: 'cluster' }, removeAll), area);
 }

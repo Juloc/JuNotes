@@ -37,6 +37,15 @@ namespace JuNotes.Frontend.Api
                 return Results.Ok(new PairingCode(code, expires));
             });
 
+            // All the person's own devices at once (the remedy for a lost device, and for a changed password or second factor: device tokens survive those on purpose, see STATE.md).
+            devices.MapDelete(string.Empty, async (HttpContext ctx, DeviceStore store, AuditStore audit) =>
+            {
+                var who = ctx.Person();
+                var removed = (await store.RevokeAllAsync(who.UserId, ctx.RequestAborted))?.Revoked ?? 0;
+                await audit.AddAsync(who.UserName, "device.removed_all", ctx.ClientIp(), $"{removed} device(s)", ctx.RequestAborted);
+                return Results.Ok(new { removed });
+            });
+
             devices.MapDelete("/{id:guid}", async (Guid id, HttpContext ctx, DeviceStore store, AuditStore audit) =>
             {
                 var who = ctx.Person();
