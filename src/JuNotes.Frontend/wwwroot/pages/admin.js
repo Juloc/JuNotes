@@ -151,8 +151,10 @@ export async function devicesPage() {
     });
   }
 
+  // Switching off is only possible once a device with a key of its own has been seen: the iPad app cannot pair yet, and without such a device switching off would lock it out.
+  const blocked = tok.enabled && tok.devicesSeen === 0;
   const toggle = !tok.configured ? null
-    : h('button', { class: `btn ${tok.enabled ? 'outline danger' : 'primary'}`, type: 'button', text: t(tok.enabled ? 'adm.tokOffDo' : 'adm.tokOnDo') });
+    : h('button', { class: `btn ${tok.enabled ? 'outline danger' : 'primary'}`, type: 'button', text: t(tok.enabled ? 'adm.tokOffDo' : 'adm.tokOnDo'), disabled: blocked });
   if (toggle) toggle.addEventListener('click', () => askCode(tok.enabled));
 
   const people = d.people.map((p) => {
@@ -170,6 +172,8 @@ export async function devicesPage() {
       h('p', { class: 'muted', text: t('adm.tokIntro') }),
       tok.configured ? h('p', { text: use }) : notice(t('adm.tokNoEnv'), 'info'),
       tok.configured ? h('p', { class: 'field-hint', text: t('adm.tokAddressNote') }) : null,
+      tok.configured && tok.enabled ? notice(t('adm.tokCannotPair'), 'warn') : null,
+      blocked ? h('p', { class: 'field-hint', text: t('adm.tokNeedsDevice') }) : null,
       toggle ? h('div', { class: 'cluster' }, toggle) : null),
     h('section', { class: 'card stack s' }, h('h2', { class: 'card-title', text: t('adm.peopleDevices') }), h('p', { class: 'muted', text: t('adm.peopleDevicesText' ) }),
       people.length ? h('div', { class: 'list' }, people) : emptyState({ icon: 'phone', title: t('adm.noPeople') })));

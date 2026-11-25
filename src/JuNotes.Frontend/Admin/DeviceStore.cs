@@ -205,6 +205,15 @@ namespace JuNotes.Frontend.Admin
             return list;
         }
 
+        // How many devices with a key of their own were seen in the last 30 days (a device counts as seen when it is paired). The shared token can only be switched off when
+        // there is at least one: without it nothing but the shared token has been used, and switching it off would shut the app out.
+        public async Task<int> SeenRecentlyAsync(CancellationToken ct)
+        {
+            await using var command = data.CreateCommand("select count(*) from device_tokens where revoked_at is null and last_seen >= $1");
+            command.Parameters.Add(new NpgsqlParameter { Value = time.GetUtcNow() - TimeSpan.FromDays(30) });
+            return (int)(long)(await command.ExecuteScalarAsync(ct))!;
+        }
+
         // Revokes every device of a person (a lost iPad: the person pairs the others again). How many there were, and the name for the log; null when there is no such person.
         public async Task<(int Revoked, string Name)?> RevokeAllAsync(Guid person, CancellationToken ct)
         {

@@ -244,9 +244,49 @@ namespace JuNotes.Backend.Tests
         }
 
         [RequiresDatabaseFact]
+        public async Task The_shared_token_cannot_be_switched_off_until_a_device_with_its_own_key_has_been_seen_in_the_last_thirty_days()
+        {
+            await using var scene = await Scene.StartAsync();
+            Assert.Equal(HttpStatusCode.OK, await scene.PullAsync(AdminHost.Token, "203.0.113.1"));
+            var none = await ReadAsync(await scene.AdaClient.SendAsync(Admin(HttpMethod.Get, "/shared-token")));
+            Assert.Equal(0, none.GetProperty("devicesSeen").GetInt32());
+
+            // No device yet: refused with a sentence, and the code of the second factor is not spent on it (a right code works at once afterwards).
+            var code = scene.Factor.Next(scene.Ada);
+            var refused = await scene.SwitchAsync("off", code);
+            Assert.Equal(HttpStatusCode.Conflict, refused.StatusCode);
+            Assert.Equal("sharedtoken.no_device", (await ReadAsync(refused)).GetProperty("error").GetString());
+            Assert.Equal(0, await scene.CountAsync("app_instance_settings", "key = 'shared_token_off'"));
+            Assert.Equal(HttpStatusCode.OK, await scene.PullAsync(AdminHost.Token, "203.0.113.1"));
+
+            // A device that was not seen for 31 days does not count, and neither does a removed one.
+            var token = await scene.DeviceAsync(scene.Bea, "iPad von Bea");
+            await using (var old = scene.Database.Data.CreateCommand("update device_tokens set last_seen = now() - interval '31 days'"))
+            {
+                await old.ExecuteNonQueryAsync();
+            }
+
+            Assert.Equal(HttpStatusCode.Conflict, (await scene.SwitchAsync("off", scene.Factor.Next(scene.Ada))).StatusCode);
+            await using (var seen = scene.Database.Data.CreateCommand("update device_tokens set last_seen = now() - interval '29 days'"))
+            {
+                await seen.ExecuteNonQueryAsync();
+            }
+
+            Assert.Equal(1, (await ReadAsync(await scene.AdaClient.SendAsync(Admin(HttpMethod.Get, "/shared-token")))).GetProperty("devicesSeen").GetInt32());
+            await scene.AdaClient.SendAsync(Admin(HttpMethod.Post, $"/people/{scene.Bea}/devices/revoke"));
+            Assert.Equal(HttpStatusCode.Conflict, (await scene.SwitchAsync("off", scene.Factor.Next(scene.Ada))).StatusCode);
+            Assert.Equal(HttpStatusCode.Unauthorized, await scene.PullAsync(token));
+
+            // A device seen within 30 days is enough.
+            await scene.DeviceAsync(scene.Cleo, "iPad von Cleo");
+            Assert.Equal(HttpStatusCode.OK, (await scene.SwitchAsync("off", scene.Factor.Next(scene.Ada))).StatusCode);
+        }
+
+        [RequiresDatabaseFact]
         public async Task A_right_token_that_is_switched_off_is_not_counted_as_a_wrong_one_and_shows_up_once_in_the_log()
         {
             await using var scene = await Scene.StartAsync();
+            await scene.DeviceAsync(scene.Bea, "iPad von Bea");
             Assert.Equal(HttpStatusCode.OK, (await scene.SwitchAsync("off", scene.Factor.Next(scene.Ada))).StatusCode);
             var brake = scene.Host.Services.GetRequiredService<TokenBrake>();
 
@@ -275,6 +315,7 @@ namespace JuNotes.Backend.Tests
         public async Task Switching_it_on_again_needs_a_fresh_code_and_an_environment_that_still_has_the_token_and_both_ways_are_logged()
         {
             await using var scene = await Scene.StartAsync();
+            await scene.DeviceAsync(scene.Bea, "iPad von Bea");
             Assert.Equal(HttpStatusCode.OK, await scene.PullAsync(AdminHost.Token));
             Assert.Equal(HttpStatusCode.OK, (await scene.SwitchAsync("off", scene.Factor.Next(scene.Ada))).StatusCode);
             Assert.Equal(HttpStatusCode.Unauthorized, await scene.PullAsync(AdminHost.Token));
@@ -304,6 +345,7 @@ namespace JuNotes.Backend.Tests
         public async Task A_token_that_the_environment_does_not_carry_cannot_be_switched_on()
         {
             await using var scene = await Scene.StartAsync(sharedToken: null);
+            await scene.DeviceAsync(scene.Bea, "iPad von Bea");
 
             var state = await ReadAsync(await scene.AdaClient.SendAsync(Admin(HttpMethod.Get, "/shared-token")));
             Assert.False(state.GetProperty("configured").GetBoolean());
