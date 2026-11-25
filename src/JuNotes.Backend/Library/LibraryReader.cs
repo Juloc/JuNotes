@@ -37,10 +37,17 @@ namespace JuNotes.Backend.Library
     public sealed record StrokeInfo(Guid Id, string Tool, string Color, double Width, IReadOnlyList<(double X, double Y)> Points);
 
     // Reads what the iPad synced, for the web view. Everything it hands out is what is not in the trash and not deleted.
-    public sealed class LibraryReader(NpgsqlDataSource dataSource, Guid? owner = null)
+    public sealed class LibraryReader
     {
-        // The same reader, held to one person's rows: what somebody else owns is not there. Without a person (the plain reader) it reads everything.
-        public LibraryReader Of(Guid person) => new(dataSource, person);
+        private readonly NpgsqlDataSource dataSource;
+        private readonly Guid? owner;
+
+        // Without a person this reads everything; only the tests and Libraries (which always names a person) make one, so no route of the server can hold a reader of everybody's notes.
+        internal LibraryReader(NpgsqlDataSource dataSource, Guid? owner = null)
+        {
+            this.dataSource = dataSource;
+            this.owner = owner;
+        }
 
         public async Task<IReadOnlyList<SubjectInfo>> SubjectsAsync(CancellationToken ct)
         {
@@ -226,5 +233,15 @@ namespace JuNotes.Backend.Library
         private static int Number(JsonElement parent, string name) => parent.TryGetProperty(name, out var value) && value.TryGetInt32(out var number) ? number : 0;
 
         private static DateTimeOffset? Date(JsonElement parent, string name) => Text(parent, name) is { } text && DateTimeOffset.TryParse(text, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var date) ? date : null;
+    }
+}
+
+namespace JuNotes.Backend.Library
+{
+    // The only way to a reader that the server hands out: always for one person. There is no reader of everybody's notes to ask for, so a route that forgets to say whose notes
+    // it reads does not compile.
+    public sealed class Libraries(NpgsqlDataSource dataSource)
+    {
+        public LibraryReader Of(Guid person) => new(dataSource, person);
     }
 }

@@ -77,7 +77,7 @@ namespace JuNotes.Backend.Service
             });
             services.AddSingleton<SchoolStore>();
             services.AddSingleton<SchoolImportService>();
-            services.AddSingleton<LibraryReader>();
+            services.AddSingleton<Libraries>();
             services.AddSingleton<HealthService>();
             services.AddSingleton<SyncService>();
             services.AddSingleton(new SyncAccess(configuration["Sync:Token"]));

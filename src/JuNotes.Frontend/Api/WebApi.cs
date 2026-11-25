@@ -35,12 +35,12 @@ namespace JuNotes.Frontend.Api
                 return await next(invocation);
             });
 
-            api.MapGet("/folders", async (int? limit, string? cursor, HttpContext ctx, LibraryReader library) =>
-                Paged((await Mine(ctx, library).SubjectsAsync(ctx.RequestAborted)).Select(Folder).ToList(), limit, cursor, folder => folder.Id));
+            api.MapGet("/folders", async (int? limit, string? cursor, HttpContext ctx, Libraries libraries) =>
+                Paged((await Mine(ctx, libraries).SubjectsAsync(ctx.RequestAborted)).Select(Folder).ToList(), limit, cursor, folder => folder.Id));
 
-            api.MapGet("/notebooks", async (string? folder, int? limit, string? cursor, HttpContext ctx, LibraryReader library) =>
+            api.MapGet("/notebooks", async (string? folder, int? limit, string? cursor, HttpContext ctx, Libraries libraries) =>
             {
-                var all = await Mine(ctx, library).NotebooksAsync(ctx.RequestAborted);
+                var all = await Mine(ctx, libraries).NotebooksAsync(ctx.RequestAborted);
                 var shown = folder switch
                 {
                     null or "" => all,
@@ -51,26 +51,26 @@ namespace JuNotes.Frontend.Api
                 return Paged(shown.Select(Notebook).ToList(), limit, cursor, notebook => notebook.Id);
             });
 
-            api.MapGet("/notebooks/{id:guid}", async (Guid id, HttpContext ctx, LibraryReader library) =>
+            api.MapGet("/notebooks/{id:guid}", async (Guid id, HttpContext ctx, Libraries libraries) =>
             {
-                var mine = Mine(ctx, library);
+                var mine = Mine(ctx, libraries);
                 return await mine.NotebookAsync(id, ctx.RequestAborted) is { } notebook
                     ? Results.Ok(new NotebookDetail(Notebook(notebook), (await mine.PagesAsync(id, ctx.RequestAborted)).Count))
                     : Error.NotFound().ToHttp();
             });
 
-            api.MapGet("/notebooks/{id:guid}/pages", async (Guid id, int? limit, string? cursor, HttpContext ctx, LibraryReader library) =>
+            api.MapGet("/notebooks/{id:guid}/pages", async (Guid id, int? limit, string? cursor, HttpContext ctx, Libraries libraries) =>
             {
-                var mine = Mine(ctx, library);
+                var mine = Mine(ctx, libraries);
                 return await mine.NotebookAsync(id, ctx.RequestAborted) is null
                     ? Error.NotFound().ToHttp()
-                    : Results.Ok(Paged((await mine.PagesAsync(id, ctx.RequestAborted)).Select(Page).ToList(), limit, cursor, page => page.Id));
+                    : Paged((await mine.PagesAsync(id, ctx.RequestAborted)).Select(Page).ToList(), limit, cursor, page => page.Id);
             });
 
             // The page as it is drawn: the paper, her objects and her strokes as one picture, as the old web view drew it. The scan or PDF a page may stand on is a file of its own.
-            api.MapGet("/pages/{id:guid}", async (Guid id, HttpContext ctx, LibraryReader library) =>
+            api.MapGet("/pages/{id:guid}", async (Guid id, HttpContext ctx, Libraries libraries) =>
             {
-                var mine = Mine(ctx, library);
+                var mine = Mine(ctx, libraries);
                 if (await mine.PageAsync(id, ctx.RequestAborted) is not { } page || await mine.NotebookAsync(page.NotebookId, ctx.RequestAborted) is not { } notebook)
                 {
                     return Error.NotFound().ToHttp();
@@ -93,20 +93,20 @@ namespace JuNotes.Frontend.Api
                 return Results.Stream(file.Stream, file.ContentType, enableRangeProcessing: true);
             });
 
-            api.MapGet("/grades", async (string? folder, int? limit, string? cursor, HttpContext ctx, LibraryReader library) =>
+            api.MapGet("/grades", async (string? folder, int? limit, string? cursor, HttpContext ctx, Libraries libraries) =>
             {
-                var all = await Mine(ctx, library).GradesAsync(ctx.RequestAborted);
+                var all = await Mine(ctx, libraries).GradesAsync(ctx.RequestAborted);
                 return Paged((Guid.TryParse(folder, out var id) ? all.Where(grade => grade.SubjectId == id).ToList() : all), limit, cursor, grade => grade.Id);
             });
 
-            api.MapGet("/cards", async (string? folder, int? limit, string? cursor, HttpContext ctx, LibraryReader library) =>
+            api.MapGet("/cards", async (string? folder, int? limit, string? cursor, HttpContext ctx, Libraries libraries) =>
             {
-                var all = await Mine(ctx, library).CardsAsync(ctx.RequestAborted);
+                var all = await Mine(ctx, libraries).CardsAsync(ctx.RequestAborted);
                 return Paged((Guid.TryParse(folder, out var id) ? all.Where(card => card.SubjectId == id).ToList() : all), limit, cursor, card => card.Id);
             });
 
             // Names of folders and notebooks. The text the iPad recognises in handwriting stays there (it is not synced), so the web cannot search inside pages yet.
-            api.MapGet("/search", async (string? q, HttpContext ctx, LibraryReader library) =>
+            api.MapGet("/search", async (string? q, HttpContext ctx, Libraries libraries) =>
             {
                 var term = (q ?? string.Empty).Trim();
                 if (term.Length is 0 or > 100)
@@ -114,7 +114,7 @@ namespace JuNotes.Frontend.Api
                     return Results.Ok(new SearchResult([], []));
                 }
 
-                var mine = Mine(ctx, library);
+                var mine = Mine(ctx, libraries);
                 bool Has(string text) => text.Contains(term, StringComparison.CurrentCultureIgnoreCase);
                 var folders = (await mine.SubjectsAsync(ctx.RequestAborted)).Where(folder => Has(folder.Name)).Take(30).Select(Folder).ToList();
                 var notebooks = (await mine.NotebooksAsync(ctx.RequestAborted)).Where(notebook => Has(notebook.Title)).Take(30).Select(Notebook).ToList();
@@ -122,7 +122,7 @@ namespace JuNotes.Frontend.Api
             });
         }
 
-        private static LibraryReader Mine(HttpContext ctx, LibraryReader library) => library.Of(ctx.Person().UserId);
+        private static LibraryReader Mine(HttpContext ctx, Libraries libraries) => libraries.Of(ctx.Person().UserId);
 
         private static FolderDto Folder(SubjectInfo folder) => new(folder.Id, folder.Name, folder.Color, folder.Symbol, folder.Sort, folder.ParentId, folder.IsSubject);
 
@@ -130,18 +130,24 @@ namespace JuNotes.Frontend.Api
 
         private static PageDto Page(PageInfo page) => new(page.Id, page.NotebookId, page.Sort, page.ContentType, page.AssetId, page.PdfPageIndex, page.Heading, page.PrintedText, page.Solution, page.Additions);
 
-        // Page by page, the cursor being the id of the last row given. The lists of one person are short, so they are read whole and cut here.
-        private static Page<T> Paged<T>(IReadOnlyList<T> all, int? limit, string? cursor, Func<T, Guid> idOf)
+        // Page by page, the cursor being the id of the last row given. A cursor that is not ours, or whose row is gone since the last page, is an error (cursor.stale) and
+        // not a start from the beginning: the page asks again from the top and drops what it has seen twice.
+        private static IResult Paged<T>(IReadOnlyList<T> all, int? limit, string? cursor, Func<T, Guid> idOf)
         {
             var request = PageRequest.From(limit, cursor);
             var start = 0;
-            if (Cursor.TryDecode(request.Cursor, out var last))
+            if (!string.IsNullOrEmpty(cursor))
             {
-                var index = all.ToList().FindIndex(item => idOf(item) == last);
-                start = index < 0 ? 0 : index + 1;
+                var index = request.Cursor is not null && Cursor.TryDecode(request.Cursor, out var last) ? all.ToList().FindIndex(item => idOf(item) == last) : -1;
+                if (index < 0)
+                {
+                    return Error.Invalid("cursor.stale", "The list changed since the last page; start again from the top.").ToHttp();
+                }
+
+                start = index + 1;
             }
 
-            return Page<T>.From(all.Skip(start).Take(request.Limit + 1).ToList(), request.Limit, item => Cursor.Encode(idOf(item)));
+            return Results.Ok(Page<T>.From(all.Skip(start).Take(request.Limit + 1).ToList(), request.Limit, item => Cursor.Encode(idOf(item))));
         }
     }
 }

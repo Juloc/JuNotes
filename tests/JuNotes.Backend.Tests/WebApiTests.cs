@@ -231,7 +231,19 @@ namespace JuNotes.Backend.Tests
                 // A limit of 0 is raised, one above 200 is lowered, a cursor that is not ours starts at the beginning.
                 Assert.Single((await JsonAsync(await scene.AClient.GetAsync(Url("/api/web/v1/notebooks?folder=root&limit=0")))).GetProperty("items").EnumerateArray());
                 Assert.Equal(150, (await JsonAsync(await scene.AClient.GetAsync(Url("/api/web/v1/notebooks?folder=root&limit=100000")))).GetProperty("items").GetArrayLength());
-                Assert.Equal(40, (await JsonAsync(await scene.AClient.GetAsync(Url("/api/web/v1/notebooks?folder=root&limit=40&cursor=nonsense")))).GetProperty("items").GetArrayLength());
+                // A cursor that is not ours, or whose row is gone, is an error and not a start from the beginning (the page asks again and drops what it has twice).
+                var nonsense = await scene.AClient.GetAsync(Url("/api/web/v1/notebooks?folder=root&limit=40&cursor=nonsense"));
+                Assert.Equal(HttpStatusCode.BadRequest, nonsense.StatusCode);
+                Assert.Contains("cursor.stale", await nonsense.Content.ReadAsStringAsync(), StringComparison.Ordinal);
+                var first = await JsonAsync(await scene.AClient.GetAsync(Url("/api/web/v1/notebooks?folder=root&limit=40")));
+                var afterFirst = first.GetProperty("next").GetString()!;
+                var lastId = Guid.Parse(first.GetProperty("items").EnumerateArray().Last().GetProperty("id").GetString()!);
+                await using (var gone = scene.Database.Data.CreateCommand($"delete from entities where id = '{lastId}'"))
+                {
+                    await gone.ExecuteNonQueryAsync();
+                }
+
+                Assert.Equal(HttpStatusCode.BadRequest, (await scene.AClient.GetAsync(Url("/api/web/v1/notebooks?folder=root&limit=40&cursor=" + Uri.EscapeDataString(afterFirst)))).StatusCode);
             }
             finally
             {
@@ -291,6 +303,23 @@ namespace JuNotes.Backend.Tests
                 Assert.Equal("5/6", (await JsonAsync(await scene.AClient.GetAsync(Url($"/api/web/v1/pages/{Page}")))).GetProperty("page").GetProperty("solution").GetString());
                 Assert.Single((await JsonAsync(await scene.AClient.GetAsync(Url("/api/web/v1/grades")))).GetProperty("items").EnumerateArray());
                 Assert.Single((await JsonAsync(await scene.AClient.GetAsync(Url("/api/web/v1/cards")))).GetProperty("items").EnumerateArray());
+            }
+            finally
+            {
+                await EndAsync(scene);
+            }
+        }
+
+        // Review 2, point 11: the server hands out no reader of everybody's notes; only Libraries.Of(person) exists.
+        [RequiresDatabaseFact]
+        public async Task There_is_no_reader_of_everybodys_notes_to_ask_for()
+        {
+            var scene = await StartAsync();
+            try
+            {
+                Assert.Null(scene.Host.Services.GetService(typeof(JuNotes.Backend.Library.LibraryReader)));
+                Assert.NotNull(scene.Host.Services.GetService(typeof(JuNotes.Backend.Library.Libraries)));
+                Assert.Empty(typeof(JuNotes.Backend.Library.LibraryReader).GetConstructors(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance));
             }
             finally
             {

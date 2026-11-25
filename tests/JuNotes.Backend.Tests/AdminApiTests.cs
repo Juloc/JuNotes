@@ -2,11 +2,12 @@ using System.Net;
 using System.Text;
 using System.Text.Json;
 using JuNotes.Frontend.Admin;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace JuNotes.Backend.Tests
 {
     // The administration as JSON (/api/web/v1/admin): only for the role admin, and the same things the old pages did.
-    public sealed class AdminApiTests : IDisposable
+    public sealed partial class AdminApiTests : IDisposable
     {
         private const string SignedInCodex = """
             case "$1 $2" in
@@ -66,6 +67,29 @@ namespace JuNotes.Backend.Tests
             return document.RootElement.Clone();
         }
 
+        // The routes are the ones the server really has (taken from its own list of endpoints), so a new administration path cannot be left out of this test.
+        private static List<(HttpMethod Method, string Path, string Template)> Endpoints(AdminHost host, string prefix)
+        {
+            var found = new List<(HttpMethod, string, string)>();
+            foreach (var endpoint in host.Services.GetRequiredService<Microsoft.AspNetCore.Routing.EndpointDataSource>().Endpoints.OfType<Microsoft.AspNetCore.Routing.RouteEndpoint>())
+            {
+                var template = endpoint.RoutePattern.RawText ?? string.Empty;
+                if (!template.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                var path = GuidParameter().Replace(template, Guid.NewGuid().ToString());
+                path = Parameter().Replace(path, "quiz");
+                foreach (var method in endpoint.Metadata.GetMetadata<Microsoft.AspNetCore.Routing.HttpMethodMetadata>()?.HttpMethods ?? ["GET"])
+                {
+                    found.Add((new HttpMethod(method), path, template));
+                }
+            }
+
+            return found;
+        }
+
         [RequiresDatabaseFact]
         public async Task Only_an_administrator_gets_in_at_any_path()
         {
@@ -77,22 +101,35 @@ namespace JuNotes.Backend.Tests
                 var admin = await host.SignedInAsync();
                 var member = await host.SignedInAsync("member");
                 using var anonymous = host.Browser();
-                var routes = new (HttpMethod Method, string Path, string? Body)[]
-                {
-                    (HttpMethod.Get, "/overview", null), (HttpMethod.Post, "/school/import", "{}"), (HttpMethod.Get, "/codex", null), (HttpMethod.Post, "/codex/login", "{}"), (HttpMethod.Post, "/codex/cancel", "{}"),
-                    (HttpMethod.Post, "/codex/logout", "{}"), (HttpMethod.Put, "/codex/settings", "{}"), (HttpMethod.Get, "/profiles", null), (HttpMethod.Put, "/profiles/quiz", "{}"), (HttpMethod.Post, "/profiles/quiz/reset", "{}"),
-                    (HttpMethod.Get, "/backups", null), (HttpMethod.Post, "/backups/run", "{}"),
-                };
+                var routes = Endpoints(host, "/api/web/v1/admin");
 
-                foreach (var (method, path, body) in routes)
+                // The list is the real one: at least what is known to exist is in it.
+                Assert.True(routes.Count >= 12, $"only {routes.Count} administration endpoints found");
+                foreach (var (method, path, template) in routes)
                 {
-                    Assert.True((await anonymous.SendAsync(Change(method, path, body))).StatusCode == HttpStatusCode.Unauthorized, $"anonymous {method} {path}");
-                    Assert.True((await member.SendAsync(Change(method, path, body))).StatusCode == HttpStatusCode.Forbidden, $"member {method} {path}");
+                    var body = method == HttpMethod.Get ? null : "{}";
+                    Assert.True((await anonymous.SendAsync(Change(method, path.Replace("/api/web/v1/admin", string.Empty, StringComparison.Ordinal), body))).StatusCode == HttpStatusCode.Unauthorized, $"anonymous {method} {template}");
+                    Assert.True((await member.SendAsync(Change(method, path.Replace("/api/web/v1/admin", string.Empty, StringComparison.Ordinal), body))).StatusCode == HttpStatusCode.Forbidden, $"member {method} {template}");
                 }
 
                 Assert.Equal(HttpStatusCode.OK, (await admin.SendAsync(Change(HttpMethod.Get, "/overview"))).StatusCode);
+
+                // And every other path of the web API needs a session (no path of it answers a stranger).
+                foreach (var (method, path, template) in Endpoints(host, "/api/web/v1").Where(route => !route.Template.StartsWith("/api/web/v1/admin", StringComparison.OrdinalIgnoreCase)))
+                {
+                    using var request = new HttpRequestMessage(method, new Uri(path, UriKind.Relative));
+                    request.Headers.Add("X-Base", "1");
+                    request.Headers.Add("Origin", "http://localhost");
+                    Assert.True((await anonymous.SendAsync(request)).StatusCode == HttpStatusCode.Unauthorized, $"anonymous {method} {template}");
+                }
             }
         }
+
+        [System.Text.RegularExpressions.GeneratedRegex(@"\{[a-zA-Z]+:guid\}", System.Text.RegularExpressions.RegexOptions.None, matchTimeoutMilliseconds: 1000)]
+        private static partial System.Text.RegularExpressions.Regex GuidParameter();
+
+        [System.Text.RegularExpressions.GeneratedRegex(@"\{[a-zA-Z]+\}", System.Text.RegularExpressions.RegexOptions.None, matchTimeoutMilliseconds: 1000)]
+        private static partial System.Text.RegularExpressions.Regex Parameter();
 
         [RequiresDatabaseFact]
         public async Task The_overview_and_the_codex_page_show_the_server_and_the_settings_can_be_saved_and_refused()

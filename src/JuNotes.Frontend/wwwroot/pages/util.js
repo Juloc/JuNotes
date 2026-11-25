@@ -3,18 +3,23 @@ import { h, api } from '/base/base.js';
 
 export const API = '/api/web/v1';
 
-/** All rows of a list that the API gives page by page (the lists of one person are short; at most 25 pages of 200). */
-export async function listAll(path) {
-  const items = [];
+/**
+ * All rows of a list that the API gives page by page (the lists of one person are short; at most 25 pages of 200). If the list changed between two pages (the server says
+ * cursor.stale) it starts again from the top, once; what was seen twice is kept once.
+ */
+export async function listAll(path, retried = false) {
+  const seen = new Map();
   let cursor = null;
   for (let i = 0; i < 25; i++) {
     const sep = path.includes('?') ? '&' : '?';
-    const page = await api('GET', `${API}${path}${sep}limit=200${cursor ? '&cursor=' + encodeURIComponent(cursor) : ''}`);
-    items.push(...page.items);
+    let page;
+    try { page = await api('GET', `${API}${path}${sep}limit=200${cursor ? '&cursor=' + encodeURIComponent(cursor) : ''}`); }
+    catch (e) { if (e.code === 'cursor.stale' && !retried) return listAll(path, true); throw e; }
+    for (const item of page.items) seen.set(item.id, item);
     cursor = page.next;
     if (!cursor) break;
   }
-  return items;
+  return [...seen.values()];
 }
 
 const HEX = /^#[0-9a-fA-F]{6}$/;
