@@ -20,6 +20,9 @@ namespace JuNotes.Backend.Tests
         private readonly string _codex;
         private readonly (string Url, string Token)? _paperless;
 
+        // A stand-in for pg_dump, for tests that only need a backup to be made (the real one must be of the version of the server).
+        public string? PgDump { get; init; }
+
         public string BackupDirectory { get; } = Path.Combine(Path.GetTempPath(), "junotes-admin-" + Guid.NewGuid().ToString("N"));
 
         public AdminHost(TestDatabase database, string codex, (string Url, string Token)? paperless = null)
@@ -35,7 +38,7 @@ namespace JuNotes.Backend.Tests
             builder.UseSetting("Sync:Token", Token);
             builder.UseSetting("Backup:Directory", BackupDirectory);
             builder.UseSetting("Backup:BeforeMigration", "false");
-            builder.UseSetting("Backup:PgDump", PostgresTools.PgDump);
+            builder.UseSetting("Backup:PgDump", PgDump ?? PostgresTools.PgDump);
             builder.UseSetting("Codex:Executable", _codex);
             builder.UseSetting("Codex:Home", Path.Combine(BackupDirectory, "codex"));
             builder.UseSetting("Assets:Directory", Path.Combine(BackupDirectory, "assets"));
