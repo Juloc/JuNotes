@@ -197,7 +197,7 @@ export default {
   'adm.tokOn': 'an',
   'adm.tokOff': 'aus',
   'adm.tokNotSet': 'nicht gesetzt',
-  'adm.tokIntro': 'Solange die App sich nicht gekoppelt hat, schickt sie diesen einen Token für das Konto der ersten Administratorin. Gekoppelte Geräte haben ihren eigenen Schlüssel und brauchen ihn nicht.',
+  'adm.tokIntro': 'Solange die App sich nicht gekoppelt hat, schickt sie diesen einen Token für das Konto der ersten Person mit der Rolle Administrator. Gekoppelte Geräte haben ihren eigenen Schlüssel und brauchen ihn nicht.',
   'adm.tokUse.one': 'In den letzten 30 Tagen hat {n} Adresse den gemeinsamen Token benutzt (zuletzt {when}).',
   'adm.tokUse.other': 'In den letzten 30 Tagen haben {n} Adressen den gemeinsamen Token benutzt (zuletzt {when}).',
   'adm.tokAddressNote': 'Eine Adresse ist nicht genau ein Gerät: ein Gerät kann mehrere Adressen haben, mehrere Geräte dieselbe (im selben Netz).',

@@ -238,9 +238,9 @@ Entwurf: ARCHITECTURE 10.1 („Ablösen des alten Tokens“, „Verwaltung der G
   `Directory.Build.props`). Begründung: Die Kopie wird in der Basis mit eigenen Regeln und Tests geprüft und bleibt byteweise gleich dem `MANIFEST`, statt in jeder App noch einmal mit anderen Maßstäben.
   Die 49 Stellen bei unserem Level gehen als Liste an die Basis (ein strengerer Level dort ist eine spätere, eigene Entscheidung; CA5350 bei TOTP bliebe eine begründete Ausnahme).
 - Das Schulische bleibt aus dem öffentlichen Repository (jetzt auch die Basis öffentlich): kein Name, keine Adresse, kein Passwort.
-- Eigentümer, 25.11.2026 (über den Orchestrator): **Einspielen von Meilenstein 1 und 2: Ja** (mit dem Tag `m2-geprueft`). **Fall B1:** Die Hefte auf dem iPad gehören seiner Frau; sie schließt die Einrichtung ab
-  und wird erste Administratorin, der Eigentümer lädt sich danach ein. „Person hinter dem alten Token ändern“ und die Übergabe von Heften werden **nicht** gebaut. **Stundenplan:** der derzeit beste Weg
-  (Recherche beim Orchestrator); Erlaubnis klärt der Eigentümer; kein Aufruf gegen den echten Dienst, bevor er sie bestätigt hat und seine Frau sich selbst angemeldet hat, dann so wenige wie möglich.
+- Eigentümer, 25.11.2026 (über den Orchestrator): **Einspielen von Meilenstein 1 und 2: Ja** (mit dem Tag `m2-geprueft`). **Fall B1:** Die Hefte auf dem iPad gehören einer anderen Person der Familie; diese schließt die Einrichtung ab
+  und wird die erste Person mit der Rolle Administrator, der Eigentümer lädt sich danach ein. „Person hinter dem alten Token ändern“ und die Übergabe von Heften werden **nicht** gebaut. **Stundenplan:** der derzeit beste Weg
+  (Recherche beim Orchestrator); Erlaubnis klärt der Eigentümer; kein Aufruf gegen den echten Dienst, bevor er sie bestätigt hat und die betroffene Person sich selbst angemeldet hat, dann so wenige wie möglich.
 - **Fragen vor dem Bauen:** Bei mehreren möglichen Entwürfen erst fragen (interaktiv, auf Deutsch), dann einmal bauen.
 
 ## Starten, testen, veröffentlichen
