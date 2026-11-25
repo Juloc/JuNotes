@@ -70,7 +70,7 @@ namespace JuNotes.Backend.Tests
                 using var anonymous = scene.Host.Browser();
                 using var app = scene.Host.Browser();
                 app.DefaultRequestHeaders.Authorization = new("Bearer", AdminHost.Token);
-                var paths = new[] { "/folders", "/notebooks", $"/notebooks/{Notebook}", $"/notebooks/{Notebook}/pages", $"/pages/{Page}", $"/assets/{Scan}", "/grades", "/cards", "/timetable", "/news", "/search?q=x" };
+                var paths = new[] { "/folders", "/notebooks", $"/notebooks/{Notebook}", $"/notebooks/{Notebook}/pages", $"/pages/{Page}", $"/assets/{Scan}", "/grades", "/cards", "/search?q=x" };
 
                 foreach (var path in paths)
                 {
@@ -185,37 +185,6 @@ namespace JuNotes.Backend.Tests
                 // Too long or empty: nothing, not an error.
                 Assert.Empty((await JsonAsync(await scene.AClient.GetAsync(Url("/api/web/v1/search?q=" + new string('a', 101))))).GetProperty("notebooks").EnumerateArray());
                 Assert.Empty((await JsonAsync(await scene.AClient.GetAsync(Url("/api/web/v1/search")))).GetProperty("folders").EnumerateArray());
-            }
-            finally
-            {
-                await EndAsync(scene);
-            }
-        }
-
-        [RequiresDatabaseFact]
-        public async Task The_schools_timetable_and_news_are_only_for_the_person_the_app_token_stands_for_until_every_person_has_their_own()
-        {
-            var scene = await StartAsync();
-            try
-            {
-                await using (var insert = scene.Database.Data.CreateCommand(
-                    "insert into calendar_events (source, uid, starts_at, ends_at, summary) values ('t', 'e1', now(), now() + interval '1 hour', 'Mathe 1'); "
-                    + "insert into school_news (source, guid, title) values ('n', 'g1', 'Neuigkeit')"))
-                {
-                    await insert.ExecuteNonQueryAsync();
-                }
-
-                // The first administrator is the person behind the token (written down at the first request of the app).
-                using var app = scene.Host.Browser();
-                app.DefaultRequestHeaders.Authorization = new("Bearer", AdminHost.Token);
-                Assert.Equal(HttpStatusCode.OK, (await app.GetAsync(Url("/api/v1/sync/info"))).StatusCode);
-                Assert.Equal(HttpStatusCode.OK, (await app.GetAsync(Url("/api/v1/sync/pull"))).StatusCode);
-
-                Assert.Equal("Mathe 1", Assert.Single((await JsonAsync(await scene.AClient.GetAsync(Url("/api/web/v1/timetable")))).EnumerateArray()).GetProperty("summary").GetString());
-                Assert.Equal("Neuigkeit", Assert.Single((await JsonAsync(await scene.AClient.GetAsync(Url("/api/web/v1/news")))).EnumerateArray()).GetProperty("title").GetString());
-                Assert.Empty((await JsonAsync(await scene.BClient.GetAsync(Url("/api/web/v1/timetable")))).EnumerateArray());
-                Assert.Empty((await JsonAsync(await scene.BClient.GetAsync(Url("/api/web/v1/news")))).EnumerateArray());
-                Assert.Equal(HttpStatusCode.BadRequest, (await scene.AClient.GetAsync(Url("/api/web/v1/timetable?from=2026-11-30T00:00:00Z&to=2026-11-01T00:00:00Z"))).StatusCode);
             }
             finally
             {

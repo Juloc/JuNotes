@@ -146,13 +146,42 @@ namespace JuNotes.Backend.Tests
                     await trigger.ExecuteNonQueryAsync();
                 }
 
-                _ = await host.SignedInPersonAsync();
+                var (_, admin) = await host.SignedInPersonAsync();
                 var pull = await app.GetAsync(Url("/api/v1/sync/pull"));
                 var again = await app.PostAsync(Url("/api/v1/sync/push"), Push(Guid.NewGuid(), "neu"));
 
                 Assert.Equal(HttpStatusCode.ServiceUnavailable, pull.StatusCode);
                 Assert.Equal(HttpStatusCode.ServiceUnavailable, again.StatusCode);
                 Assert.Equal("1", await ScalarAsync(database, "select count(*) from entities"));
+
+                // The administration says so, in words that tell what to do.
+                using var overview = System.Text.Json.JsonDocument.Parse(await admin.GetStringAsync(Url("/api/web/v1/admin/overview")));
+                Assert.True(overview.RootElement.GetProperty("claimFailed").GetBoolean());
+            }
+        }
+
+        // 8: the lock hits one address and no other (the server must see the address of the caller, not of a proxy; that is checked before the roll-out).
+        [RequiresDatabaseFact]
+        public async Task A_lock_hits_the_one_address_and_no_other()
+        {
+            var (host, database, fake) = await StartAsync();
+            await using (database)
+            using (fake)
+            using (host)
+            {
+                _ = host.Browser();
+                var brake = host.Services.GetRequiredService<TokenBrake>();
+
+                for (var attempt = 0; attempt <= TokenBrake.FailuresPerMinute; attempt++)
+                {
+                    brake.Failed("203.0.113.7");
+                }
+
+                Assert.True(brake.IsLocked("203.0.113.7"));
+                Assert.False(brake.IsLocked("203.0.113.8"));
+                Assert.False(brake.IsLocked("2001:db8::1"));
+                brake.Failed("203.0.113.8");
+                Assert.False(brake.IsLocked("203.0.113.8"));
             }
         }
 

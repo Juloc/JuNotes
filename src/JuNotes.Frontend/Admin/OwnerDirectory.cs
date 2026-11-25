@@ -39,6 +39,9 @@ namespace JuNotes.Frontend.Admin
         private volatile bool _claimed;
         private volatile bool _failed;
 
+        // True when giving the old rows to their owner failed: the door of the app answers 503 until the server is restarted (the administration shows it).
+        public bool ClaimFailed => _failed;
+
         public async Task<TokenOwner> TokenOwnerAsync(CancellationToken ct)
         {
             var pinned = await ReadPinAsync(ct);
@@ -158,7 +161,7 @@ namespace JuNotes.Frontend.Admin
 
         public void Dispose() => _gate.Dispose();
 
-        [LoggerMessage(Level = LogLevel.Error, Message = "Giving the rows without an owner to the first administrator failed; it is tried again at the next start: {Message}")]
+        [LoggerMessage(Level = LogLevel.Error, Message = "Giving the rows without an owner to the first administrator failed. The app cannot sync until it works: fix the cause (see the message) and restart the server, it is tried again at the start: {Message}")]
         private static partial void LogFailed(ILogger logger, string message);
     }
 

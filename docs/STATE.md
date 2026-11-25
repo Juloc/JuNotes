@@ -84,6 +84,9 @@ Daten und werden ebenso über das Objektmodell gesetzt; `app.css` hat die eine F
 Geprüft im Browser mit Testdaten: Bibliothek, Ordner, Heft, Seite (mit Strichen, Objekt, Lösung, Ergänzungen), Whiteboard, Scan, Noten, Karten, Stundenplan, Suche, bei breit und 390 px, hell und dunkel (das Blatt bleibt hell). Tests: `WebPagesTests` (Texte vollständig und gleich in beiden Sprachen,
 keine Markup-Erzeugung, keine eigene Farbe). **Fehlt dem Baukasten etwas, das auch andere Apps brauchen würden?** Zwei Kleinigkeiten, die ich hier gelöst habe und nenne: ein Kachelraster mit Titelbild (hier `.cover` und `.tile.notebook`) und ein Abschnittstitel (`.section-title`).
 
+**Änderung nach dem Urteil des Orchestrators (25.11.2026):** Der **Stundenplan ist nicht in Meilenstein 2.** Die Wege `timetable` und `news`, die Seite, der Menüpunkt, die Texte, der Test und die Bilder dazu sind wieder entfernt; er kommt mit Meilenstein 4 (SCOPE.md). Die Suchseite sagt in einem Satz, dass der Text in den Seiten noch nicht durchsucht wird.
+Die Verwaltung zeigt, wenn die Zuweisung der alten Hefte gescheitert ist (`claimFailed` in der Übersicht, mit dem Hinweis auf Neustart nach Behebung); die Meldung im Protokoll sagt dasselbe. Test: `SecurityFindingsTests.A_claim_that_fails_…` (503 und Hinweis) und `…A_lock_hits_the_one_address_and_no_other`.
+
 ### Scheibe 2c und 2d: die Verwaltung im Baukasten, keine Razor-Seite mehr (25.11.2026)
 
 - **Verwaltung als JSON** (`/api/web/v1/admin/...`, `RequireRole("admin")`, Wächter der Basis): `overview`, `school/import`, `codex` (Status, wartender Code, Einstellungen, Nutzung), `codex/login|cancel|logout`, `codex/settings`, `profiles` (lesen, ändern, zurücksetzen), `backups` (lesen, von Hand sichern). Test: `AdminApiTests` (ohne Sitzung 401, als `member` 403 an jedem Weg;
@@ -226,6 +229,7 @@ Nichts davon ist an der laufenden Installation ausgeführt. Einspielen ist Sache
 
 **Zusätzlich nach der Prüfung (25.11.2026):**
 - **`Sync__Token` muss mindestens 32 Zeichen haben,** sonst startet der Server nicht (Meldung nennt `Sync__Token` und die Länge, nicht den Wert). **Der Orchestrator prüft die Länge des echten Tokens vor dem Einspielen** und tauscht es bei Bedarf (in der App und im Server zugleich).
+- **Sperre je Adresse:** Sie hängt daran, dass der Server die **Adresse des Aufrufers** sieht und nicht die des Proxys (sonst könnte ein Fremder mit zehn falschen Token pro Minute das iPad aussperren). **Vor dem Einspielen prüft der Orchestrator, dass die vertrauenswürdigen Proxys stimmen und im Sicherheitsprotokoll (`api.token_refused`) die Adresse des Geräts steht, nicht die des Proxys.**
 - **Der App-Token steht danach für eine festgeschriebene Person** (`token_owner` in `app_instance_settings`), die beim ersten Zuweisen bestimmt wird. Wird sie gesperrt oder gelöscht, antwortet `/api/v1` mit 401; es wird nie jemand anderes gewählt.
 - **Sicherung:** `secret.key` geht nur mit einer Passphrase (`Backup__Passphrase`) und einem zweiten Ort verschlüsselt mit; ohne beides warnt die Sicherungsseite, und der Schlüssel muss getrennt aufgehoben werden (Datei im Volume unter `/data/base`).
 - **Zuweisung:** läuft auf einer eigenen Verbindung ohne Zeitgrenze, beim Start und bei der ersten Anmeldung; scheitert sie, antwortet `/api/v1` mit 503, bis der Server neu gestartet wird (es steht im Log).

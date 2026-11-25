@@ -30,6 +30,7 @@ export async function overviewPage() {
   importButton.addEventListener('click', () => act(importButton, api('POST', `${A}/school/import`), () => { toast(t('adm.fetched'), { kind: 'ok' }); location.reload(); }));
   const school = o.school;
   const body = h('div', { class: 'page stack l' }, tabs('overview'),
+    o.claimFailed ? notice(t('adm.claimFailed'), 'danger') : null,
     h('section', { class: 'card stack s' }, h('h2', { class: 'card-title', text: t('adm.server') }), h('div', { class: 'list' },
       row(t('adm.database'), null, badge(t(o.databaseReady ? 'adm.ready' : 'adm.notReady'), o.databaseReady ? 'ok' : 'danger')),
       row(t('adm.lastBackup'), o.backup ? `${fmtDate(o.backup.at)} (${kb(o.backup.bytes)})` : t('adm.none'), badge(t(o.backupOverdue ? 'adm.overdue' : 'adm.current'), o.backupOverdue ? 'warn' : 'ok')))),

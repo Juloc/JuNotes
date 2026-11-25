@@ -9,7 +9,7 @@ import { hubCard } from '/base/hub.js';
 import de from '/i18n/de.js';
 import en from '/i18n/en.js';
 import { homePage, folderPage, notebookPage, pagePage, searchPage } from '/pages/library.js';
-import { gradesPage, cardsPage, timetablePage } from '/pages/study.js';
+import { gradesPage, cardsPage } from '/pages/study.js';
 import { overviewPage, codexPage, profilesPage, backupsPage } from '/pages/admin.js';
 
 addMessages('de', de);
@@ -26,7 +26,6 @@ function run(me) {
       { label: t('nav.library'), icon: 'home', href: '#/' },
       { label: t('nav.grades'), icon: 'check-circle', href: '#/grades' },
       { label: t('nav.cards'), icon: 'copy', href: '#/cards' },
-      { label: t('nav.timetable'), icon: 'clock', href: '#/timetable' },
       ...(admin ? [{ label: t('nav.admin'), icon: 'sliders', href: '#/admin' }] : []),
       { label: t('shell.settings'), icon: 'user', href: '#/settings', foot: true },
     ],
@@ -51,7 +50,6 @@ function run(me) {
     '/grades/:folder': gradesPage,
     '/cards': () => cardsPage({}),
     '/cards/:folder': cardsPage,
-    '/timetable': timetablePage,
     '/settings': settingsPage,
     ...(admin ? { '/admin': overviewPage, '/admin/codex': codexPage, '/admin/profiles': profilesPage, '/admin/backups': backupsPage } : {}),
   }, frame);

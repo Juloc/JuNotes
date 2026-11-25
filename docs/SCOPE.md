@@ -75,7 +75,7 @@ Jeder endet in etwas, das er aufmachen kann. Reihenfolge und Zuschnitt gegenübe
 ### 2. Die Web-App als Seiten der Basis, mit denselben Funktionen wie heute *(gebaut, 25.11.2026; Stand in STATE.md)*
 
 - Die Web-App ist JavaScript im Baukasten und spricht JSON. Meilenstein 2 baut daher **die lesenden Wege von `/api/web/v1`**: Bibliothek, Heft, Seite, Datei,
-  dazu Noten, Karten, Stundenplan. Eine Suche im Web erst, wenn der erkannte Text mit synchronisiert wird (nicht Teil von 2).
+  dazu Noten und Karten (nur Listen, ohne Rechnung) und die Suche über Namen von Ordnern und Heften (die Oberfläche sagt in einem Satz, dass der Text der Seiten noch nicht durchsucht wird; das geht erst, wenn der erkannte Text mit synchronisiert wird). **Der Stundenplan gehört nicht zu Meilenstein 2** (Entscheidung des Orchestrators, 25.11.2026): keine Sonderregel „nur der erste Administrator“, er kommt mit Meilenstein 4, wenn die Schuldaten je Person sind.
 - Heutige Admin-Seiten (Übersicht, Codex, Profile, Sicherungen) ziehen in den Baukasten um, noch ohne neue Funktionen.
 - **Die Razor-Seiten fallen am Ende von Meilenstein 2 weg.**
 - **Aufmachen kann er:** dieselbe Web-Ansicht wie heute, nur im neuen Aussehen und hinter der neuen Anmeldung.
@@ -99,6 +99,7 @@ Jeder endet in etwas, das er aufmachen kann. Reihenfolge und Zuschnitt gegenübe
   statt gespeichertem Passwort, oder Passwort verschlüsselt) wird am Anfang des Meilensteins an einem Konto der Person selbst entschieden (ARCHITECTURE.md 8). Der Administrator sieht nur „verbunden / nicht verbunden“.
 - **Was die Schule sonst offiziell anbietet** (Kalender-Abo, Feed, Export) bleibt als Weg für Neuigkeiten und als Rückfall.
 - **Schul-Intranet: offener Punkt.** Kein Entwurf für eine Anmeldung dort, kein Code, bis der Eigentümer entschieden hat.
+- **Der Stundenplan erscheint im Web erst hier** (und mit der Seite dafür), nicht schon in Meilenstein 2.
 - **Aufmachen kann er:** sein eigener Stundenplan in der App und im Web, aus seinem eigenen Schulkonto; „Trennen“ löscht die Verbindung auf der Stelle.
 
 ### 5. Web-Verwaltung

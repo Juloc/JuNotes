@@ -26,7 +26,7 @@ namespace JuNotes.Frontend.Api
         {
             var admin = app.MapGroup(WebApi.Prefix + "/admin").RequireRole("admin");
 
-            admin.MapGet("/overview", async (HttpContext ctx, HealthService health, BackupService backups, SchoolImportService school, AiUsageStore usage, AiOptions ai, AiSettingsStore settings, CodexAccount codex, TimeProvider time) =>
+            admin.MapGet("/overview", async (HttpContext ctx, OwnerDirectory owners, HealthService health, BackupService backups, SchoolImportService school, AiUsageStore usage, AiOptions ai, AiSettingsStore settings, CodexAccount codex, TimeProvider time) =>
             {
                 var ct = ctx.RequestAborted;
                 var last = backups.Latest();
@@ -36,6 +36,7 @@ namespace JuNotes.Frontend.Api
                 return Results.Ok(new
                 {
                     databaseReady = await health.IsReadyAsync(ct),
+                    claimFailed = owners.ClaimFailed,
                     backup = last is null ? null : new { at = last.At, bytes = last.Bytes },
                     backupOverdue = BackupSchedule.IsOverdue(last?.At, time.GetUtcNow()),
                     school = school.Status,

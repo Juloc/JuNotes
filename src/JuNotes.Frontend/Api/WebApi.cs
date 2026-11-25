@@ -3,7 +3,6 @@ using Base.Web;
 using Base.Web.Auth;
 using JuNotes.Backend.Assets;
 using JuNotes.Backend.Library;
-using JuNotes.Backend.School;
 using JuNotes.Frontend.Admin;
 
 namespace JuNotes.Frontend.Api
@@ -105,24 +104,6 @@ namespace JuNotes.Frontend.Api
                 return Paged((Guid.TryParse(folder, out var id) ? all.Where(card => card.SubjectId == id).ToList() : all), limit, cursor, card => card.Id);
             });
 
-            // The school's data is one for the whole server until every person connects their own (milestone 4): only the person the app token stands for sees it.
-            api.MapGet("/timetable", async (DateTimeOffset? from, DateTimeOffset? to, HttpContext ctx, OwnerDirectory owners, SchoolStore store, TimeProvider time) =>
-            {
-                if (!await SeesSchoolAsync(ctx, owners))
-                {
-                    return Results.Ok(Array.Empty<object>());
-                }
-
-                var start = from ?? time.GetUtcNow().AddDays(-1);
-                var end = to ?? start.AddDays(14);
-                return end <= start || end - start > TimeSpan.FromDays(366)
-                    ? Error.Invalid("range.invalid", "The range must be positive and at most a year.").ToHttp()
-                    : Results.Ok(await store.EventsAsync(start, end, ctx.RequestAborted));
-            });
-
-            api.MapGet("/news", async (int? limit, HttpContext ctx, OwnerDirectory owners, SchoolStore store) =>
-                await SeesSchoolAsync(ctx, owners) ? Results.Ok(await store.NewsAsync(Math.Clamp(limit ?? 20, 1, 50), ctx.RequestAborted)) : Results.Ok(Array.Empty<object>()));
-
             // Names of folders and notebooks. The text the iPad recognises in handwriting stays there (it is not synced), so the web cannot search inside pages yet.
             api.MapGet("/search", async (string? q, HttpContext ctx, LibraryReader library) =>
             {
@@ -141,9 +122,6 @@ namespace JuNotes.Frontend.Api
         }
 
         private static LibraryReader Mine(HttpContext ctx, LibraryReader library) => library.Of(ctx.Person().UserId);
-
-        private static async Task<bool> SeesSchoolAsync(HttpContext ctx, OwnerDirectory owners)
-            => (await owners.TokenOwnerAsync(ctx.RequestAborted)).Person?.Id == ctx.Person().UserId;
 
         private static FolderDto Folder(SubjectInfo folder) => new(folder.Id, folder.Name, folder.Color, folder.Symbol, folder.Sort, folder.ParentId, folder.IsSubject);
 

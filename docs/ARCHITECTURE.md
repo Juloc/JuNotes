@@ -232,8 +232,8 @@ Entscheidung des Eigentümers (24.11.2026): **eigene Anmeldung für den Stundenp
 - **Die Quellenlage:** Eine **offizielle, öffentliche Beschreibung der JSON-RPC-Schnittstelle gibt es nicht**; mehrere Autoren von Bibliotheken schreiben, das Dokument gebe es nur auf Anfrage bei Untis
   ([Beispiel](https://webuntis.noim.me/)). Öffentlich dokumentiert ist die REST-Schnittstelle für Integrationspartner
   ([Untis Help Center](https://help.untis.at/hc/de/articles/4886785534354-API-documentation-for-integration-partners)); die Seite war für mich nicht lesbar (403), ich weiß also nicht, ob und wie eine einzelne Person sie nutzen darf.
-- **Meine Einschätzung:** A ist die richtige Wahl, **wenn** die Schule den Zugang „Untis Mobile“ eingeschaltet hat und das Geheimnis der Person zugänglich ist; das ist am Anfang von Meilenstein 4 an einem Konto der Person
-  selbst zu prüfen (sie tippt, nicht wir). Beide Wege nutzen eine Schnittstelle, die Untis nicht öffentlich beschreibt: Das sollte der Eigentümer wissen, und im Zweifel fragt man bei Untis oder der Schule nach, ob die Nutzung
+- **Meine Einschätzung:** A ist die richtige Wahl, **wenn** die Schule den Zugang „Untis Mobile“ eingeschaltet hat und das Geheimnis der Person zugänglich ist; das ist erst **nach** der Entscheidung des Eigentümers (er weiß dann, dass die Schnittstelle nicht öffentlich beschrieben ist) und dann an einem Konto der Person
+  selbst zu prüfen (sie tippt, nicht wir). Bis dahin wird nichts gegen den echten Dienst probiert. Beide Wege nutzen eine Schnittstelle, die Untis nicht öffentlich beschreibt: Das sollte der Eigentümer wissen, und im Zweifel fragt man bei Untis oder der Schule nach, ob die Nutzung
   für das eigene Konto in Ordnung ist. Kann A nicht bestätigt werden, gilt B nur mit der Regel „nachweislich nicht anders“, und der Eigentümer entscheidet.
 
 ## 9. Reihenfolge der Risiken
