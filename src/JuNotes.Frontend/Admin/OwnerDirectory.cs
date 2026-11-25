@@ -225,28 +225,61 @@ namespace JuNotes.Frontend.Admin
 
 namespace JuNotes.Frontend.Admin
 {
-    // Too many wrong tokens from one address in a minute lock that address for the rest of the minute, even for the right token; the first lock is written to the security log
-    // (never the token that was tried).
+    // Wrong tokens are counted for each address. More than ten in a minute marks the address as "locked" for the rest of the minute: that only means the wrong ones are
+    // answered without further ado; **a right token always gets through**, whatever the address did before (an address is often shared: the same network, a mobile
+    // provider, or a proxy). The first lock of an address is written to the security log, and at most once an hour for the same address, so nobody can push the real entries
+    // (sign-ins, new devices, password changes) out of the log. Never the token that was tried.
     public sealed class TokenBrake(Base.Web.RateLimit limit, AuditStore audit, TimeProvider time)
     {
         public const int FailuresPerMinute = 10;
+        private static readonly TimeSpan LogGap = TimeSpan.FromHours(1);
 
         private readonly ConcurrentDictionary<string, DateTimeOffset> _locked = new();
+        private readonly ConcurrentDictionary<string, DateTimeOffset> _logged = new();
+        private DateTimeOffset _swept;
 
         public bool IsLocked(string address) => _locked.TryGetValue(address, out var until) && until > time.GetUtcNow();
 
         public void Failed(string address)
         {
+            var now = time.GetUtcNow();
+            Sweep(now);
             if (limit.Allow("v1-token", address, FailuresPerMinute, out var wait))
             {
                 return;
             }
 
-            var until = time.GetUtcNow().AddSeconds(wait);
-            if (!_locked.TryGetValue(address, out var known) || known <= time.GetUtcNow())
+            _locked[address] = now.AddSeconds(wait);
+            if (!_logged.TryGetValue(address, out var last) || now - last >= LogGap)
             {
-                _locked[address] = until;
-                _ = audit.AddAsync("app-token", "api.token_refused", address, $"more than {FailuresPerMinute} wrong tokens in a minute; this address is locked for {wait} seconds");
+                _logged[address] = now;
+                _ = audit.AddAsync("app-token", "api.token_refused", address, $"more than {FailuresPerMinute} wrong tokens in a minute from this address (at most one line an hour for it)");
+            }
+        }
+
+        // Once an hour what has run out is forgotten, so the lists do not grow with every address that was ever locked.
+        private void Sweep(DateTimeOffset now)
+        {
+            if (now - _swept < TimeSpan.FromHours(1))
+            {
+                return;
+            }
+
+            _swept = now;
+            foreach (var (address, until) in _locked)
+            {
+                if (until <= now)
+                {
+                    _locked.TryRemove(address, out _);
+                }
+            }
+
+            foreach (var (address, at) in _logged)
+            {
+                if (now - at >= LogGap)
+                {
+                    _logged.TryRemove(address, out _);
+                }
             }
         }
     }

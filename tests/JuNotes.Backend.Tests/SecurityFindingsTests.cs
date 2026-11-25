@@ -220,9 +220,10 @@ namespace JuNotes.Backend.Tests
             }
         }
 
-        // 8: wrong tokens are slowed down, written down once, and never echoed.
+        // 8, review 2 (1 and 2): wrong tokens are counted and written down once an hour at most, and a right token always gets through, also from an address that has been
+        // sending wrong ones (a shared address, or the address of a proxy).
         [RequiresDatabaseFact]
-        public async Task Too_many_wrong_tokens_lock_the_address_even_for_the_right_one_and_the_security_log_gets_one_line_without_the_token()
+        public async Task A_right_token_gets_through_from_an_address_that_sent_many_wrong_ones_and_the_log_gets_one_line_without_the_token()
         {
             var (host, database, fake) = await StartAsync();
             await using (database)
@@ -231,13 +232,15 @@ namespace JuNotes.Backend.Tests
             {
                 using var wrong = host.Browser();
                 wrong.DefaultRequestHeaders.Authorization = new("Bearer", "a-wrong-token-that-must-never-show-up-in-a-log-line");
-                for (var attempt = 0; attempt < TokenBrake.FailuresPerMinute + 3; attempt++)
+                for (var attempt = 0; attempt < TokenBrake.FailuresPerMinute * 3; attempt++)
                 {
                     Assert.Equal(HttpStatusCode.Unauthorized, (await wrong.GetAsync(Url("/api/v1/sync/pull"))).StatusCode);
                 }
 
+                // The same address (the test server shows one) with the right token: through.
                 using var right = Token(host);
-                Assert.Equal(HttpStatusCode.Unauthorized, (await right.GetAsync(Url("/api/v1/sync/pull"))).StatusCode);
+                Assert.Equal(HttpStatusCode.OK, (await right.GetAsync(Url("/api/v1/sync/pull"))).StatusCode);
+                Assert.Equal(HttpStatusCode.OK, (await right.PostAsync(Url("/api/v1/sync/push"), Push(Guid.NewGuid(), "durch"))).StatusCode);
 
                 var lines = new List<AuditEntry>();
                 for (var wait = 0; wait < 40 && lines.Count == 0; wait++)
@@ -246,10 +249,66 @@ namespace JuNotes.Backend.Tests
                     lines = (await host.Services.GetRequiredService<AuditStore>().ListAsync(50)).Where(entry => entry.Event == "api.token_refused").ToList();
                 }
 
+                // Thirty wrong tokens in a minute, many locked minutes' worth of tries: still one line in the hour.
                 var line = Assert.Single(lines);
                 Assert.DoesNotContain("wrong-token", line.Detail + line.UserName, StringComparison.Ordinal);
                 Assert.DoesNotContain(AdminHost.Token, line.Detail + line.UserName, StringComparison.Ordinal);
             }
+        }
+
+        [RequiresDatabaseFact]
+        public async Task The_brake_writes_at_most_one_line_an_hour_for_one_address_and_forgets_what_has_run_out()
+        {
+            var (host, database, fake) = await StartAsync();
+            await using (database)
+            using (fake)
+            using (host)
+            {
+                _ = host.Browser();
+                var clock = new ManualClock();
+                var brake = new TokenBrake(host.Services.GetRequiredService<Base.Web.RateLimit>(), host.Services.GetRequiredService<AuditStore>(), clock);
+                var audit = host.Services.GetRequiredService<AuditStore>();
+
+                void Flood(string address)
+                {
+                    for (var attempt = 0; attempt <= TokenBrake.FailuresPerMinute; attempt++)
+                    {
+                        brake.Failed(address);
+                    }
+                }
+
+                async Task<int> LinesAsync()
+                {
+                    await Task.Delay(300);
+                    return (await audit.ListAsync(200)).Count(entry => entry.Event == "api.token_refused");
+                }
+
+                Flood("198.51.100.1");
+                Assert.True(brake.IsLocked("198.51.100.1"));
+                Assert.False(brake.IsLocked("198.51.100.2"));
+                Assert.Equal(1, await LinesAsync());
+
+                // Minutes later the same address is locked again but nothing more is written; another address gets its own line.
+                clock.Advance(TimeSpan.FromMinutes(5));
+                Flood("198.51.100.1");
+                Flood("198.51.100.2");
+                Assert.Equal(2, await LinesAsync());
+
+                // After the hour the address may be written again, and the old locks are gone.
+                clock.Advance(TimeSpan.FromHours(2));
+                Assert.False(brake.IsLocked("198.51.100.1"));
+                Flood("198.51.100.1");
+                Assert.Equal(3, await LinesAsync());
+            }
+        }
+
+        private sealed class ManualClock : TimeProvider
+        {
+            private DateTimeOffset _now = new(2026, 11, 25, 12, 0, 0, TimeSpan.Zero);
+
+            public void Advance(TimeSpan by) => _now += by;
+
+            public override DateTimeOffset GetUtcNow() => _now;
         }
 
         // small: the open exception is the exact path.

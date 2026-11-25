@@ -27,9 +27,9 @@ namespace JuNotes.Frontend.Api
 
         private const string OwnerKey = "notes.token-owner";
 
-        // The check of the door. Only /status (the exact path) is open. Everything else needs the token; too many wrong tokens from one address lock that address for a minute, also
-        // for the right one, and are written to the security log once. With the token the person it stands for is looked up (OwnerDirectory) and kept for the endpoints; if the
-        // token has no person any more the door says 401.
+        // The check of the door. Only /status (the exact path) is open. Everything else needs the token, and a right token always gets through; wrong ones are counted per
+        // address (TokenBrake). With the token the person it stands for is looked up (OwnerDirectory) and kept for the endpoints; if the token has no person any more the
+        // door says 401.
         public static async ValueTask<bool> CheckAsync(HttpContext context)
         {
             if (context.Request.Path.Equals(Prefix + "/status", StringComparison.OrdinalIgnoreCase))
@@ -37,17 +37,11 @@ namespace JuNotes.Frontend.Api
                 return true;
             }
 
-            var brake = context.RequestServices.GetRequiredService<TokenBrake>();
-            var address = Base.Web.Auth.RequestIdentity.ClientIp(context);
-            if (brake.IsLocked(address))
-            {
-                return false;
-            }
-
+            // The token is looked at first: a right one always gets through. Only wrong ones are counted (and, past ten a minute from one address, written to the log once an hour).
             var access = context.RequestServices.GetRequiredService<SyncAccess>();
             if (!access.IsConfigured || !access.IsAuthorized(context.Request.Headers.Authorization))
             {
-                brake.Failed(address);
+                context.RequestServices.GetRequiredService<TokenBrake>().Failed(Base.Web.Auth.RequestIdentity.ClientIp(context));
                 return false;
             }
 
