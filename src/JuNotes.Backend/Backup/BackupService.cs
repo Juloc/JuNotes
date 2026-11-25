@@ -76,32 +76,20 @@ namespace JuNotes.Backend.Backup
                 if (mirror is { IsActive: true })
                 {
                     // A copy that fails is reported and logged, never allowed to fail the backup that is already safe here.
-                    var files = new List<string> { final };
+                    var files = new List<BackupMirror.MirrorFile> { new(final, Path.GetFileName(final)) };
                     if (File.Exists(BackupFiles.AssetsArchiveFor(final)))
                     {
-                        files.Add(BackupFiles.AssetsArchiveFor(final));
+                        files.Add(new(BackupFiles.AssetsArchiveFor(final), Path.GetFileName(BackupFiles.AssetsArchiveFor(final))));
                     }
 
-                    // The key of the server goes with an encrypted copy, under the name of the backup (so pruning keeps and removes them together).
-                    string? keyCopy = null;
+                    // The key of the server goes with an encrypted copy, under the name of the backup (so pruning keeps and removes them together). It is encrypted straight from
+                    // its file: no copy in the clear is ever made.
                     if (mirror.Encrypts && options.KeyFile is { } keyFile && File.Exists(keyFile))
                     {
-                        keyCopy = Path.Combine(Path.GetTempPath(), BackupFiles.KeyFileFor(final));
-                        File.Copy(keyFile, keyCopy, overwrite: true);
-                        files.Add(keyCopy);
+                        files.Add(new(keyFile, BackupFiles.KeyFileFor(final), EncryptBesideSource: false));
                     }
 
-                    try
-                    {
-                        await mirror.MirrorAsync(files, prune: kind != BackupKind.Manual, ct);
-                    }
-                    finally
-                    {
-                        if (keyCopy is not null)
-                        {
-                            File.Delete(keyCopy);
-                        }
-                    }
+                    await mirror.MirrorAsync(files, prune: kind != BackupKind.Manual, ct);
                 }
 
                 LogWritten(logger, kind, bytes, removed.Count);

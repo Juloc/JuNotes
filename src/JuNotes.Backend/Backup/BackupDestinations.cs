@@ -205,7 +205,13 @@ namespace JuNotes.Backend.Backup
 
         public IReadOnlyList<Result> Last { get; private set; } = [];
 
-        public async Task<IReadOnlyList<Result>> MirrorAsync(IReadOnlyList<string> files, bool prune, CancellationToken ct)
+        // A file to copy: where it is and under which name it arrives. A file in a place of its own (the key) is encrypted into the temporary folder, never next to its source.
+        public sealed record MirrorFile(string Path, string Name, bool EncryptBesideSource = true);
+
+        public Task<IReadOnlyList<Result>> MirrorAsync(IReadOnlyList<string> files, bool prune, CancellationToken ct)
+            => MirrorAsync(files.Select(file => new MirrorFile(file, Path.GetFileName(file))).ToList(), prune, ct);
+
+        public async Task<IReadOnlyList<Result>> MirrorAsync(IReadOnlyList<MirrorFile> files, bool prune, CancellationToken ct)
         {
             var results = new List<Result>();
             foreach (var destination in destinations)
@@ -238,19 +244,20 @@ namespace JuNotes.Backend.Backup
             return results;
         }
 
-        private async Task SendAsync(IBackupDestination destination, string file, CancellationToken ct)
+        private async Task SendAsync(IBackupDestination destination, MirrorFile file, CancellationToken ct)
         {
             if (string.IsNullOrEmpty(passphrase))
             {
-                await destination.UploadAsync(file, Path.GetFileName(file), ct);
+                await destination.UploadAsync(file.Path, file.Name, ct);
                 return;
             }
 
-            var encrypted = file + ".enc.partial";
+            // Only the encrypted copy is ever written, and it is deleted when it has been sent.
+            var encrypted = file.EncryptBesideSource ? file.Path + ".enc.partial" : Path.Combine(Path.GetTempPath(), "junotes-" + Guid.NewGuid().ToString("N") + ".enc.partial");
             try
             {
-                await BackupCrypto.EncryptAsync(file, encrypted, passphrase, ct);
-                await destination.UploadAsync(encrypted, Path.GetFileName(file) + ".enc", ct);
+                await BackupCrypto.EncryptAsync(file.Path, encrypted, passphrase, ct);
+                await destination.UploadAsync(encrypted, file.Name + ".enc", ct);
             }
             finally
             {

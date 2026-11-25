@@ -75,5 +75,61 @@ namespace JuNotes.Backend.Tests
 
             Assert.Equal(["junotes-20260101T000000Z-auto.dump.enc", "junotes-20260101T000000Z-auto.key.enc"], old.Order());
         }
+
+        // Review 2, point 5: while a copy is made, the key exists in the clear only where it always was.
+        private sealed class WatchingDestination(string folder, string secret) : IBackupDestination
+        {
+            public List<string> Clear { get; } = [];
+
+            public string Name => "watch";
+
+            public Task UploadAsync(string localPath, string name, CancellationToken ct)
+            {
+                // The folder of the key, and what this program writes into the temporary folder (its files start with junotes-); not the rest of that folder (pipes and sockets are there).
+                foreach (var (directory, pattern) in new[] { (Path.GetTempPath(), "junotes-*"), (folder, "*") })
+                {
+                    foreach (var file in Directory.EnumerateFiles(directory, pattern, SearchOption.TopDirectoryOnly).Where(file => new FileInfo(file).Length < 1_000_000))
+                    {
+                        try
+                        {
+                            if (File.ReadAllText(file).Contains(secret, StringComparison.Ordinal) && !file.EndsWith("secret.key", StringComparison.Ordinal))
+                            {
+                                Clear.Add(file);
+                            }
+                        }
+                        catch (IOException)
+                        {
+                            // a file somebody else is using: not ours
+                        }
+                    }
+                }
+
+                return Task.CompletedTask;
+            }
+
+            public Task<IReadOnlyList<string>> ListAsync(CancellationToken ct) => Task.FromResult<IReadOnlyList<string>>([]);
+
+            public Task DeleteAsync(string name, CancellationToken ct) => Task.CompletedTask;
+        }
+
+        [Fact]
+        public async Task The_key_is_encrypted_straight_from_its_file_and_no_copy_in_the_clear_exists_while_it_is_sent()
+        {
+            var secret = "the-clear-secret-" + Guid.NewGuid().ToString("N");
+            var key = Path.Combine(_folder, "base", "secret.key");
+            Directory.CreateDirectory(Path.GetDirectoryName(key)!);
+            await File.WriteAllTextAsync(key, secret);
+            var watcher = new WatchingDestination(Path.Combine(_folder, "base"), secret);
+            var options = new BackupOptions { Directory = Path.Combine(_folder, "backups"), PgDump = FakePgDump(), KeyFile = key };
+            var mirror = new BackupMirror([watcher], "geheim", 7, NullLogger<BackupMirror>.Instance);
+            using var service = new BackupService("Host=127.0.0.1;Port=1;Username=x;Password=y;Database=z", options, TimeProvider.System, NullLogger<BackupService>.Instance, mirror);
+
+            await service.RunAsync(BackupKind.Automatic, CancellationToken.None);
+
+            Assert.Empty(watcher.Clear);
+            Assert.True(Assert.Single(mirror.Last).Ok);
+            // Nothing is left beside the key either.
+            Assert.Equal(["secret.key"], Directory.GetFiles(Path.Combine(_folder, "base")).Select(Path.GetFileName));
+        }
     }
 }
