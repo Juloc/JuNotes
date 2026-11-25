@@ -260,5 +260,42 @@ namespace JuNotes.Backend.Tests
                 Assert.Equal("Altbestand", Assert.Single(folders.GetProperty("items").EnumerateArray()).GetProperty("name").GetString());
             }
         }
+
+        // Review 2, point 6: a payload that is not an object is refused when it comes in and skipped when it is read, so it can never break the lists of its owner.
+        [RequiresDatabaseFact]
+        public async Task A_payload_that_is_not_an_object_is_refused_and_if_one_is_there_all_the_same_the_lists_still_work()
+        {
+            var scene = await StartAsync();
+            try
+            {
+                using var app = scene.Host.Browser();
+                app.DefaultRequestHeaders.Authorization = new("Bearer", AdminHost.Token);
+                foreach (var payload in new[] { "5", "[1,2]", "\"text\"", "true" })
+                {
+                    var response = await app.PostAsync(Url("/api/v1/sync/push"), new StringContent($$"""{"changes":[{"kind":"subject","id":"{{Guid.NewGuid()}}","parentId":null,"payload":{{payload}},"deleted":false}]}""", System.Text.Encoding.UTF8, "application/json"));
+                    Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+                }
+
+                // Rows like that, made some other way, are skipped in every list.
+                var parents = new Dictionary<string, Guid?> { ["subject"] = null, ["notebook"] = Folder, ["page"] = Notebook, ["grade"] = Folder, ["card"] = Folder, ["stroke"] = Page, ["object"] = Page };
+                foreach (var (kind, parent) in parents)
+                {
+                    await using var insert = scene.Database.Data.CreateCommand(
+                        $"insert into entities (kind, id, parent_id, payload, deleted, seq, owner_id) values ('{kind}', '{Guid.NewGuid()}', {(parent is { } id ? "'" + id + "'" : "null")}, '[1]', false, nextval('change_seq'), '{scene.A}')");
+                    await insert.ExecuteNonQueryAsync();
+                }
+
+                Assert.Single((await JsonAsync(await scene.AClient.GetAsync(Url("/api/web/v1/folders")))).GetProperty("items").EnumerateArray());
+                Assert.Single((await JsonAsync(await scene.AClient.GetAsync(Url("/api/web/v1/notebooks")))).GetProperty("items").EnumerateArray());
+                Assert.Equal(2, (await JsonAsync(await scene.AClient.GetAsync(Url($"/api/web/v1/notebooks/{Notebook}/pages")))).GetProperty("items").GetArrayLength());
+                Assert.Equal("5/6", (await JsonAsync(await scene.AClient.GetAsync(Url($"/api/web/v1/pages/{Page}")))).GetProperty("page").GetProperty("solution").GetString());
+                Assert.Single((await JsonAsync(await scene.AClient.GetAsync(Url("/api/web/v1/grades")))).GetProperty("items").EnumerateArray());
+                Assert.Single((await JsonAsync(await scene.AClient.GetAsync(Url("/api/web/v1/cards")))).GetProperty("items").EnumerateArray());
+            }
+            finally
+            {
+                await EndAsync(scene);
+            }
+        }
     }
 }

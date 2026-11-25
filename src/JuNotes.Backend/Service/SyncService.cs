@@ -202,6 +202,12 @@ namespace JuNotes.Backend.Service
                     throw new SyncValidationException("A change that is not a deletion needs a payload.");
                 }
 
+                // What every reader of the notes expects of a payload: a JSON object. Anything else (a number, a list, a text) would make the lists of its owner fail.
+                if (change.Payload is { ValueKind: not JsonValueKind.Object })
+                {
+                    throw new SyncValidationException("A payload must be an object.");
+                }
+
                 if (change.Payload is { } payload && payload.GetRawText().Length > MaxPayloadBytes)
                 {
                     throw new SyncValidationException("A payload is larger than 1 MB.");

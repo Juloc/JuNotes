@@ -206,7 +206,12 @@ namespace JuNotes.Backend.Library
             await using var reader = await command.ExecuteReaderAsync(ct);
             while (await reader.ReadAsync(ct))
             {
-                rows.Add((reader.GetGuid(0), reader.IsDBNull(1) ? null : reader.GetGuid(1), JsonElement.Parse(reader.GetString(2))));
+                // A row whose payload is not an object (it should not have been taken, see SyncService.Validate) is left out, so it cannot break the lists of its owner.
+                var payload = JsonElement.Parse(reader.GetString(2));
+                if (payload.ValueKind == JsonValueKind.Object)
+                {
+                    rows.Add((reader.GetGuid(0), reader.IsDBNull(1) ? null : reader.GetGuid(1), payload));
+                }
             }
 
             return rows;
