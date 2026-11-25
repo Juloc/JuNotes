@@ -29,6 +29,15 @@ dass die heutige iPad-App dabei kaputtgeht, und dessen KI über den gemeinsamen 
    **Präzisiert am 24.11.2026 (Eigentümer, auf Frage „nur Kalender-Link oder eigene Anmeldung“): „Eigene Anmeldung“ für den Stundenplan.** Das ändert die Regel „nie ein Passwort
    speichern“ für genau diesen Fall (unten). Das **Schul-Intranet** ist **noch nicht entschieden**: Der Eigentümer sieht es sich erst an, was es offiziell anbietet.
 
+### Entscheidungen des Eigentümers vom 25.11.2026 (über den Orchestrator, Eintrag nach seiner Mitteilung)
+
+9. **Einspielen von Meilenstein 1 und 2 auf die laufende Installation: Ja.** Der Orchestrator macht es mit dem Stand, der als lokaler Tag `m2-geprueft` markiert ist (Liste „Für das Einspielen“ in STATE.md).
+10. **Die Hefte auf dem iPad gehören seiner Frau: Fall B1.** Sie schließt die Einrichtung ab und wird die erste Administratorin; der Eigentümer lädt sich danach selbst ein. Folge: Die alten Hefte und der
+    gemeinsame App-Token gehören ihr. **„Person hinter dem alten Token ändern“ und die Übergabe von Heften (ARCHITECTURE 10.4) werden nicht gebaut.**
+11. **Stundenplan:** Der Eigentümer will den derzeit besten Weg der Anbindung (der Orchestrator lässt recherchieren: offizielle Wege, bekannte Bibliotheken, Anmeldung ohne gespeichertes Passwort) und
+    kümmert sich selbst darum, dass es erlaubt ist („nur privat für meine Frau, erstmal ein Test“). **Es bleibt dabei:** kein Aufruf gegen den echten Dienst, bevor er die Erlaubnis bestätigt hat **und**
+    seine Frau sich selbst angemeldet hat; dann so wenige Aufrufe wie möglich; die Regeln unten gelten unverändert (Tests nur gegen Attrappen).
+
 ### Regeln für alles Schulische
 
 1. **Die Person meldet sich selbst an,** in ihrer eigenen Einstellungsseite, mit ihren eigenen Händen. Niemand sonst tippt ihr Passwort, auch keine Sitzung und kein Test. Es gibt keinen gemeinsamen Schulzugang

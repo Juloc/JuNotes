@@ -160,6 +160,9 @@ Der Stand davor ist als lokaler Tag `m2-geprueft` markiert (letzter Commit vor 3
   `Directory.Build.props`). Begründung: Die Kopie wird in der Basis mit eigenen Regeln und Tests geprüft und bleibt byteweise gleich dem `MANIFEST`, statt in jeder App noch einmal mit anderen Maßstäben.
   Die 49 Stellen bei unserem Level gehen als Liste an die Basis (ein strengerer Level dort ist eine spätere, eigene Entscheidung; CA5350 bei TOTP bliebe eine begründete Ausnahme).
 - Das Schulische bleibt aus dem öffentlichen Repository (jetzt auch die Basis öffentlich): kein Name, keine Adresse, kein Passwort.
+- Eigentümer, 25.11.2026 (über den Orchestrator): **Einspielen von Meilenstein 1 und 2: Ja** (mit dem Tag `m2-geprueft`). **Fall B1:** Die Hefte auf dem iPad gehören seiner Frau; sie schließt die Einrichtung ab
+  und wird erste Administratorin, der Eigentümer lädt sich danach ein. „Person hinter dem alten Token ändern“ und die Übergabe von Heften werden **nicht** gebaut. **Stundenplan:** der derzeit beste Weg
+  (Recherche beim Orchestrator); Erlaubnis klärt der Eigentümer; kein Aufruf gegen den echten Dienst, bevor er sie bestätigt hat und seine Frau sich selbst angemeldet hat, dann so wenige wie möglich.
 - **Fragen vor dem Bauen:** Bei mehreren möglichen Entwürfen erst fragen (interaktiv, auf Deutsch), dann einmal bauen.
 
 ## Starten, testen, veröffentlichen
@@ -298,7 +301,7 @@ Stand 25.11.2026, nach beiden Sicherheitsprüfungen. **Nichts davon ist an der l
 
 **Ohne Änderung der Compose-Datei und der Volumes:** Der Schlüssel der Basis liegt im Volume unter `/data/base` (das Image setzt `BASE_DATA`), die Datenbankverbindung bleibt `ConnectionStrings__JuNotes`, die Werte `Admin__Password`/`Web__Password`/`UNTIS_*` werden nicht mehr gelesen (harmlos).
 
-### Schritt 0: zwei Antworten des Eigentümers
+### Schritt 0: zwei Antworten des Eigentümers (**beantwortet am 25.11.2026: Fall B1 und Ja**, siehe SCOPE.md 9 und 10)
 1. **Wem gehören die Hefte auf dem iPad?** (Fall A: der Person, die die Einrichtung abschließt: weiter. Fall B1: einer anderen Person: **diese** schließt die Einrichtung ab und wird erste Administratorin, der Eigentümer lädt sich danach ein. Fall B2: der Eigentümer schließt ab und gibt später ab: braucht die zurückgestellte Übergabe, **dann nicht einspielen**.) Die Zuweisung der alten Hefte gibt **alle** an die Person, die die Einrichtung abschließt, und ändert sich später nicht.
 2. **Sein Ja** zum Einspielen (Sicherung davor, Wartezeit der App, Rückweg bekannt).
 
