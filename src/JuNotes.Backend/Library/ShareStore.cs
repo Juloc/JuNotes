@@ -21,7 +21,8 @@ namespace JuNotes.Backend.Library
     }
 
     // Shares of single notebooks, read only (ARCHITECTURE 10.2). Every question about a share is asked of the table each time and nothing is kept, so a revoked share is gone
-    // with the next request. Who may share: only the owner of the notebook, and only a notebook that is not deleted or in the trash.
+    // with the next request. The shares of a person who is blocked are closed for as long as they are blocked (the person behind them keeps the notebooks, nobody reads them
+    // through a share), and open again when the person is. Who may share: only the owner of the notebook, and only a notebook that is not deleted or in the trash.
     public sealed class ShareStore(NpgsqlDataSource data, TimeProvider time)
     {
         // The people one can share with: active people of this installation who can sign in, without the asker. Name and id only.
@@ -109,7 +110,7 @@ namespace JuNotes.Backend.Library
         // The live shares made with this person (the notebook has to be still the sharer's, and the sharer still there).
         public async Task<IReadOnlyList<Share>> ForRecipientAsync(Guid recipient, CancellationToken ct)
         {
-            await using var command = data.CreateCommand("select s.id, s.notebook_id, s.owner_id, u.name from shares s join users u on u.id = s.owner_id join entities e on e.id = s.notebook_id and e.kind = 'notebook' and e.owner_id = s.owner_id where s.recipient_id = $1 and s.revoked_at is null and s.mode = 'read' order by s.created_at, s.id");
+            await using var command = data.CreateCommand("select s.id, s.notebook_id, s.owner_id, u.name from shares s join users u on u.id = s.owner_id and u.state = 'active' join entities e on e.id = s.notebook_id and e.kind = 'notebook' and e.owner_id = s.owner_id where s.recipient_id = $1 and s.revoked_at is null and s.mode = 'read' order by s.created_at, s.id");
             command.Parameters.Add(new NpgsqlParameter { Value = recipient });
             return await ReadSharesAsync(command, ct);
         }
@@ -117,7 +118,7 @@ namespace JuNotes.Backend.Library
         // The share that lets this person read this notebook, or nothing. Asked at every request.
         public async Task<Share?> FindAsync(Guid recipient, Guid notebook, CancellationToken ct)
         {
-            await using var command = data.CreateCommand("select s.id, s.notebook_id, s.owner_id, u.name from shares s join users u on u.id = s.owner_id join entities e on e.id = s.notebook_id and e.kind = 'notebook' and e.owner_id = s.owner_id where s.recipient_id = $1 and s.notebook_id = $2 and s.revoked_at is null and s.mode = 'read'");
+            await using var command = data.CreateCommand("select s.id, s.notebook_id, s.owner_id, u.name from shares s join users u on u.id = s.owner_id and u.state = 'active' join entities e on e.id = s.notebook_id and e.kind = 'notebook' and e.owner_id = s.owner_id where s.recipient_id = $1 and s.notebook_id = $2 and s.revoked_at is null and s.mode = 'read'");
             command.Parameters.Add(new NpgsqlParameter { Value = recipient });
             command.Parameters.Add(new NpgsqlParameter { Value = notebook });
             return (await ReadSharesAsync(command, ct)).FirstOrDefault();
@@ -126,7 +127,7 @@ namespace JuNotes.Backend.Library
         // The share through which this person may read this page: the page has to lie in a notebook that is shared with them by the person who owns the page.
         public async Task<Share?> FindForPageAsync(Guid recipient, Guid page, CancellationToken ct)
         {
-            await using var command = data.CreateCommand("select s.id, s.notebook_id, s.owner_id, u.name from shares s join users u on u.id = s.owner_id join entities p on p.kind = 'page' and p.parent_id = s.notebook_id and p.owner_id = s.owner_id join entities e on e.id = s.notebook_id and e.kind = 'notebook' and e.owner_id = s.owner_id where p.id = $2 and s.recipient_id = $1 and s.revoked_at is null and s.mode = 'read'");
+            await using var command = data.CreateCommand("select s.id, s.notebook_id, s.owner_id, u.name from shares s join users u on u.id = s.owner_id and u.state = 'active' join entities p on p.kind = 'page' and p.parent_id = s.notebook_id and p.owner_id = s.owner_id join entities e on e.id = s.notebook_id and e.kind = 'notebook' and e.owner_id = s.owner_id where p.id = $2 and s.recipient_id = $1 and s.revoked_at is null and s.mode = 'read'");
             command.Parameters.Add(new NpgsqlParameter { Value = recipient });
             command.Parameters.Add(new NpgsqlParameter { Value = page });
             return (await ReadSharesAsync(command, ct)).FirstOrDefault();

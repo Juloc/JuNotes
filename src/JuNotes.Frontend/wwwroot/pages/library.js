@@ -69,6 +69,8 @@ async function showNotebook(id, shared) {
   const root = shared ? `${API}/shared` : API;
   const detail = await api('GET', `${root}/notebooks/${encodeURIComponent(id)}`);
   const pages = await listAll(`${shared ? '/shared' : ''}/notebooks/${encodeURIComponent(id)}/pages`);
+  // who has this notebook (the owner's own page says so whenever she opens it, so a share that came back with the notebook out of the trash is never a surprise)
+  const holders = shared ? [] : await listAll(`/notebooks/${encodeURIComponent(id)}/shares`).catch(() => []);
   const notebook = detail.notebook;
   const rows = pages.map((page, index) => h('a', { class: 'row', href: `#/${shared ? 'shared/' : ''}page/${page.id}` },
     h('span', { class: 'row-lead', text: String(index + 1) }),
@@ -80,6 +82,7 @@ async function showNotebook(id, shared) {
   if (share) share.addEventListener('click', () => shareDialog(notebook));
   const body = h('div', { class: 'page stack l' },
     shared ? notice(t('shared.readonly', { name: notebook.ownerName })) : null,
+    holders.length ? notice(t('share.sharedWith', { names: holders.map((x) => x.recipientName).join(', ') })) : null,
     h('div', { class: 'notebook-head' }, coverEl(notebook, 'small', shared ? `${API}/shared/assets` : undefined), h('p', { class: 'muted', text: tp('lib.pages', pages.length) }), share),
     pages.length ? h('div', { class: 'list' }, rows) : emptyState({ icon: 'file', title: t('lib.noPages.title'), text: t('lib.noPages.text') }));
   return { title: notebook.title, back: shared ? '#/' : (notebook.folderId ? `#/folder/${notebook.folderId}` : '#/'), body };

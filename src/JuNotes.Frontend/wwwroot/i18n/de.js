@@ -178,7 +178,7 @@ export default {
   'shared.readonly': '{name} hat dieses Heft mit dir geteilt. Du kannst es nur lesen.',
   'share.button': 'Teilen',
   'share.title': 'Heft „{name}“ teilen',
-  'share.intro': 'Wer ein Heft mit dir teilt, kann es nur lesen: die Seiten, die Zeichnungen und die Dateien darin. Du kannst die Freigabe jederzeit entziehen; das gilt sofort.',
+  'share.intro': 'Wer das Heft bekommt, kann es nur lesen. Alles im Heft wird mitgeteilt: die Seiten, die Zeichnungen und die Dateien darin, auch Lösungen und Ergänzungen. Du kannst die Freigabe jederzeit entziehen; das gilt sofort.',
   'share.nobody': 'Noch mit niemandem geteilt.',
   'share.pick': 'Person wählen',
   'share.add': 'Teilen',
@@ -190,4 +190,5 @@ export default {
   'share.everyone': 'Mit allen anderen Personen geteilt.',
   'err.share.self': 'Ein Heft teilst du mit einer anderen Person.',
   'err.share.person': 'Diese Person gibt es nicht (mehr).',
+  'share.sharedWith': 'Dieses Heft ist geteilt mit {names} (nur lesen). Legst du es in den Papierkorb und holst es zurück, sind sie wieder dabei.',
 };

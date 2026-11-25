@@ -178,7 +178,7 @@ export default {
   'shared.readonly': '{name} shared this notebook with you. You can only read it.',
   'share.button': 'Share',
   'share.title': 'Share “{name}”',
-  'share.intro': 'Whoever you share a notebook with can only read it: the pages, the drawings and the files in it. You can take the share back at any time; it works at once.',
+  'share.intro': 'Whoever gets the notebook can only read it. Everything in the notebook is shared: the pages, the drawings and the files in it, including solutions and additions. You can take the share back at any time; it works at once.',
   'share.nobody': 'Not shared with anybody yet.',
   'share.pick': 'Choose a person',
   'share.add': 'Share',
@@ -190,4 +190,5 @@ export default {
   'share.everyone': 'Shared with everybody else.',
   'err.share.self': 'You share a notebook with somebody else.',
   'err.share.person': 'That person is not there (any more).',
+  'share.sharedWith': 'This notebook is shared with {names} (read only). If you put it in the trash and bring it back, they have it again.',
 };

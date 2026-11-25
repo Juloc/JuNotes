@@ -299,6 +299,25 @@ namespace JuNotes.Backend.Tests
         }
 
         [RequiresDatabaseFact]
+        public async Task The_shares_of_a_blocked_owner_are_closed_on_every_path_and_open_again_when_she_is_unblocked()
+        {
+            await using var scene = await Scene.StartAsync();
+            await scene.ShareAsync(Shared, scene.Bea);
+            var users = scene.Host.Services.GetRequiredService<UserStore>();
+            Assert.Equal("200,200,200,200,200,200,200", await Scene.ReadingAsync(scene.BeaClient));
+
+            await users.SetStateAsync(scene.Ada, PersonState.Blocked);
+
+            Assert.Equal("404,404,404,404,404,404,404", await Scene.ReadingAsync(scene.BeaClient));
+            Assert.Empty(Ids(await ReadAsync(await Get(scene.BeaClient, "/shared"))));
+            Assert.Equal(1, await scene.CountAsync("shares", "revoked_at is null"));
+
+            await users.SetStateAsync(scene.Ada, PersonState.Active);
+
+            Assert.Equal("200,200,200,200,200,200,200", await Scene.ReadingAsync(scene.BeaClient));
+        }
+
+        [RequiresDatabaseFact]
         public async Task A_notebook_in_the_trash_or_deleted_is_gone_for_the_recipient_and_comes_back_when_it_does()
         {
             await using var scene = await Scene.StartAsync();

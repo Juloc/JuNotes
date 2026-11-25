@@ -265,7 +265,7 @@ namespace JuNotes.Backend.Tests
             {
                 using var app = Token(host);
                 Assert.Equal(HttpStatusCode.OK, (await app.PostAsync(Url("/api/v1/sync/push"), Push(Guid.NewGuid(), "alt"))).StatusCode);
-                // A slow claim: every update of entities takes a moment.
+                // A slow claim: every update of entities takes a moment (long enough to look at it and give up while it runs).
                 foreach (var sql in new[] { "create function slow() returns trigger language plpgsql as $$ begin perform pg_sleep(1.0); return new; end $$", "create trigger slow_update before update on entities for each row execute function slow()" })
                 {
                     await using var command = database.Data.CreateCommand(sql);
@@ -274,9 +274,24 @@ namespace JuNotes.Backend.Tests
 
                 var (_, _) = await host.SignedInPersonAsync();
                 var owners = host.Services.GetRequiredService<OwnerDirectory>();
-                using var giveUp = new CancellationTokenSource(TimeSpan.FromMilliseconds(250));
+                using var giveUp = new CancellationTokenSource();
 
-                var owner = await owners.TokenOwnerAsync(giveUp.Token);
+                var call = owners.TokenOwnerAsync(giveUp.Token);
+                // The request gives up as soon as the claim is running on the server (not after some time: the clock has nothing to do with the rule, and a slow machine must not
+                // change the result). The wait below only looks for that moment.
+                var running = false;
+                for (var attempt = 0; attempt < 400 && !running; attempt++)
+                {
+                    running = await ScalarAsync(database, "select count(*) from pg_stat_activity where application_name = 'notes-maintenance' and state = 'active' and query like 'update entities set owner_id%'") != "0";
+                    if (!running)
+                    {
+                        await Task.Delay(25);
+                    }
+                }
+
+                Assert.True(running, "the claim never started");
+                giveUp.Cancel();
+                var owner = await call;
 
                 Assert.Equal(TokenState.Person, owner.State);
                 Assert.Equal("0", await ScalarAsync(database, "select count(*) from entities where owner_id is null"));
