@@ -154,7 +154,7 @@ namespace JuNotes.Backend.Library
             return kept.Count == 0 ? null : string.Join(';', kept);
         }
 
-        [GeneratedRegex(@"^/api/web/v1/assets/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$", RegexOptions.None, matchTimeoutMilliseconds: 1000)]
+        [GeneratedRegex(@"^/api/web/v1/(shared/)?assets/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$", RegexOptions.None, matchTimeoutMilliseconds: 1000)]
         private static partial Regex AssetReference();
 
         [GeneratedRegex(@"^-?[0-9]+(\.[0-9]+)?(e-?[0-9]+)?$", RegexOptions.None, matchTimeoutMilliseconds: 1000)]

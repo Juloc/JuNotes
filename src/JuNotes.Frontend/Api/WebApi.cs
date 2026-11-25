@@ -76,10 +76,7 @@ namespace JuNotes.Frontend.Api
                     return Error.NotFound().ToHttp();
                 }
 
-                var template = page.ContentType == "drawing" ? page.Template ?? notebook.Template : "blank";
-                // Only what the renderer writes gets out: the picture goes through the allow list before it leaves the server.
-                var svg = SvgAllowList.Clean(PageRenderer.Svg(notebook.Type, template, await mine.StrokesAsync(id, ctx.RequestAborted), await mine.ObjectsAsync(id, ctx.RequestAborted), Prefix + "/assets/"));
-                return Results.Ok(new PageView(Page(page), notebook.Type, svg));
+                return Results.Ok(await ViewAsync(mine, page, notebook, Prefix + "/assets/", ctx.RequestAborted));
             });
 
             api.MapGet("/assets/{id:guid}", async (Guid id, HttpContext ctx, AssetService assets) =>
@@ -122,13 +119,22 @@ namespace JuNotes.Frontend.Api
             });
         }
 
+        // The page as it is drawn. Only what the renderer writes gets out: the picture goes through the allow list before it leaves the server. The prefix says where the
+        // files on the page are fetched from (the own files or, for a shared notebook, the shared ones).
+        internal static async Task<PageView> ViewAsync(LibraryReader reader, PageInfo page, NotebookInfo notebook, string assetPrefix, CancellationToken ct)
+        {
+            var template = page.ContentType == "drawing" ? page.Template ?? notebook.Template : "blank";
+            var svg = SvgAllowList.Clean(PageRenderer.Svg(notebook.Type, template, await reader.StrokesAsync(page.Id, ct), await reader.ObjectsAsync(page.Id, ct), assetPrefix));
+            return new PageView(Page(page), notebook.Type, svg);
+        }
+
         private static LibraryReader Mine(HttpContext ctx, Libraries libraries) => libraries.Of(ctx.Person().UserId);
 
         private static FolderDto Folder(SubjectInfo folder) => new(folder.Id, folder.Name, folder.Color, folder.Symbol, folder.Sort, folder.ParentId, folder.IsSubject);
 
-        private static NotebookDto Notebook(NotebookInfo notebook) => new(notebook.Id, notebook.SubjectId, notebook.Title, notebook.Type, notebook.Template, notebook.CreatedAt, notebook.Cover);
+        internal static NotebookDto Notebook(NotebookInfo notebook) => new(notebook.Id, notebook.SubjectId, notebook.Title, notebook.Type, notebook.Template, notebook.CreatedAt, notebook.Cover);
 
-        private static PageDto Page(PageInfo page) => new(page.Id, page.NotebookId, page.Sort, page.ContentType, page.AssetId, page.PdfPageIndex, page.Heading, page.PrintedText, page.Solution, page.Additions);
+        internal static PageDto Page(PageInfo page) => new(page.Id, page.NotebookId, page.Sort, page.ContentType, page.AssetId, page.PdfPageIndex, page.Heading, page.PrintedText, page.Solution, page.Additions);
 
         // Page by page, the cursor being the id of the last row given. A cursor that is not ours, or whose row is gone since the last page, is an error (cursor.stale) and
         // not a start from the beginning: the page asks again from the top and drops what it has seen twice.

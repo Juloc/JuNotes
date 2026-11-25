@@ -8,7 +8,7 @@ import { peopleCard } from '/base/people.js';
 import { hubCard } from '/base/hub.js';
 import de from '/i18n/de.js';
 import en from '/i18n/en.js';
-import { homePage, folderPage, notebookPage, pagePage, searchPage } from '/pages/library.js';
+import { homePage, folderPage, notebookPage, pagePage, searchPage, sharedNotebookPage, sharedPagePage } from '/pages/library.js';
 import { gradesPage, cardsPage } from '/pages/study.js';
 import { pairingCard } from '/pages/devices.js';
 import { overviewPage, codexPage, profilesPage, backupsPage } from '/pages/admin.js';
@@ -51,6 +51,8 @@ function run(me) {
     '/': homePage,
     '/folder/:id': folderPage,
     '/notebook/:id': notebookPage,
+    '/shared/notebook/:id': sharedNotebookPage,
+    '/shared/page/:id': sharedPagePage,
     '/page/:id': pagePage,
     '/search/:q': searchPage,
     '/grades': () => gradesPage({}),

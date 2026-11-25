@@ -26,14 +26,14 @@ const HEX = /^#[0-9a-fA-F]{6}$/;
 const GUID = /^[0-9a-fA-F-]{36}$/;
 
 /** The front of a notebook as the person made it. The colours come from the data, so they go in through the object model (the content policy allows no style attribute) and only as plain hex. */
-export function coverEl(notebook, cls = '') {
+export function coverEl(notebook, cls = '', assets = `${API}/assets`) {
   const cover = notebook.cover;
   const el = h('div', { class: `cover ${cls}`.trim() });
   if (cover) {
     const a = HEX.test(cover.colorA) ? cover.colorA : null;
     const b = HEX.test(cover.colorB) ? cover.colorB : a;
     if (cover.style === 'image' && GUID.test(cover.assetId || '')) {
-      el.style.backgroundImage = `url(${API}/assets/${cover.assetId})`;
+      el.style.backgroundImage = `url(${assets}/${cover.assetId})`;
       el.style.backgroundSize = 'cover';
       el.style.backgroundPosition = 'center';
     } else if (a) {
@@ -67,7 +67,7 @@ const ELEMENTS = {
 const STYLE_PROPERTIES = ['font', 'color', 'white-space', 'overflow-wrap'];
 const SVG_NS = 'http://www.w3.org/2000/svg';
 const XHTML_NS = 'http://www.w3.org/1999/xhtml';
-const ASSET = new RegExp(`^${API.replaceAll('/', '\\/')}\\/assets\\/[0-9a-fA-F-]{36}$`);
+const ASSET = new RegExp(`^${API.replaceAll('/', '\\/')}(?:\\/shared)?\\/assets\\/[0-9a-fA-F-]{36}$`);
 const risky = (value) => /url\(|javascript:|expression\(|@import/i.test(value);
 
 // The style attribute would be ignored by the content policy; the few properties the text box uses are set through the object model instead.
