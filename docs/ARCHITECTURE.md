@@ -349,7 +349,33 @@ Wie in 3a entschieden: Freigaben gelten im Web, nicht im Abgleich; die App der E
 **Danach, in dieser Reihenfolge:** 3a Gerätetoken und Kopplung (Server mit Tests; die App-Änderung nach Abschnitt 11) · 3c Freigaben im Web · 3d Geräteverwaltung und Abschalten des gemeinsamen Tokens · 3b klein (Löschprüfung und endgültiges Löschen der Hefte). Jede Scheibe lauffähig, mit Tests mit mehreren Personen, STATE.md am Ende.
 **Risiken:** Die Kopplung braucht eine Änderung der App, die hier nur übersetzt, nicht auf einem iPad geprüft werden kann (Abschnitt 11). Die zurückgestellte Übergabe (10.4) bleibt der heikelste Teil, falls sie doch kommt.
 
-## 11. App-Änderung für die Kopplung (Entwurf, nichts gebaut)
+## 11. App-Änderung für die Kopplung
+
+**Stand 27.11.2026: gebaut** (Server und App; die App nur in der CI übersetzt, auf keinem Gerät gestartet). Wunsch des Eigentümers: *„In der App einmal die Adresse
+eintragen, dann anmelden.“* Was davon gebaut ist und wo es vom Entwurf unten abweicht:
+
+- **Anmeldefenster statt Code als Hauptweg.** „Anmelden“ öffnet `<Server>/#/app-login?state=<Zufall>` in einem privaten Fenster des Systems
+  (`ASWebAuthenticationSession`, `.ephemeral`: nichts aus Safari wird übernommen). Dort meldet sich die Person an wie im Browser (Hub, oder Passwort mit 2FA). Die
+  Seite (`pages/applogin.js`) merkt sich den `state` im `sessionStorage` des Tabs (die Anmeldung über den Hub verlässt die Seite und kommt ohne Adresse zurück),
+  holt nach der Anmeldung mit `POST /api/web/v1/devices/pairing/app` einen Kopplungscode und gibt ihn an `junotes://paired?code=…&state=…` weiter, ohne Rückfrage
+  (Entscheidung des Eigentümers). Die App prüft den `state` und tauscht den Code wie bisher bei `POST /api/v1/pair`. Ein Token geht nie durch die Seite.
+- **Frische statt 2FA-Code.** `pairing/app` gibt einen Code nur, wenn die Sitzung höchstens **5 Minuten** alt ist (`DevicesApi.FreshSignIn`); die Anmeldung
+  selbst ist der frische Beweis (Personen, die sich über den Hub anmelden, haben in Notes keinen zweiten Faktor). Eine ältere Sitzung bekommt 403
+  `pairing.not_fresh`, die Seite bietet „Neu anmelden“ (abmelden, Anfrage der App bleibt). Der Weg mit Code und QR-Code (`/devices/pairing`) verlangt weiter den frischen 2FA-Code.
+- **Kein gemeinsamer Token in der App.** Das Feld für den Zugangsschlüssel ist weg; ein alter Eintrag `syncToken` im Schlüsselbund wird beim Start gelöscht (die
+  App war noch nicht in Benutzung). Der Geräteschlüssel liegt im Schlüsselbund als `deviceToken` („nach dem ersten Entsperren“).
+- **Abmelden** ruft `DELETE /api/v1/device` (neu, additiv; nur mit dem eigenen Geräteschlüssel, entfernt nur dieses Gerät; der gemeinsame Token bekommt 409) und
+  vergisst den Schlüssel; die Hefte bleiben auf dem iPad.
+- **Zweiter Weg:** „Mit Code verbinden“: Code tippen oder einfügen (auch den Link der Seite), oder den QR-Code mit `DataScannerViewController` scannen. Gehört der
+  QR-Code zu einem anderen Server als dem eingetragenen, fragt die App.
+- **Statuszeile:** neuer Zustand „Abgemeldet, bitte in den Einstellungen neu anmelden“ bei 401; ohne Anmeldung „Nicht angemeldet, alles liegt auf dem iPad“.
+- **`/api/v1/status`** hat das Feld `pairing: true`.
+- **Nicht gebaut:** die Auswertung von `PushResponse.accepted` und „Neu vom Server laden“ (Zeile `SyncEngine` unten). Solange nur eine Person ein iPad nutzt und
+  ihr alle Zeilen gehören, nimmt der Server alles an; bei geteilten Heften (Stufe 2) wird das nötig.
+
+*Der Entwurf vom 25.11. (unten) bleibt zum Nachlesen stehen.*
+
+### 11.1 Entwurf vom 25.11.2026
 
 Stand 25.11.2026. Ziel: Das iPad koppelt sich mit einem Einmalcode (10.1) und schickt danach seinen eigenen Gerätetoken statt des gemeinsamen. Gelesen sind `clients/ios` (`ServerSettings.swift`, `Keychain.swift`, `SettingsView.swift`, `AppModel.swift`, `JuNotesCore/Sources/JuNotesCore/Sync/*`); gebaut oder gestartet wurde nichts.
 

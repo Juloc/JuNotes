@@ -32,6 +32,20 @@ JulOS-Chat): eigenes Review mit einem unabhängigen Helfer, Push, Release und Ei
 - **Kein gemeinsamer Token im Stack:** Der Stack `notes` setzt `SYNC_TOKEN` nicht. Die iPad-App kann sich aber noch nicht koppeln, also gleicht sie gerade
   **nicht** ab (401). Gewünscht ist (Eigentümer, 27.11.): In der App einmal die Adresse eintragen, dann anmelden. Das ist die App-Änderung (ARCHITECTURE 11) mit
   einem Anmeldefenster (die normale Web-Anmeldung, Hub oder Passwort mit 2FA, danach automatisch ein Kopplungscode); QR/Code bleibt als zweiter Weg.
+- **Gebaut am 27.11. (lokal committet, nicht gepusht, nicht eingespielt): die Anmeldung in der App** (ARCHITECTURE 11, Abschnitt oben). Server: `/#/app-login`,
+  `POST /api/web/v1/devices/pairing/app` (nur Sitzungen bis 5 Minuten), `DELETE /api/v1/device`, `pairing` in `/api/v1/status`. App: Adresse + „Anmelden“ im
+  privaten Fenster, „Mit Code verbinden“ (tippen, einfügen, QR), „Abmelden“, Statuszeile „Abgemeldet“. Tests: `DeviceTests.The_sign_in_window_of_the_app_…`,
+  `DeviceTests.A_device_signs_out_with_its_own_token_and_only_itself`, `ApiContractTests.Status_…` (Feld `pairing`), Swift `PairingTests` (9) und
+  `SyncSnapshotTests.anUnknownKeyAsksToSignInAgain`; Gegenprobe: ohne die 5-Minuten-Regel wird der Test rot. Im Browser lokal durchgespielt (Anfrage merken,
+  Anmeldung, „Verbunden“, Code einlösen, Abgleich, Abmelden, 401 danach; „Bitte neu anmelden“ bei alter Sitzung). **Nicht geprüft:** die App selbst (kein Mac;
+  nur die CI übersetzt), das Anmeldefenster auf dem iPad, die Rückkehr über den Hub, Scannen mit der Kamera, Aussehen der Seite bei 390 px und dunkel (der
+  Browser-Bereich war verborgen; die Seite nutzt nur `emptyState` der Basis).
+- **Für die Sicherheitsprüfung (App-Anmeldung):** (1) Die Seite öffnet nur die feste Adresse `junotes://paired`, nichts aus dem Link bestimmt das Ziel; `state` nur
+  `[A-Za-z0-9_-]{16,128}`. (2) Der Code ist einmalig und 10 Minuten gültig wie jeder andere; die App prüft den `state` und ignoriert fremde Antworten. (3) Frische:
+  nur eine Sitzung bis 5 Minuten; `created_at` der Sitzung ändert sich beim Rotieren nicht. (4) Bekannte Grenze: Öffnet jemand die Seite mit einem fremden
+  `state` in einem gewöhnlichen Browser (nicht im Anmeldefenster) und meldet sich dort frisch an, geht der Code an die App, die auf diesem Gerät `junotes://`
+  annimmt; unsere App meldet das Schema nicht an (das Anmeldefenster braucht es nicht) und ignoriert fremde `state`. Eine Rückfrage auf der Seite wurde bewusst
+  weggelassen (Eigentümer: „Nein, direkt“). (5) `DELETE /api/v1/device` entfernt nur das Gerät, dessen Schlüssel mitkommt.
 - **Weitere Entscheidungen vom 27.11.:** Geräte bleiben angemeldet, bis man sie entfernt (Sperren wirkt sofort); Sicherungen auf ein NAS und verschlüsselt in eine
   Cloud (Ziel noch offen; Geheimnisse wie die Passphrase besser über eine Einstellungsseite als über die Umgebung); KI künftig über die Brücke von JulOS
   (ein Schlüssel pro App, in den Einstellungen eingetippt); die Oberfläche nach dem Weg von caddy neu entwerfen (base 0.4.0, je Seite drei Entwürfe, dann bauen).
