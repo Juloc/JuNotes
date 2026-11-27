@@ -7,6 +7,8 @@ import FoundationNetworking
 public struct PairedDevice: Equatable, Sendable {
     public let token: String
     public let personName: String
+    /// The id of the person on the server: the app keeps it, so the notebooks of two people never mix on one iPad.
+    public let personID: String
 }
 
 public enum PairingError: Error, Equatable, Sendable {
@@ -60,21 +62,31 @@ public enum Pairing {
     }
 
     /// A value only this request knows; the sign-in page hands it back unchanged.
-    public static func newState() -> String {
+    public static func newState() -> String { random(32) }
+
+    /// The secret of one sign-in (PKCE, RFC 7636): it never leaves the app until the code is redeemed, so a code caught on its way back is worth nothing.
+    public static func newVerifier() -> String { random(64) }
+
+    /// What the sign-in page gets instead of the secret: base64url of its SHA-256, without padding (43 characters).
+    public static func challenge(for verifier: String) -> String {
+        SHA256.hash(Data(verifier.utf8)).base64EncodedString().replacingOccurrences(of: "+", with: "-").replacingOccurrences(of: "/", with: "_").replacingOccurrences(of: "=", with: "")
+    }
+
+    private static func random(_ count: Int) -> String {
         var generator = SystemRandomNumberGenerator()
         let letters = Array("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789")
-        return String((0..<32).map { _ in letters[Int(generator.next(upperBound: UInt64(letters.count)))] })
+        return String((0..<count).map { _ in letters[Int(generator.next(upperBound: UInt64(letters.count)))] })
     }
 
     /// The address of the scheme the sign-in page sends its answer to.
     public static let callbackScheme = "junotes"
 
     /// Where the sign-in window opens: the normal sign-in of the web app, which answers to the app afterwards.
-    public static func signInURL(server: URL, state: String) -> URL? {
+    public static func signInURL(server: URL, state: String, challenge: String) -> URL? {
         guard var parts = URLComponents(url: server, resolvingAgainstBaseURL: false) else { return nil }
         parts.path = "/"
         parts.query = nil
-        parts.fragment = "/app-login?state=\(state)"
+        parts.fragment = "/app-login?state=\(state)&challenge=\(challenge)"
         return parts.url
     }
 
@@ -106,26 +118,28 @@ public struct PairingClient: Sendable {
     private struct PairRequest: Encodable {
         let code: String
         let deviceName: String
+        let verifier: String?
     }
 
     private struct PairAnswer: Decodable {
         let token: String
         let personName: String
+        let personId: String
     }
 
-    /// Trades a code for the device's own key. The code is good once and for ten minutes.
-    public func pair(code: String, deviceName: String) async throws -> PairedDevice {
+    /// Trades a code for the device's own key. The code is good once and for ten minutes. A code from the sign-in window needs the secret of that sign-in.
+    public func pair(code: String, deviceName: String, verifier: String? = nil) async throws -> PairedDevice {
         guard Pairing.allows(baseURL) else { throw PairingError.notSecure }
         guard let code = Pairing.normalise(code) else { throw PairingError.codeRefused }
         var request = URLRequest(url: baseURL.appendingPathComponent("api/v1/pair"))
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.httpBody = try JSONEncoder().encode(PairRequest(code: code, deviceName: deviceName))
+        request.httpBody = try JSONEncoder().encode(PairRequest(code: code, deviceName: deviceName, verifier: verifier))
         let (data, status) = try await exchange(request)
         guard status == 200, let answer = try? JSONDecoder().decode(PairAnswer.self, from: data), !answer.token.isEmpty else {
             throw status >= 500 ? PairingError.serverUnreachable : PairingError.codeRefused
         }
-        return PairedDevice(token: answer.token, personName: answer.personName)
+        return PairedDevice(token: answer.token, personName: answer.personName, personID: answer.personId)
     }
 
     /// Signs this device out on the server: its key stops working. A key the server no longer knows counts as signed out.

@@ -358,7 +358,11 @@ eintragen, dann anmelden.“* Was davon gebaut ist und wo es vom Entwurf unten a
   (`ASWebAuthenticationSession`, `.ephemeral`: nichts aus Safari wird übernommen). Dort meldet sich die Person an wie im Browser (Hub, oder Passwort mit 2FA). Die
   Seite (`pages/applogin.js`) merkt sich den `state` im `sessionStorage` des Tabs (die Anmeldung über den Hub verlässt die Seite und kommt ohne Adresse zurück),
   holt nach der Anmeldung mit `POST /api/web/v1/devices/pairing/app` einen Kopplungscode und gibt ihn an `junotes://paired?code=…&state=…` weiter, ohne Rückfrage
-  (Entscheidung des Eigentümers). Die App prüft den `state` und tauscht den Code wie bisher bei `POST /api/v1/pair`. Ein Token geht nie durch die Seite.
+  (Entscheidung des Eigentümers). Die App prüft den `state` und tauscht den Code bei `POST /api/v1/pair` (mit dem Geheimnis, siehe PKCE). Ein Token geht nie durch die Seite.
+- **PKCE (RFC 7636, S256).** Die App erzeugt je Anmeldung ein Geheimnis und schickt nur dessen SHA-256 (`challenge`) an die Seite; der Code ist an die
+  `challenge` gebunden (Migration 0012) und wird bei `/api/v1/pair` nur mit dem Geheimnis (`verifier`) eingelöst. Ein abgefangener Code ist wertlos.
+- **Ein iPad, ein Konto.** Die Antwort von `/pair` nennt zusätzlich `personId`; die App bleibt beim Server und der Person der ersten Anmeldung und lehnt ein
+  anderes Konto ab (die Bibliothek auf dem iPad, ihr Merker und ihre wartenden Änderungen gehören diesem Konto).
 - **Frische statt 2FA-Code.** `pairing/app` gibt einen Code nur, wenn die Sitzung höchstens **5 Minuten** alt ist (`DevicesApi.FreshSignIn`); die Anmeldung
   selbst ist der frische Beweis (Personen, die sich über den Hub anmelden, haben in Notes keinen zweiten Faktor). Eine ältere Sitzung bekommt 403
   `pairing.not_fresh`, die Seite bietet „Neu anmelden“ (abmelden, Anfrage der App bleibt). Der Weg mit Code und QR-Code (`/devices/pairing`) verlangt weiter den frischen 2FA-Code.
@@ -367,7 +371,7 @@ eintragen, dann anmelden.“* Was davon gebaut ist und wo es vom Entwurf unten a
 - **Abmelden** ruft `DELETE /api/v1/device` (neu, additiv; nur mit dem eigenen Geräteschlüssel, entfernt nur dieses Gerät; der gemeinsame Token bekommt 409) und
   vergisst den Schlüssel; die Hefte bleiben auf dem iPad.
 - **Zweiter Weg:** „Mit Code verbinden“: Code tippen oder einfügen (auch den Link der Seite), oder den QR-Code mit `DataScannerViewController` scannen. Gehört der
-  QR-Code zu einem anderen Server als dem eingetragenen, fragt die App.
+  QR-Code zu einem anderen Server als dem eingetragenen, oder ist keiner eingetragen, fragt die App mit dem Namen des Servers.
 - **Statuszeile:** neuer Zustand „Abgemeldet, bitte in den Einstellungen neu anmelden“ bei 401; ohne Anmeldung „Nicht angemeldet, alles liegt auf dem iPad“.
 - **`/api/v1/status`** hat das Feld `pairing: true`.
 - **Nicht gebaut:** die Auswertung von `PushResponse.accepted` und „Neu vom Server laden“ (Zeile `SyncEngine` unten). Solange nur eine Person ein iPad nutzt und

@@ -48,7 +48,7 @@ struct SettingsView: View {
                 Button("Abmelden", role: .destructive) { Task { working = true; await model.signOut(); working = false } }
                 Button("Abbrechen", role: .cancel) {}
             } message: {
-                Text("Das iPad wird auch auf dem Server entfernt. Deine Hefte bleiben auf dem iPad; was noch nicht abgeglichen ist, geht beim nächsten Anmelden mit.")
+                Text("Das iPad wird auch auf dem Server entfernt. Deine Hefte bleiben auf dem iPad; was noch nicht abgeglichen ist, geht mit, wenn du dich wieder mit demselben Konto anmeldest.")
             }
         }
         .presentationDetents([.large])
@@ -108,7 +108,8 @@ struct SettingsView: View {
     private func signInWithWindow() async {
         guard let server, Pairing.allows(server) else { return }
         let state = Pairing.newState()
-        guard let start = Pairing.signInURL(server: server, state: state) else { return }
+        let secret = Pairing.newVerifier()
+        guard let start = Pairing.signInURL(server: server, state: state, challenge: Pairing.challenge(for: secret)) else { return }
         message = nil
         working = true
         defer { working = false }
@@ -116,7 +117,7 @@ struct SettingsView: View {
             let answer = try await webAuthenticationSession.authenticate(using: start, callback: .customScheme(Pairing.callbackScheme), preferredBrowserSession: .ephemeral, additionalHeaderFields: [:])
             switch Pairing.readAnswer(answer, state: state) {
             case .code(let code):
-                try await model.signIn(code: code, server: server)
+                try await model.signIn(code: code, server: server, verifier: secret)
             case .failed, nil:
                 message = "Die Anmeldung hat nicht geklappt. Versuch es noch einmal."
             }
@@ -124,6 +125,8 @@ struct SettingsView: View {
             // she closed the window: nothing to say
         } catch let error as PairingError {
             message = PairingCodeView.text(for: error)
+        } catch let error as SignInError {
+            message = error.text
         } catch {
             message = "Das Anmeldefenster ließ sich nicht öffnen. Prüfe die Adresse."
         }

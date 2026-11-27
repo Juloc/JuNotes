@@ -27,6 +27,24 @@ final class PairingStub: URLProtocol {
     override func stopLoading() {}
 }
 
+extension URLRequest {
+    /// The body as sent: URLProtocol hands it over as a stream, not as httpBody.
+    func httpBodyData() -> Data {
+        if let httpBody { return httpBody }
+        guard let stream = httpBodyStream else { return Data() }
+        stream.open()
+        defer { stream.close() }
+        var data = Data()
+        var buffer = [UInt8](repeating: 0, count: 4096)
+        while stream.hasBytesAvailable {
+            let read = stream.read(&buffer, maxLength: buffer.count)
+            if read <= 0 { break }
+            data.append(buffer, count: read)
+        }
+        return data
+    }
+}
+
 struct PairingRulesTests {
     @Test func aCodeIsReadAsTheServerReadsIt() {
         #expect(Pairing.normalise("abcde-fgh23") == "ABCDEFGH23")
@@ -55,8 +73,18 @@ struct PairingRulesTests {
     }
 
     @Test func theSignInWindowOpensTheAppLoginOfTheServer() {
-        let url = Pairing.signInURL(server: URL(string: "https://notes.example/old/path?x=1")!, state: "S7ate")
-        #expect(url?.absoluteString == "https://notes.example/#/app-login?state=S7ate")
+        let url = Pairing.signInURL(server: URL(string: "https://notes.example/old/path?x=1")!, state: "S7ate", challenge: "C4all")
+        #expect(url?.absoluteString == "https://notes.example/#/app-login?state=S7ate&challenge=C4all")
+    }
+
+    /// The secret of RFC 7636 (appendix B), checked against Python's hashlib; the server tests use the same secret.
+    @Test func theChallengeIsTheSha256OfTheSecretInBase64Url() {
+        #expect(Pairing.challenge(for: "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk") == "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM")
+        #expect(SHA256.hash(Data()).map { String(format: "%02x", $0) }.joined() == "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855")
+        #expect(SHA256.hash(Data(String(repeating: "a", count: 1000).utf8)).map { String(format: "%02x", $0) }.joined() == "41edece42d63e8d9bf515a9ba6932e1c20cbc9f5a5d134645adb5db1b9737ea3")
+        let secret = Pairing.newVerifier()
+        #expect(secret.count == 64)
+        #expect(Pairing.challenge(for: secret).count == 43)
     }
 
     @Test func onlyTheAnswerToThisRequestCounts() {
@@ -86,12 +114,15 @@ struct PairingClientTests {
             #expect(request.url?.path == "/api/v1/pair")
             #expect(request.httpMethod == "POST")
             #expect(request.value(forHTTPHeaderField: "Authorization") == nil)
-            return (200, Data(#"{"token":"nt1_abc","deviceId":"5d0c2b3a-0000-0000-0000-000000000001","personName":"Bea","api":1}"#.utf8))
+            let body = try JSONSerialization.jsonObject(with: request.httpBodyData()) as? [String: Any]
+            #expect(body?["code"] as? String == "ABCDEFGH23")
+            #expect(body?["verifier"] as? String == "secret-of-the-app")
+            return (200, Data(#"{"token":"nt1_abc","deviceId":"5d0c2b3a-0000-0000-0000-000000000001","personName":"Bea","personId":"7c0c2b3a-0000-0000-0000-000000000002","api":1}"#.utf8))
         }
 
-        let paired = try await client.pair(code: "abcde-fgh23", deviceName: "iPad")
+        let paired = try await client.pair(code: "abcde-fgh23", deviceName: "iPad", verifier: "secret-of-the-app")
 
-        #expect(paired == PairedDevice(token: "nt1_abc", personName: "Bea"))
+        #expect(paired == PairedDevice(token: "nt1_abc", personName: "Bea", personID: "7c0c2b3a-0000-0000-0000-000000000002"))
     }
 
     @Test func everyRefusalIsTheSame() async {

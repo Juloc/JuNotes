@@ -33,7 +33,7 @@ JulOS-Chat): eigenes Review mit einem unabhängigen Helfer, Push, Release und Ei
   **nicht** ab (401). Gewünscht ist (Eigentümer, 27.11.): In der App einmal die Adresse eintragen, dann anmelden. Das ist die App-Änderung (ARCHITECTURE 11) mit
   einem Anmeldefenster (die normale Web-Anmeldung, Hub oder Passwort mit 2FA, danach automatisch ein Kopplungscode); QR/Code bleibt als zweiter Weg.
 - **Gebaut am 27.11. (lokal committet, nicht gepusht, nicht eingespielt): die Anmeldung in der App** (ARCHITECTURE 11, Abschnitt oben). Server: `/#/app-login`,
-  `POST /api/web/v1/devices/pairing/app` (nur Sitzungen bis 5 Minuten), `DELETE /api/v1/device`, `pairing` in `/api/v1/status`. App: Adresse + „Anmelden“ im
+  `POST /api/web/v1/devices/pairing/app` (nur Sitzungen bis 5 Minuten, nur mit PKCE-`challenge`), `DELETE /api/v1/device`, `pairing` in `/api/v1/status`, `personId` und `verifier` bei `/api/v1/pair` (additiv), Migration 0012. App: Adresse + „Anmelden“ im
   privaten Fenster, „Mit Code verbinden“ (tippen, einfügen, QR), „Abmelden“, Statuszeile „Abgemeldet“. Tests: `DeviceTests.The_sign_in_window_of_the_app_…`,
   `DeviceTests.A_device_signs_out_with_its_own_token_and_only_itself`, `ApiContractTests.Status_…` (Feld `pairing`), Swift `PairingTests` (9) und
   `SyncSnapshotTests.anUnknownKeyAsksToSignInAgain`; Gegenprobe: ohne die 5-Minuten-Regel wird der Test rot. Im Browser lokal durchgespielt (Anfrage merken,
@@ -41,11 +41,17 @@ JulOS-Chat): eigenes Review mit einem unabhängigen Helfer, Push, Release und Ei
   nur die CI übersetzt), das Anmeldefenster auf dem iPad, die Rückkehr über den Hub, Scannen mit der Kamera, Aussehen der Seite bei 390 px und dunkel (der
   Browser-Bereich war verborgen; die Seite nutzt nur `emptyState` der Basis).
 - **Für die Sicherheitsprüfung (App-Anmeldung):** (1) Die Seite öffnet nur die feste Adresse `junotes://paired`, nichts aus dem Link bestimmt das Ziel; `state` nur
-  `[A-Za-z0-9_-]{16,128}`. (2) Der Code ist einmalig und 10 Minuten gültig wie jeder andere; die App prüft den `state` und ignoriert fremde Antworten. (3) Frische:
-  nur eine Sitzung bis 5 Minuten; `created_at` der Sitzung ändert sich beim Rotieren nicht. (4) Bekannte Grenze: Öffnet jemand die Seite mit einem fremden
-  `state` in einem gewöhnlichen Browser (nicht im Anmeldefenster) und meldet sich dort frisch an, geht der Code an die App, die auf diesem Gerät `junotes://`
-  annimmt; unsere App meldet das Schema nicht an (das Anmeldefenster braucht es nicht) und ignoriert fremde `state`. Eine Rückfrage auf der Seite wurde bewusst
-  weggelassen (Eigentümer: „Nein, direkt“). (5) `DELETE /api/v1/device` entfernt nur das Gerät, dessen Schlüssel mitkommt.
+  `[A-Za-z0-9_-]{16,128}`. (2) **PKCE** (Migration `0012_pairing_challenge.sql`, Fund des Reviews vom 27.11.): Die App schickt `challenge` = base64url(SHA-256 eines
+  Geheimnisses), `pairing/app` gibt einen Code nur mit `challenge` (sonst 400 `pairing.no_challenge`) und speichert sie am Code; `POST /api/v1/pair` löst einen solchen
+  Code nur mit dem passenden `verifier` ein, sonst wie ein falscher Code (401, Code bleibt unverbraucht). Wer den Code auf dem Weg zur App abfängt (eine fremde App,
+  die `junotes://` annimmt, ein Link auf die Seite, während man frisch angemeldet ist), kann damit nichts anfangen. Codes aus „Gerät koppeln“ haben keine
+  `challenge` und brauchen weiter den frischen 2FA-Code. (3) Frische: nur eine Sitzung bis 5 Minuten, geprüft mit der Uhr der Datenbank (`created_at` ändert sich
+  beim Rotieren nicht). (4) Eine Anfrage der App, die nicht binnen 10 Minuten abgeschlossen wird, verfällt im `sessionStorage`. (5) Eine Rückfrage auf der Seite
+  wurde bewusst weggelassen (Eigentümer: „Nein, direkt“); PKCE macht sie unnötig. (6) `DELETE /api/v1/device` entfernt nur das Gerät, dessen Schlüssel mitkommt.
+  (7) **Ein iPad, ein Konto:** Die App merkt sich Server und `personId` (neu und additiv in der Antwort von `/pair`) der ersten Anmeldung; eine Anmeldung als
+  andere Person oder bei einem anderen Server lehnt sie ab und gibt den neuen Schlüssel sofort zurück, weil Merker und noch nicht gesendete Änderungen dem ersten
+  Konto gehören (Regel 6). (8) Ein QR-Code oder Link, dessen Server nicht der eingetragene ist (oder wenn keiner eingetragen ist), wird erst nach einer Rückfrage
+  mit dem Namen des Servers benutzt. (9) Bekannt und hingenommen: Ein Code aus dem Anmeldefenster ersetzt einen gerade unter „Gerät koppeln“ gezeigten (eine Person hat höchstens einen lebenden Code).
 - **Weitere Entscheidungen vom 27.11.:** Geräte bleiben angemeldet, bis man sie entfernt (Sperren wirkt sofort); Sicherungen auf ein NAS und verschlüsselt in eine
   Cloud (Ziel noch offen; Geheimnisse wie die Passphrase besser über eine Einstellungsseite als über die Umgebung); KI künftig über die Brücke von JulOS
   (ein Schlüssel pro App, in den Einstellungen eingetippt); die Oberfläche nach dem Weg von caddy neu entwerfen (base 0.4.0, je Seite drei Entwürfe, dann bauen).
@@ -490,8 +496,8 @@ Dabei gehen Konten, Sitzungen und der zweite Faktor verloren **und** alles, was 
 begin;
 drop table shared_token_seen;            -- 0011
 drop table shares;                       -- 0010
-drop table pairing_codes, device_tokens; -- 0009
-delete from schema_migrations where number in (9, 10, 11);
+drop table pairing_codes, device_tokens; -- 0009 (und 0012, die Spalte challenge, geht mit)
+delete from schema_migrations where number in (9, 10, 11, 12);
 delete from app_instance_settings where key = 'shared_token_off';
 commit;
 ```

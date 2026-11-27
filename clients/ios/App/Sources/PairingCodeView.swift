@@ -59,7 +59,7 @@ struct PairingCodeView: View {
                 }
                 Button("Abbrechen", role: .cancel) { otherServer = nil }
             } message: {
-                Text("Der QR-Code gehört zu einem anderen Server als dem eingetragenen.")
+                Text(server == nil ? "Der QR-Code nennt diesen Server. Deine Hefte werden dorthin gesichert." : "Der QR-Code gehört zu einem anderen Server als dem eingetragenen. Deine Hefte würden dorthin gesichert.")
             }
         }
     }
@@ -77,11 +77,10 @@ struct PairingCodeView: View {
             return
         }
         typed = Pairing.formatted(link.code)
-        if let server, server.host() == link.server.host() {
+        if let server, server.host()?.lowercased() == link.server.host()?.lowercased() {
             Task { await run(link.code, server) }
-        } else if server == nil {
-            Task { await run(link.code, link.server) }
         } else {
+            // the server comes from the QR code (none typed, or another one): she says yes to it first, with its name, so nobody's code can send her notebooks elsewhere
             otherServer = link
         }
     }
@@ -101,6 +100,8 @@ struct PairingCodeView: View {
             dismiss()
         } catch let error as PairingError {
             message = Self.text(for: error)
+        } catch let error as SignInError {
+            message = error.text
         } catch {
             message = "Das hat nicht geklappt. Versuch es noch einmal."
         }
