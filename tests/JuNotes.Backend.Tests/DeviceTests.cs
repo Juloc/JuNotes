@@ -324,7 +324,7 @@ namespace JuNotes.Backend.Tests
             var token = answer.GetProperty("token").GetString()!;
             Assert.StartsWith("nt1_", token, StringComparison.Ordinal);
             Assert.True(token.Length >= 47, "256 bits are at least 43 characters after the prefix");
-            Assert.Equal(["token", "deviceId", "personName", "api"], answer.EnumerateObject().Select(property => property.Name).ToArray());
+            Assert.Equal(["token", "deviceId", "personName", "personId", "api"], answer.EnumerateObject().Select(property => property.Name).ToArray());
             Assert.Equal(0, await scene.CountAsync("pairing_codes"));
             Assert.Equal(1, await scene.CountAsync("device_tokens", $"hash = '{Hash(token)}'"));
             Assert.Equal(0, await scene.CountAsync("device_tokens", $"hash = '{token}'"));
@@ -740,16 +740,39 @@ namespace JuNotes.Backend.Tests
 
         private static string Hash(string text) => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(text)));
 
+        // The secret of the app in the tests (RFC 7636 allows 43 to 128 characters).
+        private const string Verifier = "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk";
+
+        private static async Task<HttpResponseMessage> RedeemWithSecretAsync(Scene scene, string code, string verifier, string name = "iPad")
+        {
+            var request = new HttpRequestMessage(HttpMethod.Post, Url("/api/v1/pair")) { Content = Json($$"""{"code":"{{code}}","deviceName":"{{name}}","verifier":"{{verifier}}"}""") };
+            return await scene.Host.Browser().SendAsync(request);
+        }
+
         [RequiresDatabaseFact]
         public async Task The_sign_in_window_of_the_app_makes_a_code_for_the_person_who_has_just_signed_in_and_refuses_an_older_sign_in()
         {
             await using var scene = await Scene.StartAsync();
 
+            // The same challenge as the app makes for the same secret (its test checks this value too).
+            Assert.Equal("E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM", DeviceStore.Challenge(Verifier));
+
+            // Only from the app: without a challenge (the SHA-256 of the app's secret) there is no code.
+            Assert.Equal(HttpStatusCode.BadRequest, (await scene.BClient.SendAsync(Scene.Web(HttpMethod.Post, "/devices/pairing/app", "{}"))).StatusCode);
+            Assert.Equal(HttpStatusCode.BadRequest, (await scene.BClient.SendAsync(Scene.Web(HttpMethod.Post, "/devices/pairing/app", """{"challenge":"short"}"""))).StatusCode);
+
             // A fresh sign-in is the proof: no code of the second factor is asked for, and the code is the person's own (B's code pairs a device of B, not of A).
-            var made = await scene.BClient.SendAsync(Scene.Web(HttpMethod.Post, "/devices/pairing/app"));
+            var made = await scene.BClient.SendAsync(Scene.Web(HttpMethod.Post, "/devices/pairing/app", $$"""{"challenge":"{{DeviceStore.Challenge(Verifier)}}"}"""));
             Assert.Equal(HttpStatusCode.OK, made.StatusCode);
-            var redeemed = await scene.RedeemAsync((await ReadAsync(made)).GetProperty("code").GetString()!, "iPad von B");
+            var code = (await ReadAsync(made)).GetProperty("code").GetString()!;
+
+            // Whoever catches the code on its way to the app cannot use it: without the secret, or with another one, it is refused like a wrong code and stays unspent.
+            Assert.Equal(HttpStatusCode.Unauthorized, (await scene.RedeemAsync(code, "Fremd")).StatusCode);
+            Assert.Equal(HttpStatusCode.Unauthorized, (await RedeemWithSecretAsync(scene, code, new string('x', 43))).StatusCode);
+            Assert.Equal(1, await scene.CountAsync("pairing_codes", $"person_id = '{scene.B}'"));
+            var redeemed = await RedeemWithSecretAsync(scene, code, Verifier, "iPad von B");
             Assert.Equal(HttpStatusCode.OK, redeemed.StatusCode);
+            Assert.Equal(scene.B.ToString(), (await ReadAsync(redeemed)).GetProperty("personId").GetString());
             var token = (await ReadAsync(redeemed)).GetProperty("token").GetString()!;
             Assert.Equal(["iPad von B"], Strings(await ReadAsync(await scene.BClient.SendAsync(Scene.Web(HttpMethod.Get, "/devices"))), "name"));
             Assert.Empty(Strings(await ReadAsync(await scene.AClient.SendAsync(Scene.Web(HttpMethod.Get, "/devices"))), "name"));
@@ -761,15 +784,15 @@ namespace JuNotes.Backend.Tests
                 await older.ExecuteNonQueryAsync();
             }
 
-            var refused = await scene.AClient.SendAsync(Scene.Web(HttpMethod.Post, "/devices/pairing/app"));
+            var refused = await scene.AClient.SendAsync(Scene.Web(HttpMethod.Post, "/devices/pairing/app", $$"""{"challenge":"{{DeviceStore.Challenge(Verifier)}}"}"""));
             Assert.Equal(HttpStatusCode.Forbidden, refused.StatusCode);
             Assert.Equal("pairing.not_fresh", (await ReadAsync(refused)).GetProperty("error").GetString());
             Assert.Equal(0, await scene.CountAsync("pairing_codes", $"person_id = '{scene.A}'"));
 
             // Without a session there is nothing to make a code for, and the token of a device does not open the web paths.
-            var anonymous = Scene.Web(HttpMethod.Post, "/devices/pairing/app");
+            var anonymous = Scene.Web(HttpMethod.Post, "/devices/pairing/app", "{}");
             Assert.Equal(HttpStatusCode.Unauthorized, (await scene.Host.Browser().SendAsync(anonymous)).StatusCode);
-            var withToken = Scene.Web(HttpMethod.Post, "/devices/pairing/app");
+            var withToken = Scene.Web(HttpMethod.Post, "/devices/pairing/app", "{}");
             withToken.Headers.Authorization = new("Bearer", token);
             Assert.Equal(HttpStatusCode.Unauthorized, (await scene.Host.Browser().SendAsync(withToken)).StatusCode);
         }

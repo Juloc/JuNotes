@@ -235,6 +235,8 @@ export default {
   'applogin.signInAgain': 'Neu anmelden',
   'applogin.failed': 'Die App ließ sich nicht verbinden',
   'applogin.back': 'Zurück zur App',
+  'applogin.expired': 'Die Anfrage der App ist abgelaufen. Tippe in der App noch einmal auf „Anmelden“.',
+  'err.pairing.no_challenge': 'Öffne diese Seite aus der App heraus.',
   'err.pairing.not_fresh': 'Mit der App verbinden geht nur direkt nach einer Anmeldung. Bitte melde dich neu an.',
   'err.sharedtoken.no_device': 'Die Person, für die der gemeinsame Token steht, hat in den letzten 30 Tagen kein Gerät mit eigenem Schlüssel benutzt; mit dem Abschalten würde ihr iPad ausgesperrt.',
   'err.sharedtoken.not_configured': 'Der Server trägt den gemeinsamen Token nicht mehr in seiner Umgebung; er lässt sich nicht einschalten.',

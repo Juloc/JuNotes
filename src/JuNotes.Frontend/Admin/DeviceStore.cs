@@ -16,7 +16,7 @@ namespace JuNotes.Frontend.Admin
     public sealed record PersonDevices(Guid Id, string Name, string State, int Devices);
 
     // The answer to a pairing: the token (shown once, never stored in the clear), the device and the person.
-    public sealed record Paired(string Token, Guid DeviceId, string PersonName);
+    public sealed record Paired(string Token, Guid DeviceId, string PersonName, Guid PersonId);
 
     // Device tokens and the one-time codes that pair them (ARCHITECTURE 10.1). Both are random and kept only as their SHA-256.
     //  - A pairing code: 10 characters of the Base32 alphabet (50 bit), ten minutes, one use, deleted at its first hit. A person has at most one live code, a new one replaces
@@ -36,7 +36,8 @@ namespace JuNotes.Frontend.Admin
         // ----- Codes -----
 
         // A new code for the person (any live code of theirs is gone); expired codes of everybody are swept at the same time.
-        public async Task<(string Code, DateTimeOffset ExpiresAt)> NewCodeAsync(Guid person, CancellationToken ct)
+        // challenge: the SHA-256 (base64url) of the secret of the app that asked for the code from its sign-in window; null for a code that is typed or scanned.
+        public async Task<(string Code, DateTimeOffset ExpiresAt)> NewCodeAsync(Guid person, CancellationToken ct, string? challenge = null)
         {
             var now = time.GetUtcNow();
             var code = Base32.Encode(RandomNumberGenerator.GetBytes(7))[..CodeLength];
@@ -50,13 +51,14 @@ namespace JuNotes.Frontend.Admin
                 await sweep.ExecuteNonQueryAsync(ct);
             }
 
-            await using (var insert = new NpgsqlCommand("insert into pairing_codes (id, person_id, hash, expires_at, created_at) values ($1, $2, $3, $4, $5)", connection, transaction))
+            await using (var insert = new NpgsqlCommand("insert into pairing_codes (id, person_id, hash, expires_at, created_at, challenge) values ($1, $2, $3, $4, $5, $6)", connection, transaction))
             {
                 insert.Parameters.Add(new NpgsqlParameter { Value = Guid.NewGuid() });
                 insert.Parameters.Add(new NpgsqlParameter { Value = person });
                 insert.Parameters.Add(new NpgsqlParameter { Value = HashOf(code) });
                 insert.Parameters.Add(new NpgsqlParameter { Value = expires });
                 insert.Parameters.Add(new NpgsqlParameter { Value = now });
+                insert.Parameters.Add(new NpgsqlParameter { Value = (object?)challenge ?? DBNull.Value, NpgsqlDbType = NpgsqlTypes.NpgsqlDbType.Text });
                 await insert.ExecuteNonQueryAsync(ct);
             }
 
@@ -69,19 +71,23 @@ namespace JuNotes.Frontend.Admin
 
         // Null for every code that does not work: never existed, expired, already used, or of a person who is no longer active. The work is the same in all of these cases.
         // A hit is spent in the same statement that finds the owner (delete ... returning), so two requests with the same code never both get a token.
-        public async Task<Paired?> RedeemAsync(string? sent, string? deviceName, string address, CancellationToken ct)
+        // verifier: the secret of the app, needed (and only then) for a code that was made with a challenge. A code whose verifier does not match is treated like a wrong code
+        // and is not spent: whoever caught it on its way to the app cannot use it, and the app itself still can.
+        public async Task<Paired?> RedeemAsync(string? sent, string? deviceName, string address, CancellationToken ct, string? verifier = null)
         {
             var now = time.GetUtcNow();
             var sentHash = Convert.FromHexString(HashOf(Normalise(sent)));
+            var proof = Encoding.ASCII.GetBytes(verifier is { Length: >= 43 and <= 128 } ? Challenge(verifier) : string.Empty);
             Guid? hit = null;
-            await using (var live = data.CreateCommand("select id, hash from pairing_codes where expires_at > $1"))
+            await using (var live = data.CreateCommand("select id, hash, challenge from pairing_codes where expires_at > $1"))
             {
                 live.Parameters.Add(new NpgsqlParameter { Value = now });
                 await using var reader = await live.ExecuteReaderAsync(ct);
                 while (await reader.ReadAsync(ct))
                 {
                     // Every live code is compared, whether or not an earlier one matched.
-                    if (CryptographicOperations.FixedTimeEquals(sentHash, Convert.FromHexString(reader.GetString(1))))
+                    if (CryptographicOperations.FixedTimeEquals(sentHash, Convert.FromHexString(reader.GetString(1)))
+                        && (reader.IsDBNull(2) || CryptographicOperations.FixedTimeEquals(proof, Encoding.ASCII.GetBytes(reader.GetString(2)))))
                     {
                         hit = reader.GetGuid(0);
                     }
@@ -125,7 +131,20 @@ namespace JuNotes.Frontend.Admin
             }
 
             await transaction.CommitAsync(ct);
-            return new Paired(token, deviceId, personName);
+            return new Paired(token, deviceId, personName, personId);
+        }
+
+        // The challenge of a secret (RFC 7636, S256): base64url of its SHA-256, without padding.
+        public static string Challenge(string verifier) => Base64Url(SHA256.HashData(Encoding.ASCII.GetBytes(verifier)));
+
+        // Whether this session of the person was made in the last minutes (the sign-in window of the app). Asked of the database's own clock, the one that wrote created_at.
+        public async Task<bool> SignedInJustNowAsync(Guid sessionId, Guid person, TimeSpan within, CancellationToken ct)
+        {
+            await using var command = data.CreateCommand("select exists (select 1 from sessions where id = $1 and user_id = $2 and created_at > now() - $3)");
+            command.Parameters.Add(new NpgsqlParameter { Value = sessionId });
+            command.Parameters.Add(new NpgsqlParameter { Value = person });
+            command.Parameters.Add(new NpgsqlParameter { Value = within });
+            return (bool)(await command.ExecuteScalarAsync(ct))!;
         }
 
         // ----- Tokens -----

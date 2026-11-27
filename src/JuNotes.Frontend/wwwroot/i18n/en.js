@@ -235,6 +235,8 @@ export default {
   'applogin.signInAgain': 'Sign in again',
   'applogin.failed': 'The app could not be connected',
   'applogin.back': 'Back to the app',
+  'applogin.expired': 'The request of the app has expired. Tap “Sign in” in the app once more.',
+  'err.pairing.no_challenge': 'Open this page from the app.',
   'err.pairing.not_fresh': 'The app can only be connected right after a sign-in. Please sign in again.',
   'err.sharedtoken.no_device': 'The person the shared token stands for has not used a device with a key of its own in the last 30 days; switching off would shut their iPad out.',
   'err.sharedtoken.not_configured': 'The server no longer carries the shared token in its environment; it cannot be switched on.',

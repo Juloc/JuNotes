@@ -113,7 +113,8 @@ namespace JuNotes.Frontend.Api
                 ? await next(invocation)
                 : Results.Problem("Diese Funktion ist für dein Konto noch nicht freigegeben.", statusCode: 403);
 
-        private sealed record PairRequest(string? Code, string? DeviceName);
+        // verifier (additive): the secret of the app, for a code from its sign-in window.
+        private sealed record PairRequest(string? Code, string? DeviceName, string? Verifier = null);
 
         private const int PairBodyLimit = 2048;
 
@@ -136,7 +137,7 @@ namespace JuNotes.Frontend.Api
             }
 
             var request = await ReadPairRequestAsync(context.Request, ct);
-            var paired = request is null ? null : await devices.RedeemAsync(request.Code, request.DeviceName, address, ct);
+            var paired = request is null ? null : await devices.RedeemAsync(request.Code, request.DeviceName, address, ct, request.Verifier);
             if (paired is null)
             {
                 brake.PairFailed(address);
@@ -144,7 +145,8 @@ namespace JuNotes.Frontend.Api
             }
 
             await audit.AddAsync(paired.PersonName, "device.paired", address, "device " + DeviceStore.CleanName(request!.DeviceName), ct);
-            return Json(new { token = paired.Token, deviceId = paired.DeviceId, personName = paired.PersonName, api = 1 });
+            // personId (additive): the app keeps it, so it does not mix the notebooks of two people on one iPad.
+            return Json(new { token = paired.Token, deviceId = paired.DeviceId, personName = paired.PersonName, personId = paired.PersonId, api = 1 });
         }
 
         private static IResult PairRefused() => Results.Problem("The code is not valid or has expired.", statusCode: 401);
