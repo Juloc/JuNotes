@@ -4,7 +4,9 @@ COPY global.json Directory.Build.props Directory.Packages.props ./
 COPY base/ base/
 COPY src/ src/
 COPY database/ database/
-RUN dotnet publish src/JuNotes.Frontend/JuNotes.Frontend.csproj -c Release -o /app
+# The commit comes from the caller (CI); the version stands in Directory.Build.props.
+ARG COMMIT=
+RUN dotnet publish src/JuNotes.Frontend/JuNotes.Frontend.csproj -c Release -o /app -p:SourceRevisionId=${COMMIT}
 
 FROM mcr.microsoft.com/dotnet/aspnet:11.0
 # pg_dump has to be at least as new as the database, so the client comes from the PostgreSQL project's own repository.

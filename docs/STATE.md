@@ -282,8 +282,10 @@ cd clients/ios/JuNotesCore && swift test
 veröffentlicht `JuNotes.ipa` plus `source.json` als Release `latest`. Installiert wird die `.ipa` per Sideloading; herunterladen mit
 `gh release download latest --repo Juloc/JuNotes -p JuNotes.ipa`.
 
-**Server aktualisieren:** Der Server baut sein Image aus dem GitHub-Zweig `main`. Das Aktualisieren geschieht auf der Docker-VM nach dem Eintrag in `docs/LOCAL.md`
-(Image neu bauen, Container neu starten). Vor jeder Migration entsteht automatisch eine Sicherung.
+**Server aktualisieren:** Ein Versions-Tag (`v0.3.0`) baut in der CI das Image `ghcr.io/juloc/notes:<version>`. Die Version steht in `Directory.Build.props`;
+der Tag muss ihr gleichen (die CI bricht sonst ab), und `/api/health` zeigt sie samt Commit. Bis `v0.2.0` stand dort immer `1.0.0`, weil die Version nicht ins Image
+kam; am Health-Endpunkt lässt sich darum nicht ablesen, ob 0.2.0 läuft, nur am Image im Stack. Das Aktualisieren geschieht auf der Docker-VM nach dem Eintrag in
+`docs/LOCAL.md` (Tag im Compose-File setzen, Container neu starten). Vor jeder Migration entsteht automatisch eine Sicherung.
 
 **Nicht pushen**, bevor der Orchestrator es sagt: Der Entwurf des Umzugs ist lokal committet.
 
