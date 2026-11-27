@@ -263,7 +263,7 @@ Instanz-Token (festgeschrieben auf den ersten Administrator), `owner_id` hat kei
 
 ### 10.1 Gerätetoken je Person
 
-**Stand 25.11.2026: der Server-Teil ist gebaut (Scheibe 3a, Migration `0009_devices.sql`; Beschreibung und Tests in STATE.md „Meilenstein 3, Scheibe 3a“). Die App-Änderung (Abschnitt 11) und die Verwaltung der Geräte durch den Administrator (3d) sind nicht gebaut.** Wo der Bau vom Entwurf abweicht, steht es unten im Text kursiv.
+**Stand 25.11.2026: der Server-Teil ist gebaut (Scheibe 3a, Migration `0009_devices.sql`; Beschreibung und Tests in STATE.md „Meilenstein 3, Scheibe 3a“). Die Verwaltung der Geräte durch den Administrator ist seit 3d gebaut (STATE.md „Scheibe 3d“); die App-Änderung (Abschnitt 11) ist nicht gebaut.** Wo der Bau vom Entwurf abweicht, steht es unten im Text kursiv.
 
 **Ziel:** Das iPad schreibt als die Person, der es gehört, und in das Gerät wird nie ein Passwort getippt. Der gemeinsame Token wird abgelöst.
 

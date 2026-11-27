@@ -121,6 +121,9 @@ namespace JuNotes.Frontend.Admin
             }
         }
 
+        // The person the shared token stands for, once one is pinned; null before. Only reads: nothing is pinned or claimed by asking.
+        public Task<Guid?> PinnedAsync(CancellationToken ct) => ReadPinAsync(ct);
+
         private async Task<Guid?> ReadPinAsync(CancellationToken ct)
         {
             await using var command = data.CreateCommand("select value from app_instance_settings where key = $1");

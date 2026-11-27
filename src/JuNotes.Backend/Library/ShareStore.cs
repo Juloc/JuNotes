@@ -64,20 +64,31 @@ namespace JuNotes.Backend.Library
                 return (ShareOutcome.RecipientNotFound, null);
             }
 
-            var now = time.GetUtcNow();
-            await using var insert = data.CreateCommand("insert into shares (id, notebook_id, owner_id, recipient_id, mode, created_at) values ($1, $2, $3, $4, 'read', $5) on conflict (notebook_id, recipient_id) where revoked_at is null do nothing returning id");
-            insert.Parameters.Add(new NpgsqlParameter { Value = Guid.NewGuid() });
-            insert.Parameters.Add(new NpgsqlParameter { Value = notebook });
-            insert.Parameters.Add(new NpgsqlParameter { Value = owner });
-            insert.Parameters.Add(new NpgsqlParameter { Value = recipient });
-            insert.Parameters.Add(new NpgsqlParameter { Value = now });
-            if (await insert.ExecuteScalarAsync(ct) is Guid id)
+            // Twice at most: when the share that stood in the way is revoked between the insert and the read, the second insert makes it.
+            for (var attempt = 0; ; attempt++)
             {
-                return (ShareOutcome.Created, new ShareRecipient(id, recipient, name, now));
-            }
+                var now = time.GetUtcNow();
+                await using var insert = data.CreateCommand("insert into shares (id, notebook_id, owner_id, recipient_id, mode, created_at) values ($1, $2, $3, $4, 'read', $5) on conflict (notebook_id, recipient_id) where revoked_at is null do nothing returning id");
+                insert.Parameters.Add(new NpgsqlParameter { Value = Guid.NewGuid() });
+                insert.Parameters.Add(new NpgsqlParameter { Value = notebook });
+                insert.Parameters.Add(new NpgsqlParameter { Value = owner });
+                insert.Parameters.Add(new NpgsqlParameter { Value = recipient });
+                insert.Parameters.Add(new NpgsqlParameter { Value = now });
+                if (await insert.ExecuteScalarAsync(ct) is Guid id)
+                {
+                    return (ShareOutcome.Created, new ShareRecipient(id, recipient, name, now));
+                }
 
-            var existing = (await ForNotebookAsync(owner, notebook, ct)).First(share => share.RecipientId == recipient);
-            return (ShareOutcome.AlreadyShared, existing);
+                if ((await ForNotebookAsync(owner, notebook, ct)).FirstOrDefault(share => share.RecipientId == recipient) is { } existing)
+                {
+                    return (ShareOutcome.AlreadyShared, existing);
+                }
+
+                if (attempt == 1)
+                {
+                    throw new InvalidOperationException("The share was neither made nor found twice in a row.");
+                }
+            }
         }
 
         // The live shares of one notebook of this owner, oldest first. (Whether the notebook is the owner's is for the caller to check.)

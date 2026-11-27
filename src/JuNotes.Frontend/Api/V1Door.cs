@@ -68,12 +68,14 @@ namespace JuNotes.Frontend.Api
                 return false;
             }
 
-            await sharedToken.SeenAsync(address, context.RequestAborted);
             var owner = await services.GetRequiredService<OwnerDirectory>().TokenOwnerAsync(context.RequestAborted);
             if (owner.State == TokenState.Refused)
             {
                 return false;
             }
+
+            // Counted only once the token was let in: an iPad that keeps knocking for a blocked person has not "used" it.
+            await sharedToken.SeenAsync(address, context.RequestAborted);
 
             context.Items[OwnerKey] = owner;
             return true;

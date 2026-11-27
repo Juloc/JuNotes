@@ -213,6 +213,7 @@ namespace JuNotes.Backend.Tests
         {
             await using var scene = await Scene.StartAsync();
             var device = await scene.DeviceAsync(scene.Bea, "iPad von Bea");
+            await scene.DeviceAsync(scene.Ada, "iPad von Ada"); // the person the shared token stands for has a device of her own, so it may be switched off
             Assert.Equal(HttpStatusCode.OK, await scene.PullAsync(AdminHost.Token, "203.0.113.1"));
 
             // Not for a member, not without a session, not without a right code of the second factor.
@@ -259,26 +260,31 @@ namespace JuNotes.Backend.Tests
             Assert.Equal(0, await scene.CountAsync("app_instance_settings", "key = 'shared_token_off'"));
             Assert.Equal(HttpStatusCode.OK, await scene.PullAsync(AdminHost.Token, "203.0.113.1"));
 
-            // A device that was not seen for 31 days does not count, and neither does a removed one.
-            var token = await scene.DeviceAsync(scene.Bea, "iPad von Bea");
-            await using (var old = scene.Database.Data.CreateCommand("update device_tokens set last_seen = now() - interval '31 days'"))
+            // The shared token stands for Ada (the pull above pinned her): a device of somebody else says nothing about Ada's iPad and does not count.
+            await scene.DeviceAsync(scene.Bea, "iPad von Bea");
+            Assert.Equal(HttpStatusCode.Conflict, (await scene.SwitchAsync("off", scene.Factor.Next(scene.Ada))).StatusCode);
+            Assert.Equal(0, (await ReadAsync(await scene.AdaClient.SendAsync(Admin(HttpMethod.Get, "/shared-token")))).GetProperty("devicesSeen").GetInt32());
+
+            // A device of Ada that was not seen for 31 days does not count, and neither does a removed one.
+            var token = await scene.DeviceAsync(scene.Ada, "iPad von Ada");
+            await using (var old = scene.Database.Data.CreateCommand($"update device_tokens set last_seen = now() - interval '31 days' where person_id = '{scene.Ada}'"))
             {
                 await old.ExecuteNonQueryAsync();
             }
 
             Assert.Equal(HttpStatusCode.Conflict, (await scene.SwitchAsync("off", scene.Factor.Next(scene.Ada))).StatusCode);
-            await using (var seen = scene.Database.Data.CreateCommand("update device_tokens set last_seen = now() - interval '29 days'"))
+            await using (var seen = scene.Database.Data.CreateCommand($"update device_tokens set last_seen = now() - interval '29 days' where person_id = '{scene.Ada}'"))
             {
                 await seen.ExecuteNonQueryAsync();
             }
 
             Assert.Equal(1, (await ReadAsync(await scene.AdaClient.SendAsync(Admin(HttpMethod.Get, "/shared-token")))).GetProperty("devicesSeen").GetInt32());
-            await scene.AdaClient.SendAsync(Admin(HttpMethod.Post, $"/people/{scene.Bea}/devices/revoke"));
+            await scene.AdaClient.SendAsync(Admin(HttpMethod.Post, $"/people/{scene.Ada}/devices/revoke"));
             Assert.Equal(HttpStatusCode.Conflict, (await scene.SwitchAsync("off", scene.Factor.Next(scene.Ada))).StatusCode);
             Assert.Equal(HttpStatusCode.Unauthorized, await scene.PullAsync(token));
 
-            // A device seen within 30 days is enough.
-            await scene.DeviceAsync(scene.Cleo, "iPad von Cleo");
+            // A device of Ada seen within 30 days is enough.
+            await scene.DeviceAsync(scene.Ada, "iPhone von Ada");
             Assert.Equal(HttpStatusCode.OK, (await scene.SwitchAsync("off", scene.Factor.Next(scene.Ada))).StatusCode);
         }
 
@@ -316,6 +322,7 @@ namespace JuNotes.Backend.Tests
         {
             await using var scene = await Scene.StartAsync();
             await scene.DeviceAsync(scene.Bea, "iPad von Bea");
+            await scene.DeviceAsync(scene.Ada, "iPad von Ada"); // the person the shared token stands for has a device of her own, so it may be switched off
             Assert.Equal(HttpStatusCode.OK, await scene.PullAsync(AdminHost.Token));
             Assert.Equal(HttpStatusCode.OK, (await scene.SwitchAsync("off", scene.Factor.Next(scene.Ada))).StatusCode);
             Assert.Equal(HttpStatusCode.Unauthorized, await scene.PullAsync(AdminHost.Token));

@@ -226,7 +226,7 @@ export default {
   'dev.removeAllTitle': 'Alle Geräte entfernen?',
   'dev.removeAllText': '{n} Geräte haben danach keinen Zugriff mehr und müssen neu gekoppelt werden. Das ist der Weg nach einem verlorenen Gerät oder nach einem neuen Passwort oder zweiten Faktor: deren Schlüssel ändern sich dadurch nicht.',
   'adm.tokCannotPair': 'Die iPad-App kann sich noch nicht koppeln. Wer den gemeinsamen Token jetzt abschaltet, sperrt das iPad aus.',
-  'adm.tokNeedsDevice': 'Abschalten geht erst, wenn ein Gerät mit eigenem Schlüssel in den letzten 30 Tagen gesehen wurde. Bisher gibt es keins.',
-  'err.sharedtoken.no_device': 'Es wurde in den letzten 30 Tagen kein Gerät mit eigenem Schlüssel gesehen; mit dem Abschalten würde die App ausgesperrt.',
+  'adm.tokNeedsDevice': 'Abschalten geht erst, wenn die Person, für die der Token steht, in den letzten 30 Tagen ein Gerät mit eigenem Schlüssel benutzt hat. Bisher gibt es keins.',
+  'err.sharedtoken.no_device': 'Die Person, für die der gemeinsame Token steht, hat in den letzten 30 Tagen kein Gerät mit eigenem Schlüssel benutzt; mit dem Abschalten würde ihr iPad ausgesperrt.',
   'err.sharedtoken.not_configured': 'Der Server trägt den gemeinsamen Token nicht mehr in seiner Umgebung; er lässt sich nicht einschalten.',
 };

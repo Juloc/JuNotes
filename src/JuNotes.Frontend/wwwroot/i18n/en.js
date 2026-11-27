@@ -226,7 +226,7 @@ export default {
   'dev.removeAllTitle': 'Remove all devices?',
   'dev.removeAllText': '{n} devices will have no access afterwards and have to be paired again. This is the way after a lost device, or after a new password or second factor: their keys are not changed by those.',
   'adm.tokCannotPair': 'The iPad app cannot pair yet. Whoever switches the shared token off now shuts the iPad out.',
-  'adm.tokNeedsDevice': 'Switching off is possible once a device with a key of its own has been seen in the last 30 days. There is none so far.',
-  'err.sharedtoken.no_device': 'No device with a key of its own has been seen in the last 30 days; switching off would shut the app out.',
+  'adm.tokNeedsDevice': 'Switching off is possible once the person the token stands for has used a device with a key of its own in the last 30 days. There is none so far.',
+  'err.sharedtoken.no_device': 'The person the shared token stands for has not used a device with a key of its own in the last 30 days; switching off would shut their iPad out.',
   'err.sharedtoken.not_configured': 'The server no longer carries the shared token in its environment; it cannot be switched on.',
 };
