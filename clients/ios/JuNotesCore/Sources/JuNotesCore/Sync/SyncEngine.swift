@@ -97,7 +97,9 @@ extension SyncSnapshot {
             localWriteFailed = false
         case .offline:
             connection = .noNetwork
-        case .serverUnreachable, .unauthorized, .rejected:
+        case .unauthorized:
+            connection = .signedOut
+        case .serverUnreachable, .rejected:
             connection = .serverUnreachable
         case .storeFailed:
             localWriteFailed = true

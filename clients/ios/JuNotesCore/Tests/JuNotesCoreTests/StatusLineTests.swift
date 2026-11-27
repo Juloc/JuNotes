@@ -64,7 +64,7 @@ struct StatusLineSetupTests {
         #expect(line.sync == .notConfigured)
         #expect(line.syncLevel == .waiting)
         #expect(line.isWorkSafe)
-        #expect(StatusLineText(now: now).sync(.notConfigured) == "Server noch nicht eingerichtet, alles liegt auf dem iPad")
+        #expect(StatusLineText(now: now).sync(.notConfigured) == "Nicht angemeldet, alles liegt auf dem iPad")
     }
 
     @Test func pageGeometryDependsOnTheNotebookKind() {

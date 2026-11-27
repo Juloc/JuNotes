@@ -8,7 +8,7 @@ import UIKit
 enum Demo {
     static let isOn = ProcessInfo.processInfo.arguments.contains("-JuNotesDemo")
 
-    /// The screen to open: today, subject, notebook, cards, grades.
+    /// The screen to open: today, subject, notebook, cards, grades, settings.
     static var screen: String {
         let arguments = ProcessInfo.processInfo.arguments
         guard let index = arguments.firstIndex(of: "-JuNotesScreen"), arguments.indices.contains(index + 1) else { return "today" }

@@ -63,6 +63,8 @@ struct RootView: View {
         .safeAreaInset(edge: .bottom, spacing: 0) { StatusLineView() }
         .task {
             if Demo.isOn { await model.seedDemo() }
+            // the screenshot of the sign-in (settings of a device that is not signed in)
+            if Demo.isOn && Demo.screen == "settings" { showSettings = true }
             await model.purgeTrash()
             await model.reload()
             await model.consumePendingAction()

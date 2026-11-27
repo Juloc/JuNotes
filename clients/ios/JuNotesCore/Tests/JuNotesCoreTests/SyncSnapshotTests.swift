@@ -21,12 +21,26 @@ struct SyncSnapshotTests {
         #expect(StatusLine(snapshot, now: now).sync == .waitingForNetwork(pending: 3))
     }
 
-    @Test func aRefusedOrUnauthorizedServerShowsAsUnreachable() {
-        for result in [SyncResult.serverUnreachable, .unauthorized, .rejected("x")] {
+    @Test func aRefusedServerShowsAsUnreachable() {
+        for result in [SyncResult.serverUnreachable, .rejected("x")] {
             var snapshot = SyncSnapshot()
             snapshot.record(result, pending: 1)
             #expect(StatusLine(snapshot, now: now).sync == .serverUnreachable(pending: 1))
         }
+    }
+
+    /// A key the server no longer knows (device removed, person blocked) asks her to sign in again, and the work stays safe on the iPad.
+    @Test func anUnknownKeyAsksToSignInAgain() {
+        var snapshot = SyncSnapshot()
+        snapshot.record(.unauthorized, pending: 2)
+        let line = StatusLine(snapshot, now: now)
+        #expect(line.sync == .signedOut(pending: 2))
+        #expect(line.syncLevel == .problem)
+        #expect(line.isWorkSafe)
+        #expect(StatusLineText(now: now).sync(line.sync) == "Abgemeldet, bitte in den Einstellungen neu anmelden. Alles ist sicher auf dem iPad")
+
+        snapshot.record(.synced(pushed: 2, pulled: 0, at: now), pending: 0)
+        #expect(StatusLine(snapshot, now: now).sync == .synced(at: now))
     }
 
     @Test func aLocalFailureIsTheWorstCaseAndClearsOnTheNextGoodSync() {

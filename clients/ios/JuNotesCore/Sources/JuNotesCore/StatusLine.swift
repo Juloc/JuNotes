@@ -5,11 +5,13 @@ public enum Connection: Sendable, Equatable {
     case online
     case noNetwork
     case serverUnreachable
+    /// The server no longer knows the key of this device (it was removed, or the person blocked): she has to sign in again.
+    case signedOut
 }
 
 /// Everything the status line needs to know; the app fills it from the local database and the network monitor.
 public struct SyncSnapshot: Sendable, Equatable {
-    /// False until the server address and token are entered.
+    /// False until the device is signed in (server address and its own key).
     public var isConfigured: Bool
     public var localWriteFailed: Bool
     public var pendingChanges: Int
@@ -44,6 +46,7 @@ public enum SyncState: Sendable, Equatable {
     case pending(count: Int)
     case waitingForNetwork(pending: Int)
     case serverUnreachable(pending: Int)
+    case signedOut(pending: Int)
     case never
 }
 
@@ -72,6 +75,8 @@ public struct StatusLine: Sendable, Equatable {
             sync = .waitingForNetwork(pending: snapshot.pendingChanges)
         case .serverUnreachable:
             sync = .serverUnreachable(pending: snapshot.pendingChanges)
+        case .signedOut:
+            sync = .signedOut(pending: snapshot.pendingChanges)
         case .online:
             if snapshot.pendingChanges > 0 {
                 sync = .pending(count: snapshot.pendingChanges)
@@ -95,7 +100,7 @@ public struct StatusLine: Sendable, Equatable {
         switch sync {
         case .synced: .ok
         case .pending, .waitingForNetwork, .never, .notConfigured: .waiting
-        case .serverUnreachable: .problem
+        case .serverUnreachable, .signedOut: .problem
         }
     }
 

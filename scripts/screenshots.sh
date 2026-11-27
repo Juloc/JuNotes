@@ -57,5 +57,6 @@ shoot 6-heft notebook
 shoot 7-cover-editor coverEditor
 shoot 8-karteikarten cards
 shoot 9-noten grades
+shoot 10-anmelden settings
 
 ls -l "$out"
