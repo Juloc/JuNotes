@@ -17,6 +17,9 @@ namespace JuNotes.Frontend.Api
     // code of the second factor is spent, so the same one cannot be used twice. Nothing here ever returns a token or a hash.
     internal static class DevicesApi
     {
+        // How old a sign-in may be to connect an app from its sign-in window.
+        public static readonly TimeSpan FreshSignIn = TimeSpan.FromMinutes(5);
+
         public static void MapDevicesApi(this IEndpointRouteBuilder app)
         {
             var devices = app.MapGroup(WebApi.Prefix + "/devices");
@@ -34,6 +37,23 @@ namespace JuNotes.Frontend.Api
 
                 var (code, expires) = await store.NewCodeAsync(who.UserId, ctx.RequestAborted);
                 await audit.AddAsync(who.UserName, "pairing.code_made", ctx.ClientIp(), null, ctx.RequestAborted);
+                return Results.Ok(new PairingCode(code, expires));
+            });
+
+            // The sign-in window of the app (/#/app-login): the person has just signed in there, through the hub or with password and second factor, so the sign-in itself is the
+            // fresh proof that a code of the second factor is elsewhere (people who sign in through the hub have none here). Only a session made in the last few minutes counts;
+            // an older one (a browser that was signed in already) is refused and the page asks to sign in again. The code goes to the app at once and is redeemed by it.
+            devices.MapPost("/pairing/app", async (HttpContext ctx, DeviceStore store, SessionStore sessions, TimeProvider time, AuditStore audit) =>
+            {
+                var who = ctx.Person();
+                var current = (await sessions.ListAsync(who.UserId, who.Id, ctx.RequestAborted)).FirstOrDefault(session => session.Current);
+                if (current is null || time.GetUtcNow() - current.CreatedAt > FreshSignIn)
+                {
+                    return Error.Forbidden("pairing.not_fresh", "Sign in again: only a sign-in of the last few minutes can connect an app.").ToHttp();
+                }
+
+                var (code, expires) = await store.NewCodeAsync(who.UserId, ctx.RequestAborted);
+                await audit.AddAsync(who.UserName, "pairing.code_made", ctx.ClientIp(), "sign-in window of the app", ctx.RequestAborted);
                 return Results.Ok(new PairingCode(code, expires));
             });
 

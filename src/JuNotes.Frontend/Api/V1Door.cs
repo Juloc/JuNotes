@@ -188,7 +188,8 @@ namespace JuNotes.Frontend.Api
 
         private static void Map(IEndpointRouteBuilder endpoints)
         {
-            endpoints.MapGet("/api/v1/status", () => Json(new { name = "JuNotes", version = Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "0.0.0", api = 1 }));
+            // pairing (additive): this server pairs devices (POST /api/v1/pair, and the sign-in for the app at /#/app-login); an older app ignores the field.
+            endpoints.MapGet("/api/v1/status", () => Json(new { name = "JuNotes", version = Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "0.0.0", api = 1, pairing = true }));
 
             endpoints.MapPost(PairPath, PairAsync);
 
@@ -197,6 +198,24 @@ namespace JuNotes.Frontend.Api
             secured.AddEndpointFilter(async (invocation, next) => invocation.HttpContext.Items[OwnerKey] is TokenOwner { State: TokenState.Pending }
                 ? Results.Problem("The server is not ready: the notes are not assigned yet. Try again later.", statusCode: 503)
                 : await next(invocation));
+            // The app's "Abmelden": the device removes itself, with its own token (additive). The shared token is not a device and cannot sign out: 409.
+            secured.MapDelete("/device", async (HttpContext context, DeviceStore devices, AuditStore audit, CancellationToken ct) =>
+            {
+                var header = context.Request.Headers.Authorization.ToString();
+                if (!header.StartsWith(DeviceBearer, StringComparison.Ordinal))
+                {
+                    return Results.Problem("Only a device with a key of its own can sign out.", statusCode: 409);
+                }
+
+                if (await devices.SignOutAsync(header[BearerPrefix.Length..], ct) is not { } removed)
+                {
+                    return Results.NotFound();
+                }
+
+                await audit.AddAsync(removed.Person, "device.signed_out", Base.Web.Auth.RequestIdentity.ClientIp(context), "device " + removed.Device, ct);
+                return Results.NoContent();
+            });
+
             var sync = secured.MapGroup("/sync");
             sync.MapPost("/push", async (PushRequest request, HttpContext context, SyncService service, ISecurityLog log, CancellationToken ct) =>
             {

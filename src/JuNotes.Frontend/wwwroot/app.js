@@ -11,6 +11,7 @@ import en from '/i18n/en.js';
 import { homePage, folderPage, notebookPage, pagePage, searchPage, sharedNotebookPage, sharedPagePage } from '/pages/library.js';
 import { gradesPage, cardsPage } from '/pages/study.js';
 import { pairingCard } from '/pages/devices.js';
+import { captureAppLogin, appLoginWaiting, finishAppLogin } from '/pages/applogin.js';
 import { overviewPage, codexPage, profilesPage, devicesPage, backupsPage } from '/pages/admin.js';
 
 addMessages('de', de);
@@ -20,7 +21,9 @@ if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').cat
 // A page the browser brings back from its memory of going back and forth (after sign-out, say) is not shown as it was: it is loaded again.
 addEventListener('pageshow', (e) => { if (e.persisted) location.reload(); });
 
-start({ icon: 'file', onSignedIn: run });
+// the sign-in window of the iPad app: its request is kept before the sign-in, and answered right after it instead of opening the app
+captureAppLogin();
+start({ icon: 'file', onSignedIn: (me) => (appLoginWaiting() ? finishAppLogin() : run(me)) });
 
 function run(me) {
   const admin = me.roles.includes('admin');

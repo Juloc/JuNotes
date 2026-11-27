@@ -189,6 +189,17 @@ namespace JuNotes.Frontend.Admin
             return await command.ExecuteScalarAsync(ct) as string;
         }
 
+        // A device signs itself out with its own token (the app's "Abmelden"): only the device that sends the token, never another. The name for the log, or null when the
+        // token is not a live one (the door has let it in a moment before, so null means it was removed in between).
+        public async Task<(string Device, string Person)?> SignOutAsync(string token, CancellationToken ct)
+        {
+            await using var command = data.CreateCommand("update device_tokens d set revoked_at = $2 from users u where u.id = d.person_id and d.hash = $1 and d.revoked_at is null returning d.name, u.name");
+            command.Parameters.Add(new NpgsqlParameter { Value = HashOf(token) });
+            command.Parameters.Add(new NpgsqlParameter { Value = time.GetUtcNow() });
+            await using var reader = await command.ExecuteReaderAsync(ct);
+            return await reader.ReadAsync(ct) ? (reader.GetString(0), reader.GetString(1)) : null;
+        }
+
         // ----- The administrator -----
 
         // Every person who can sign in, with the number of their devices that still work.

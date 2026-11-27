@@ -739,5 +739,64 @@ namespace JuNotes.Backend.Tests
         }
 
         private static string Hash(string text) => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(text)));
+
+        [RequiresDatabaseFact]
+        public async Task The_sign_in_window_of_the_app_makes_a_code_for_the_person_who_has_just_signed_in_and_refuses_an_older_sign_in()
+        {
+            await using var scene = await Scene.StartAsync();
+
+            // A fresh sign-in is the proof: no code of the second factor is asked for, and the code is the person's own (B's code pairs a device of B, not of A).
+            var made = await scene.BClient.SendAsync(Scene.Web(HttpMethod.Post, "/devices/pairing/app"));
+            Assert.Equal(HttpStatusCode.OK, made.StatusCode);
+            var redeemed = await scene.RedeemAsync((await ReadAsync(made)).GetProperty("code").GetString()!, "iPad von B");
+            Assert.Equal(HttpStatusCode.OK, redeemed.StatusCode);
+            var token = (await ReadAsync(redeemed)).GetProperty("token").GetString()!;
+            Assert.Equal(["iPad von B"], Strings(await ReadAsync(await scene.BClient.SendAsync(Scene.Web(HttpMethod.Get, "/devices"))), "name"));
+            Assert.Empty(Strings(await ReadAsync(await scene.AClient.SendAsync(Scene.Web(HttpMethod.Get, "/devices"))), "name"));
+            Assert.Equal(HttpStatusCode.OK, (await scene.Device(token).GetAsync(Url("/api/v1/sync/pull"))).StatusCode);
+
+            // A sign-in older than five minutes (a browser that was signed in already) is refused, and no code is made.
+            await using (var older = scene.Database.Data.CreateCommand($"update sessions set created_at = now() - interval '6 minutes' where user_id = '{scene.A}'"))
+            {
+                await older.ExecuteNonQueryAsync();
+            }
+
+            var refused = await scene.AClient.SendAsync(Scene.Web(HttpMethod.Post, "/devices/pairing/app"));
+            Assert.Equal(HttpStatusCode.Forbidden, refused.StatusCode);
+            Assert.Equal("pairing.not_fresh", (await ReadAsync(refused)).GetProperty("error").GetString());
+            Assert.Equal(0, await scene.CountAsync("pairing_codes", $"person_id = '{scene.A}'"));
+
+            // Without a session there is nothing to make a code for, and the token of a device does not open the web paths.
+            var anonymous = Scene.Web(HttpMethod.Post, "/devices/pairing/app");
+            Assert.Equal(HttpStatusCode.Unauthorized, (await scene.Host.Browser().SendAsync(anonymous)).StatusCode);
+            var withToken = Scene.Web(HttpMethod.Post, "/devices/pairing/app");
+            withToken.Headers.Authorization = new("Bearer", token);
+            Assert.Equal(HttpStatusCode.Unauthorized, (await scene.Host.Browser().SendAsync(withToken)).StatusCode);
+        }
+
+        [RequiresDatabaseFact]
+        public async Task A_device_signs_out_with_its_own_token_and_only_itself()
+        {
+            await using var scene = await Scene.StartAsync();
+            var a = await scene.PairAsync(scene.A, scene.AClient, "iPad von A");
+            var b = await scene.PairAsync(scene.B, scene.BClient, "iPad von B");
+            var b2 = await scene.PairAsync(scene.B, scene.BClient, "iPhone von B");
+
+            Assert.Equal(HttpStatusCode.NoContent, (await scene.Device(b).DeleteAsync(Url("/api/v1/device"))).StatusCode);
+
+            // That device is out; the other device of the same person and the device of the other person go on.
+            Assert.Equal(HttpStatusCode.Unauthorized, (await scene.Device(b).GetAsync(Url("/api/v1/sync/pull"))).StatusCode);
+            Assert.Equal(HttpStatusCode.OK, (await scene.Device(b2).GetAsync(Url("/api/v1/sync/pull"))).StatusCode);
+            Assert.Equal(HttpStatusCode.OK, (await scene.Device(a).GetAsync(Url("/api/v1/sync/pull"))).StatusCode);
+            Assert.Equal(["iPhone von B"], Strings(await ReadAsync(await scene.BClient.SendAsync(Scene.Web(HttpMethod.Get, "/devices"))), "name"));
+            Assert.Equal(["iPad von A"], Strings(await ReadAsync(await scene.AClient.SendAsync(Scene.Web(HttpMethod.Get, "/devices"))), "name"));
+
+            // The shared token is not a device: it cannot sign out. Without any token the door says 401 as everywhere.
+            var shared = scene.Host.Browser();
+            shared.DefaultRequestHeaders.Authorization = new("Bearer", AdminHost.Token);
+            Assert.Equal(HttpStatusCode.Conflict, (await shared.DeleteAsync(Url("/api/v1/device"))).StatusCode);
+            Assert.Equal(HttpStatusCode.Unauthorized, (await scene.Host.Browser().DeleteAsync(Url("/api/v1/device"))).StatusCode);
+            Assert.Equal(HttpStatusCode.OK, (await shared.GetAsync(Url("/api/v1/sync/pull"))).StatusCode);
+        }
     }
 }

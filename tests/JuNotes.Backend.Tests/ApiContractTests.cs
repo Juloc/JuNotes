@@ -71,7 +71,9 @@ namespace JuNotes.Backend.Tests
                 var body = await ReadAsync(response);
 
                 Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-                Assert.Equal(["name", "version", "api"], Names(body));
+                // pairing was added for the sign-in of the app (additive: an older app ignores it).
+                Assert.Equal(["name", "version", "api", "pairing"], Names(body));
+                Assert.True(body.GetProperty("pairing").GetBoolean());
                 Assert.Equal("JuNotes", body.GetProperty("name").GetString());
                 Assert.Equal(1, body.GetProperty("api").GetInt32());
                 Assert.Matches(@"^\d+\.\d+\.\d+$", body.GetProperty("version").GetString()!);
