@@ -1,7 +1,7 @@
 <Project>
   <PropertyGroup>
     <!-- The version of the app: /api/health shows it, and a release tag (v0.3.0) must equal it (the release workflow checks). -->
-    <Version>0.3.0</Version>
+    <Version>0.4.0</Version>
     <TargetFramework>net11.0</TargetFramework>
     <LangVersion>latest</LangVersion>
     <ImplicitUsings>enable</ImplicitUsings>
